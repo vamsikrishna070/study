@@ -5,7 +5,7 @@ import { cx, Button, Field, inputClass } from '../components/shared.jsx';
 import { GraduationCap } from 'lucide-react';
 
 export default function Register() {
-  const [form, setForm] = useState({ name: '', email: '', password: '', university: '', degree: 'B.Tech', branch: 'CSE', semester: '1' });
+  const [form, setForm] = useState({ name: '', email: '', password: '', confirmPassword: '', university: '', degree: 'B.Tech', branch: 'CSE', semester: '1' });
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { register } = useAuth();
@@ -18,7 +18,14 @@ export default function Register() {
     setError('');
     setIsSubmitting(true);
 
-    const res = await register({ ...form, semester: Number(form.semester) });
+    if (form.password !== form.confirmPassword) {
+      setError('Passwords do not match');
+      setIsSubmitting(false);
+      return;
+    }
+
+    const { confirmPassword, ...payload } = form;
+    const res = await register({ ...payload, semester: Number(form.semester) });
     if (res.success) {
       navigate('/', { replace: true });
     } else {
@@ -54,7 +61,7 @@ export default function Register() {
             <input type="password" required className={inputClass} value={form.password} onChange={e => set('password', e.target.value)} placeholder="Enter Your Password" />
           </Field>
           <Field label="Confirm Password">
-            <input type="password" required className={inputClass} value={form.password} onChange={e => set('password', e.target.value)} placeholder="Confirm Your Password" />
+            <input type="password" required className={inputClass} value={form.confirmPassword} onChange={e => set('confirmPassword', e.target.value)} placeholder="Confirm Your Password" />
           </Field>
 
           <hr className="my-6 border-border" />
