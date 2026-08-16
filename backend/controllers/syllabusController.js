@@ -1,121 +1,339 @@
-import Subject from '../models/Subject.js';
-import Unit from '../models/Unit.js';
-import Topic from '../models/Topic.js';
-import { createRequire } from 'module';
+import Subject from "../models/Subject.js";
+import Unit from "../models/Unit.js";
+import Topic from "../models/Topic.js";
+import { createRequire } from "module";
 const require = createRequire(import.meta.url);
-const pdfParse = require('pdf-parse');
+
+let pdfParse;
+try {
+  const pdfParseModule = require("pdf-parse");
+  pdfParse = pdfParseModule.default || pdfParseModule;
+} catch (error) {
+  console.error("[SyllabusExtract] Failed to load pdf-parse module", {
+    message: error.message,
+    nodeVersion: process.version,
+  });
+}
+
+class HttpError extends Error {
+  constructor(statusCode, message) {
+    super(message);
+    this.statusCode = statusCode;
+  }
+}
+
+const THEORY_SECTION_REGEX = /course\s+uniti[sz]ation\s+plan\s+theory/i;
+const LAB_SECTION_REGEX = /course\s+uniti[sz]ation\s+plan\s+(lab|laboratory)/i;
+const UNIT_LINE_REGEX = /^UNIT\s*(\d+)\s*(.*)$/i;
+
+function parseContactHours(value) {
+  if (!value) return null;
+  const match = value.match(
+    /(?:^|\s)(\d{1,2}(?:\.\d+)?)\s*(?:hours?|hrs?)?\s*$/i,
+  );
+  if (!match) return { stripped: value.trim(), contactHours: null };
+
+  const contactHours = Number(match[1]);
+  if (!Number.isFinite(contactHours) || contactHours > 30) {
+    return { stripped: value.trim(), contactHours: null };
+  }
+
+  const stripped = value.slice(0, match.index).trim();
+  return { stripped, contactHours };
+}
+
+function cleanUnitTitle(value, unitNumber) {
+  const raw = value
+    .replace(/^[-:,.\s]+/, "")
+    .replace(/\s+(?:CLO|CO)\s*\d+(?:\s*,\s*\d+)*$/i, "")
+    .trim();
+  return raw || `Unit ${unitNumber}`;
+}
+
+function cleanTopicText(value) {
+  let topic = value
+    .replace(/[\u2022\u25E6]/g, " ")
+    .replace(/^[-*o]\s+/i, "")
+    .replace(/^\d+[.)\]:-]?\s+/, "")
+    .replace(/\s+(?:CLO|CO)\s*\d+(?:\s*,\s*\d+)*$/i, "")
+    .replace(/\s+\d{1,2}(?:\.\d+)?\s*(?:hours?|hrs?)\s*$/i, "")
+    .replace(/\s+\d{1,2}(?:\.\d+)?\s+\d+(?:\s*,\s*\d+)*$/i, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  if (!topic) return "";
+  if (
+    /^(unit\s*no\.?|topic\s*name|contact\s*hours?|clos?|s\.\s*no\.?|sl\.\s*no\.?)$/i.test(
+      topic,
+    )
+  )
+    return "";
+  if (/^\d+(?:\s*,\s*\d+)*$/.test(topic)) return "";
+  return topic;
+}
+
+function parseSyllabusTheoryUnits(text) {
+  const normalizedLines = text
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+
+  const theoryStart = normalizedLines.findIndex((line) =>
+    THEORY_SECTION_REGEX.test(line),
+  );
+  let theoryLines = normalizedLines;
+
+  if (theoryStart >= 0) {
+    theoryLines = normalizedLines.slice(theoryStart + 1);
+  }
+
+  const labStart = theoryLines.findIndex((line) =>
+    LAB_SECTION_REGEX.test(line),
+  );
+  if (labStart >= 0) {
+    theoryLines = theoryLines.slice(0, labStart);
+  }
+
+  const units = [];
+  let currentUnit = null;
+  let pendingTopic = "";
+
+  const pushPendingTopic = () => {
+    if (!currentUnit || !pendingTopic) return;
+    const cleaned = cleanTopicText(pendingTopic);
+    if (cleaned.length > 2) {
+      currentUnit.topics.push({ name: cleaned });
+    }
+    pendingTopic = "";
+  };
+
+  for (const line of theoryLines) {
+    if (/^total\s+theory\s+contact\s+hours?/i.test(line)) {
+      break;
+    }
+
+    const unitMatch = line.match(UNIT_LINE_REGEX);
+    if (unitMatch) {
+      pushPendingTopic();
+      const unitNumber = Number(unitMatch[1]);
+      const remainder = unitMatch[2]?.trim() || "";
+      const { stripped, contactHours } = parseContactHours(remainder);
+
+      currentUnit = {
+        unitNumber,
+        name: cleanUnitTitle(stripped, unitNumber),
+        contactHours,
+        topics: [],
+      };
+      units.push(currentUnit);
+      continue;
+    }
+
+    if (!currentUnit) continue;
+
+    if (
+      /^(unit\s*no\.?|topic\s*name|contact\s*hours?|clos?|s\.\s*no\.?|sl\.\s*no\.?)$/i.test(
+        line,
+      )
+    ) {
+      continue;
+    }
+
+    const maybeTopic = cleanTopicText(line);
+    if (!maybeTopic) continue;
+
+    const startsNewTopic =
+      /^\d+[.)\]:-]?\s+/.test(line) || /^[-*\u2022]/.test(line);
+    if (startsNewTopic) {
+      pushPendingTopic();
+      pendingTopic = maybeTopic;
+      continue;
+    }
+
+    if (!pendingTopic) {
+      pendingTopic = maybeTopic;
+      continue;
+    }
+
+    pendingTopic = `${pendingTopic} ${maybeTopic}`
+      .replace(/\s{2,}/g, " ")
+      .trim();
+  }
+
+  pushPendingTopic();
+
+  return units.filter((unit) => unit.topics.length > 0);
+}
 
 export async function extractSyllabus(req, res) {
   try {
-    const subject = await Subject.findOne({ _id: req.params.id, user: req.user._id });
-    if (!subject) return res.status(404).json({ success: false, message: 'Subject not found' });
+    const subjectId = req.params.id;
+    const userId = req.user?._id?.toString();
 
-    const { fileData } = req.body;
-    if (!fileData || !fileData.url) {
-      return res.status(400).json({ success: false, message: 'Syllabus file data is required' });
-    }
+    console.info("[SyllabusExtract] Started", { subjectId, userId });
 
-    const response = await fetch(fileData.url);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch PDF from URL: ${response.statusText}`);
-    }
-    const arrayBuffer = await response.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    const subject = await Subject.findOne({
+      _id: subjectId,
+      user: req.user._id,
+    });
+    if (!subject)
+      return res
+        .status(404)
+        .json({ success: false, message: "Subject not found" });
 
-    const pdfData = await pdfParse(buffer);
-    const text = pdfData.text;
-
-    if (!text || text.trim().length < 50) {
-      return res.status(422).json({ 
-        success: false, 
-        message: 'This PDF appears to be scanned or image-based.',
-        scanned: true
+    const syllabusFile = subject.syllabusFile || {};
+    if (!syllabusFile.url) {
+      return res.status(400).json({
+        success: false,
+        message: "Syllabus PDF has not been uploaded for this subject.",
       });
     }
 
-    // Parsing Logic tailored for SRM AP
-    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-    const units = [];
-    let currentUnit = null;
-    let pendingTopic = '';
-
-    const pushPendingTopic = () => {
-      if (pendingTopic && currentUnit) {
-        let cleaned = pendingTopic.replace(/[\d\s,]+$/, '').trim(); // remove trailing metadata "3 3 1,2"
-        cleaned = cleaned.replace(/^[-•*o]\s*/, '').trim(); // remove leading dashes
-        if (cleaned.length > 2) {
-          currentUnit.topics.push({ name: cleaned });
-        }
-        pendingTopic = '';
-      }
-    };
-
-    const unitRegex = /^UNIT\s+(\d+)(?:\s*(?:—|-|:)\s*(.*))?/i;
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-
-      if (line.match(/Course Utilization Plan – Lab/i) || line.match(/Total theory contact hours/i) || line.match(/Total Contact Hours/i)) {
-        break; // Stop parsing at Lab or end of Theory
-      }
-
-      const unitMatch = line.match(unitRegex);
-      if (unitMatch) {
-        pushPendingTopic();
-        const uNum = unitMatch[1];
-        let uName = unitMatch[2] ? unitMatch[2].trim() : '';
-        
-        if (!uName && i + 1 < lines.length && !lines[i+1].match(unitRegex) && !lines[i+1].match(/contact hours/i)) {
-          uName = lines[i+1];
-        }
-
-        currentUnit = {
-          name: `UNIT ${uNum} - ${uName || 'Title'}`,
-          topics: []
-        };
-        units.push(currentUnit);
-        continue;
-      }
-
-      if (currentUnit) {
-        if (line.match(/contact hours/i) || line.match(/^Topics:/i) || line.match(/Unit No./i) || line.match(/CLOs/i)) {
-          continue; // ignore table headers and metadata
-        }
-
-        const isNewTopic = line.match(/^[-•*o]/);
-        if (isNewTopic) {
-          pushPendingTopic();
-          pendingTopic = line;
-        } else {
-          if (!pendingTopic) {
-            pendingTopic = line;
-          } else {
-            pendingTopic += ' ' + line;
-          }
-        }
-      }
+    if (
+      syllabusFile.mimeType &&
+      !syllabusFile.mimeType.toLowerCase().includes("pdf")
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Uploaded file is not a PDF.",
+      });
     }
-    pushPendingTopic();
+
+    if (!pdfParse || typeof pdfParse !== "function") {
+      throw new HttpError(500, "PDF parser is unavailable on server.");
+    }
+
+    console.info("[SyllabusExtract] Syllabus file metadata", {
+      subjectId,
+      hasUrl: Boolean(syllabusFile.url),
+      publicId: syllabusFile.publicId || "",
+      originalName: syllabusFile.originalName || "",
+      mimeType: syllabusFile.mimeType || "",
+    });
+
+    let response;
+    try {
+      response = await fetch(syllabusFile.url);
+    } catch (error) {
+      console.error("[SyllabusExtract] PDF fetch request failed", {
+        subjectId,
+        message: error.message,
+      });
+      throw new HttpError(502, "Could not download syllabus PDF from storage.");
+    }
+
+    const contentType = response.headers.get("content-type") || "";
+    const contentLength = response.headers.get("content-length") || "unknown";
+
+    console.info("[SyllabusExtract] PDF fetch response", {
+      subjectId,
+      ok: response.ok,
+      status: response.status,
+      statusText: response.statusText,
+      contentType,
+      contentLength,
+    });
+
+    if (!response.ok) {
+      throw new HttpError(
+        502,
+        `Could not download syllabus PDF from storage. (${response.status} ${response.statusText})`,
+      );
+    }
+
+    if (!contentType.toLowerCase().includes("application/pdf")) {
+      throw new HttpError(400, "Uploaded file is not a PDF.");
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    if (!buffer.length) {
+      throw new HttpError(502, "Could not download syllabus PDF from storage.");
+    }
+
+    const signature = buffer.subarray(0, 4).toString("utf8");
+    if (signature !== "%PDF") {
+      throw new HttpError(400, "Uploaded file is not a PDF.");
+    }
+
+    let pdfData;
+    try {
+      pdfData = await pdfParse(buffer);
+    } catch (error) {
+      console.error("[SyllabusExtract] pdf-parse failed", {
+        subjectId,
+        message: error.message,
+        nodeVersion: process.version,
+      });
+      throw new HttpError(500, "Unexpected PDF parsing error.");
+    }
+
+    const text = pdfData?.text || "";
+
+    if (!text || text.trim().length < 50) {
+      return res.status(422).json({
+        success: false,
+        message: "Could not extract readable text from PDF.",
+      });
+    }
+
+    const units = parseSyllabusTheoryUnits(text);
 
     if (units.length === 0) {
-      return res.status(422).json({ success: false, message: 'Could not detect syllabus structure from this PDF.' });
+      return res.status(422).json({
+        success: false,
+        message: "Could not detect syllabus structure from this PDF.",
+      });
     }
+
+    console.info("[SyllabusExtract] Completed", {
+      subjectId,
+      unitCount: units.length,
+      topicCount: units.reduce((sum, unit) => sum + unit.topics.length, 0),
+    });
 
     res.json({ success: true, data: { units } });
   } catch (error) {
-    console.error('Syllabus extraction error:', error);
-    res.status(500).json({ success: false, message: 'Failed to extract syllabus' });
+    if (error instanceof HttpError) {
+      console.error("[SyllabusExtract] Handled failure", {
+        statusCode: error.statusCode,
+        message: error.message,
+      });
+      return res
+        .status(error.statusCode)
+        .json({ success: false, message: error.message });
+    }
+
+    console.error("[SyllabusExtract] Unexpected failure", {
+      message: error.message,
+      stack: error.stack,
+      nodeVersion: process.version,
+    });
+    return res.status(500).json({
+      success: false,
+      message: "Failed to extract syllabus due to an unexpected server error.",
+    });
   }
 }
 
 export async function confirmSyllabus(req, res) {
   try {
-    const subject = await Subject.findOne({ _id: req.params.id, user: req.user._id });
-    if (!subject) return res.status(404).json({ success: false, message: 'Subject not found' });
+    const subject = await Subject.findOne({
+      _id: req.params.id,
+      user: req.user._id,
+    });
+    if (!subject)
+      return res
+        .status(404)
+        .json({ success: false, message: "Subject not found" });
 
     const { units } = req.body;
     if (!units || !Array.isArray(units)) {
-      return res.status(400).json({ success: false, message: 'Units array is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: "Units array is required" });
     }
 
     // Insert Units and Topics
@@ -126,7 +344,7 @@ export async function confirmSyllabus(req, res) {
         user: req.user._id,
         subject: subject._id,
         title: u.name,
-        order: unitOrder
+        order: unitOrder,
       });
 
       if (u.topics && Array.isArray(u.topics)) {
@@ -138,17 +356,19 @@ export async function confirmSyllabus(req, res) {
             subject: subject._id,
             unit: unitDoc._id,
             title: t.name,
-            status: 'not-started',
-            importance: 'medium',
-            order: topicOrder
+            status: "not-started",
+            importance: "medium",
+            order: topicOrder,
           });
         }
       }
     }
 
-    res.json({ success: true, message: 'Syllabus successfully saved' });
+    res.json({ success: true, message: "Syllabus successfully saved" });
   } catch (error) {
-    console.error('Confirm error:', error);
-    res.status(500).json({ success: false, message: 'Failed to save syllabus' });
+    console.error("Confirm error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to save syllabus" });
   }
 }
