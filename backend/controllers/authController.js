@@ -10,6 +10,8 @@ const publicUser = (user) => ({
   branch: user.branch,
   batch: user.batch,
   semester: user.semester,
+  profileImageUrl: user.profileImageUrl,
+  profileImagePublicId: user.profileImagePublicId,
   notificationPreferences: user.notificationPreferences,
 });
 
@@ -37,7 +39,7 @@ export async function me(req, res) {
 }
 
 export async function updateProfile(req, res) {
-  const { name, university, degree, branch, batch, semester } = req.body;
+  const { name, university, degree, branch, batch, semester, profileImageUrl, profileImagePublicId } = req.body;
   const user = await User.findById(req.user._id);
   if (!user) return res.status(404).json({ success: false, message: 'User not found' });
   
@@ -47,6 +49,8 @@ export async function updateProfile(req, res) {
   if (branch !== undefined) user.branch = branch;
   if (batch !== undefined) user.batch = batch;
   if (semester !== undefined) user.semester = semester;
+  if (profileImageUrl !== undefined) user.profileImageUrl = profileImageUrl;
+  if (profileImagePublicId !== undefined) user.profileImagePublicId = profileImagePublicId;
 
   await user.save();
   res.json({ success: true, data: publicUser(user) });

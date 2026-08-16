@@ -10,6 +10,8 @@ const userSchema = new mongoose.Schema({
   branch: { type: String, trim: true, default: '' },
   batch: { type: String, trim: true, default: '' },
   semester: { type: Number, min: 1, max: 12, default: 1 },
+  profileImageUrl: { type: String, default: '' },
+  profileImagePublicId: { type: String, default: '' },
   notificationPreferences: {
     email: { type: Boolean, default: true },
     push: { type: Boolean, default: true },

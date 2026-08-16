@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
-import { Moon, Sun, Trophy, ToggleLeft, ToggleRight } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
+import { Moon, Sun, Trophy, ToggleLeft, ToggleRight, Camera, X } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
-import { useSubscribePush } from "../services/apiHooks.js";
+import { useSubscribePush, uploadFile } from "../services/apiHooks.js";
 import Shell from "../components/Shell.jsx";
 import {
   Button,
@@ -17,6 +17,7 @@ export default function SettingsPage() {
   );
   const { user, logout, updateProfile } = useAuth();
   const subscribePush = useSubscribePush();
+  const fileInputRef = useRef(null);
 
   const [form, setForm] = useState({
     name: user?.name || "",
@@ -25,6 +26,10 @@ export default function SettingsPage() {
     branch: user?.branch || "",
     semester: String(user?.semester || "1"),
   });
+
+  const [profileImageUrl, setProfileImageUrl] = useState(user?.profileImageUrl || "");
+  const [profileImagePublicId, setProfileImagePublicId] = useState(user?.profileImagePublicId || "");
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const [saved, setSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -39,10 +44,35 @@ export default function SettingsPage() {
     localStorage.setItem("study-arena-theme", next ? "dark" : "light");
   };
 
+  const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingImage(true);
+    try {
+      const data = await uploadFile(file);
+      setProfileImageUrl(data.url);
+      setProfileImagePublicId(data.publicId);
+    } catch (err) {
+      alert("Failed to upload image. Please try again.");
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setProfileImageUrl("");
+    setProfileImagePublicId("");
+  };
+
   const save = async (e) => {
     e.preventDefault();
     setIsSaving(true);
-    const data = { ...form, semester: Number(form.semester) };
+    const data = { 
+      ...form, 
+      semester: Number(form.semester),
+      profileImageUrl,
+      profileImagePublicId
+    };
     const res = await updateProfile(data);
     if (res.success) {
       setSaved(true);
@@ -85,19 +115,48 @@ export default function SettingsPage() {
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="space-y-6">
           <section className="rounded-2xl border border-card-border bg-card p-6 sm:p-8">
-            <div className="flex items-start gap-4">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary font-display text-xl text-primary-foreground">
-                {user?.name
-                  ?.split(" ")
-                  .map((p) => p[0])
-                  .join("")
-                  .slice(0, 2)}
+            <div className="flex items-start gap-5">
+              <div className="relative group">
+                {profileImageUrl ? (
+                  <div className="h-16 w-16 overflow-hidden rounded-full border-2 border-border">
+                    <img src={profileImageUrl} alt="Profile" className="h-full w-full object-cover" />
+                  </div>
+                ) : (
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary font-display text-xl text-primary-foreground">
+                    {user?.name?.split(" ").map((p) => p[0]).join("").slice(0, 2)}
+                  </div>
+                )}
+                
+                <div 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="absolute inset-0 flex cursor-pointer items-center justify-center rounded-full bg-black/40 opacity-0 transition-opacity group-hover:opacity-100"
+                >
+                  <Camera size={20} className="text-white" />
+                </div>
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  onChange={handleImageUpload} 
+                  accept="image/jpeg, image/png, image/webp" 
+                  className="hidden" 
+                />
               </div>
-              <div>
+
+              <div className="flex-1">
                 <h2 className="font-display text-2xl">Profile</h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  A little context for a more personal workspace.
-                </p>
+                <div className="mt-1 flex items-center gap-3">
+                  <p className="text-sm text-muted-foreground">
+                    {uploadingImage ? "Uploading..." : "A little context for a more personal workspace."}
+                  </p>
+                  {profileImageUrl && !uploadingImage && (
+                    <button 
+                      onClick={handleRemoveImage}
+                      className="text-xs font-semibold text-destructive hover:underline"
+                    >
+                      Remove picture
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
             <form onSubmit={save} className="mt-7 space-y-5">

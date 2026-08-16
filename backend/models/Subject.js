@@ -12,6 +12,13 @@ const subjectSchema = new mongoose.Schema({
   progress: { type: Number, min: 0, max: 100, default: 0 },
   targetGrade: { type: String, trim: true, default: '' },
   color: { type: String, default: '#d46c52' },
+  syllabusFile: {
+    url: { type: String, default: '' },
+    publicId: { type: String, default: '' },
+    originalName: { type: String, default: '' },
+    mimeType: { type: String, default: '' },
+    size: { type: Number, default: 0 },
+  },
 }, { timestamps: true });
 
 subjectSchema.index({ user: 1, code: 1 }, { unique: true });

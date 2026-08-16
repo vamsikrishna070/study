@@ -10,6 +10,7 @@ import reminderRoutes from './reminderRoutes.js';
 import resourceRoutes from './resourceRoutes.js';
 import studySessionRoutes from './studySessionRoutes.js';
 import subjectRoutes from './subjectRoutes.js';
+import syllabusRoutes from './syllabusRoutes.js';
 import taskRoutes from './taskRoutes.js';
 import topicRoutes from './topicRoutes.js';
 import unitRoutes from './unitRoutes.js';
@@ -33,6 +34,7 @@ router.get('/health', (_req, res) => {
 router.use('/auth', authRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/subjects', subjectRoutes);
+router.use('/subjects/:id/syllabus', syllabusRoutes);
 router.use('/units', unitRoutes);
 router.use('/topics', topicRoutes);
 router.use('/notes', noteRoutes);

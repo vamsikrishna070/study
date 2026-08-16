@@ -10,6 +10,7 @@ import Register from './pages/Register.jsx';
 import { DashboardPage } from './pages/DashboardPage.jsx';
 import { SubjectsPage } from './pages/SubjectsPage.jsx';
 import SubjectDetail from './pages/SubjectDetail.jsx';
+import Syllabus from './pages/Syllabus.jsx';
 import { NotesPage } from './pages/NotesPage.jsx';
 import { TasksPage } from './pages/TasksPage.jsx';
 import ExamsPage from './pages/ExamsPage.jsx';
@@ -32,6 +33,7 @@ function Router() {
     <Route path="/" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
     <Route path="/subjects" element={<ProtectedRoute><SubjectsPage /></ProtectedRoute>} />
     <Route path="/subjects/:id" element={<ProtectedRoute><SubjectDetail /></ProtectedRoute>} />
+    <Route path="/syllabus" element={<ProtectedRoute><Syllabus /></ProtectedRoute>} />
     <Route path="/study-session" element={<ProtectedRoute><StudySession /></ProtectedRoute>} />
     <Route path="/recordings" element={<ProtectedRoute><Recordings /></ProtectedRoute>} />
     <Route path="/reminders" element={<ProtectedRoute><Reminders /></ProtectedRoute>} />
