@@ -4,15 +4,45 @@ import Topic from "../models/Topic.js";
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 
-let pdfParse;
+let pdfParseLegacy;
+let PDFParseClass;
 try {
   const pdfParseModule = require("pdf-parse");
-  pdfParse = pdfParseModule.default || pdfParseModule;
+  if (typeof pdfParseModule === "function") {
+    pdfParseLegacy = pdfParseModule;
+  }
+  if (typeof pdfParseModule?.default === "function") {
+    pdfParseLegacy = pdfParseModule.default;
+  }
+  if (typeof pdfParseModule?.PDFParse === "function") {
+    PDFParseClass = pdfParseModule.PDFParse;
+  }
 } catch (error) {
   console.error("[SyllabusExtract] Failed to load pdf-parse module", {
     message: error.message,
     nodeVersion: process.version,
   });
+}
+
+async function parsePdfText(buffer) {
+  if (typeof pdfParseLegacy === "function") {
+    const parsed = await pdfParseLegacy(buffer);
+    return parsed?.text || "";
+  }
+
+  if (typeof PDFParseClass === "function") {
+    const parser = new PDFParseClass({ data: buffer });
+    try {
+      const parsed = await parser.getText();
+      return parsed?.text || "";
+    } finally {
+      if (typeof parser.destroy === "function") {
+        await parser.destroy();
+      }
+    }
+  }
+
+  throw new Error("Unsupported pdf-parse API shape.");
 }
 
 class HttpError extends Error {
@@ -27,7 +57,7 @@ const LAB_SECTION_REGEX = /course\s+uniti[sz]ation\s+plan\s+(lab|laboratory)/i;
 const UNIT_LINE_REGEX = /^UNIT\s*(\d+)\s*(.*)$/i;
 
 function parseContactHours(value) {
-  if (!value) return null;
+  if (!value) return { stripped: "", contactHours: null };
   const match = value.match(
     /(?:^|\s)(\d{1,2}(?:\.\d+)?)\s*(?:hours?|hrs?)?\s*$/i,
   );
@@ -190,9 +220,11 @@ export async function extractSyllabus(req, res) {
       });
     }
 
+    const storedMimeType = (syllabusFile.mimeType || "").toLowerCase();
     if (
-      syllabusFile.mimeType &&
-      !syllabusFile.mimeType.toLowerCase().includes("pdf")
+      storedMimeType &&
+      !storedMimeType.includes("pdf") &&
+      !storedMimeType.includes("octet-stream")
     ) {
       return res.status(400).json({
         success: false,
@@ -200,7 +232,7 @@ export async function extractSyllabus(req, res) {
       });
     }
 
-    if (!pdfParse || typeof pdfParse !== "function") {
+    if (!pdfParseLegacy && !PDFParseClass) {
       throw new HttpError(500, "PDF parser is unavailable on server.");
     }
 
@@ -242,9 +274,11 @@ export async function extractSyllabus(req, res) {
       );
     }
 
-    if (!contentType.toLowerCase().includes("application/pdf")) {
-      throw new HttpError(400, "Uploaded file is not a PDF.");
-    }
+    const normalizedContentType = contentType.toLowerCase();
+    const contentTypeLooksPdfLike =
+      normalizedContentType.includes("application/pdf") ||
+      normalizedContentType.includes("application/octet-stream") ||
+      normalizedContentType.includes("binary/octet-stream");
 
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
@@ -255,22 +289,27 @@ export async function extractSyllabus(req, res) {
 
     const signature = buffer.subarray(0, 4).toString("utf8");
     if (signature !== "%PDF") {
+      if (!contentTypeLooksPdfLike) {
+        throw new HttpError(
+          502,
+          `Could not download syllabus PDF from storage. Received content type: ${contentType || "unknown"}.`,
+        );
+      }
       throw new HttpError(400, "Uploaded file is not a PDF.");
     }
 
-    let pdfData;
+    let text = "";
     try {
-      pdfData = await pdfParse(buffer);
+      text = await parsePdfText(buffer);
     } catch (error) {
       console.error("[SyllabusExtract] pdf-parse failed", {
         subjectId,
         message: error.message,
         nodeVersion: process.version,
+        parserMode: pdfParseLegacy ? "legacy-function" : "v2-class",
       });
       throw new HttpError(500, "Unexpected PDF parsing error.");
     }
-
-    const text = pdfData?.text || "";
 
     if (!text || text.trim().length < 50) {
       return res.status(422).json({
