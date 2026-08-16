@@ -1,66 +1,10 @@
 import { useState, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { UploadCloud, X, FileText, Image as ImageIcon, Video, Music, File, ExternalLink, Youtube } from 'lucide-react';
+import { UploadCloud, Mic } from 'lucide-react';
 import { getGetNotesQueryKey, getGetDashboardQueryKey, useCreateNote, useUpdateNote, useGetSubjects, uploadFile } from '../../services/apiHooks.js';
 import { Button, Field, Modal, cx, inputClass } from '../shared.jsx';
-
-function AttachmentIcon({ mimeType }) {
-  if (mimeType?.startsWith('image/')) return <ImageIcon size={16} />;
-  if (mimeType?.startsWith('video/')) return <Video size={16} />;
-  if (mimeType?.startsWith('audio/')) return <Music size={16} />;
-  if (mimeType === 'application/pdf') return <FileText size={16} />;
-  if (mimeType?.includes('youtube')) return <Youtube size={16} />;
-  return <File size={16} />;
-}
-
-function AttachmentPreview({ attachment, onRemove }) {
-  const isImage = attachment.mimeType?.startsWith('image/');
-  const isAudio = attachment.mimeType?.startsWith('audio/');
-  const isVideo = attachment.mimeType?.startsWith('video/');
-  const isYouTube = attachment.mimeType === 'video/youtube';
-  const size = attachment.size ? `${Math.round(attachment.size / 1024)} KB` : '';
-
-  return (
-    <div className="relative overflow-hidden rounded-xl border border-border bg-muted/20">
-      {isImage && (
-        <div className="aspect-video w-full overflow-hidden bg-muted">
-          <img src={attachment.url} alt={attachment.originalName} className="h-full w-full object-cover" />
-        </div>
-      )}
-      {isAudio && (
-        <div className="p-3">
-          <audio controls src={attachment.url} className="w-full" />
-        </div>
-      )}
-      {isVideo && (
-        <div className="aspect-video w-full overflow-hidden bg-black">
-          <video controls src={attachment.url} className="h-full w-full" />
-        </div>
-      )}
-      <div className="flex items-center gap-3 px-3 py-2.5">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground">
-          <AttachmentIcon mimeType={attachment.mimeType} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-xs font-semibold">{attachment.originalName}</p>
-          {size && <p className="text-[10px] text-muted-foreground">{size}</p>}
-        </div>
-        <div className="flex items-center gap-1">
-          {!isAudio && !isVideo && attachment.url && (
-            <a href={attachment.url} target="_blank" rel="noopener noreferrer" className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
-              <ExternalLink size={13} />
-            </a>
-          )}
-          {onRemove && (
-            <button type="button" onClick={onRemove} className="rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive">
-              <X size={13} />
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
+import VoiceRecorder from '../shared/VoiceRecorder.jsx';
+import AttachmentCard from '../shared/AttachmentCard.jsx';
 
 export default function NoteModal({ initial, onClose }) {
   const qc = useQueryClient();
@@ -69,9 +13,11 @@ export default function NoteModal({ initial, onClose }) {
   const subjectsQuery = useGetSubjects();
   const subjects = subjectsQuery.data || [];
   const fileInputRef = useRef(null);
+  
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [youtubeUrl, setYoutubeUrl] = useState('');
+  const [recordingMode, setRecordingMode] = useState(false);
 
   const [form, setForm] = useState({
     title: initial?.title || '',
@@ -90,11 +36,33 @@ export default function NoteModal({ initial, onClose }) {
     try {
       const data = await uploadFile(file);
       setAttachments(prev => [...prev, {
+        type: 'file',
         url: data.url,
         publicId: data.publicId,
         originalName: data.originalName || file.name,
         mimeType: file.type,
         size: file.size,
+      }]);
+    } catch {
+      alert('Upload failed. Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleRecordingSave = async ({ file, title, duration, type }) => {
+    setRecordingMode(false);
+    setUploading(true);
+    try {
+      const data = await uploadFile(file);
+      setAttachments(prev => [...prev, {
+        type,
+        url: data.url,
+        publicId: data.publicId,
+        originalName: title,
+        mimeType: file.type,
+        size: file.size,
+        duration
       }]);
     } catch {
       alert('Upload failed. Please try again.');
@@ -119,6 +87,7 @@ export default function NoteModal({ initial, onClose }) {
   const addYouTube = () => {
     if (!youtubeUrl.trim()) return;
     setAttachments(prev => [...prev, {
+      type: 'youtube',
       url: youtubeUrl.trim(),
       publicId: '',
       originalName: 'YouTube Video',
@@ -167,12 +136,10 @@ export default function NoteModal({ initial, onClose }) {
       }
     >
       <div className="space-y-5">
-        {/* Row 1: Title */}
         <Field label="Title">
           <input required className={inputClass} value={form.title} onChange={e => set('title', e.target.value)} placeholder="The idea you want to remember" data-testid="input-note-title" />
         </Field>
 
-        {/* Row 2: Subject + Topic */}
         <div className="grid gap-5 sm:grid-cols-2">
           <Field label="Subject">
             <select required className={inputClass} value={form.subjectId} onChange={e => set('subjectId', e.target.value)} data-testid="select-note-subject">
@@ -185,7 +152,6 @@ export default function NoteModal({ initial, onClose }) {
           </Field>
         </div>
 
-        {/* Row 3: Priority + Tags */}
         <div className="grid gap-5 sm:grid-cols-2">
           <Field label="Priority">
             <select className={inputClass} value={form.priority} onChange={e => set('priority', e.target.value)} data-testid="select-note-priority">
@@ -200,7 +166,6 @@ export default function NoteModal({ initial, onClose }) {
           </Field>
         </div>
 
-        {/* Note content */}
         <Field label="Note content">
           <textarea
             required
@@ -212,48 +177,57 @@ export default function NoteModal({ initial, onClose }) {
           />
         </Field>
 
-        {/* Attachments */}
-        <div className="space-y-3">
-          <span className="block text-xs font-bold uppercase tracking-[.12em] text-muted-foreground">Attachments</span>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between border-b border-border pb-2">
+            <span className="text-xs font-bold uppercase tracking-[.12em] text-muted-foreground">Attachments</span>
+            <div className="flex gap-2">
+              <Button type="button" variant="quiet" onClick={() => fileInputRef.current?.click()} className="h-8 gap-1.5 px-3 py-0 text-xs">
+                <UploadCloud size={14} /> Upload File
+              </Button>
+              <Button type="button" variant="quiet" onClick={() => setRecordingMode(true)} className="h-8 gap-1.5 px-3 py-0 text-xs">
+                <Mic size={14} /> Record Voice
+              </Button>
+            </div>
+            <input type="file" className="hidden" ref={fileInputRef} onChange={handleFileChange} multiple />
+          </div>
 
-          {/* Existing attachments */}
-          {attachments.length > 0 && (
-            <div className="grid gap-3 sm:grid-cols-2">
+          {recordingMode && (
+            <VoiceRecorder onSave={handleRecordingSave} onCancel={() => setRecordingMode(false)} />
+          )}
+
+          {uploading && !recordingMode && (
+            <div className="flex items-center justify-center gap-2 rounded-xl border border-border bg-muted/10 p-4">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+              <span className="text-sm font-semibold text-accent">Uploading…</span>
+            </div>
+          )}
+
+          {dragOver && (
+            <div
+              onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={handleDrop}
+              className="flex h-32 flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-accent bg-accent/5 text-center transition-colors"
+            >
+              <UploadCloud size={24} className="text-accent" />
+              <span className="font-semibold text-accent">Drop files here</span>
+            </div>
+          )}
+
+          {!dragOver && attachments.length > 0 && (
+            <div className="flex flex-col gap-2">
               {attachments.map((att, i) => (
-                <AttachmentPreview key={i} attachment={att} onRemove={() => removeAttachment(i)} />
+                <AttachmentCard key={i} attachment={att} onRemove={() => removeAttachment(i)} />
               ))}
             </div>
           )}
 
-          {/* Upload zone */}
-          <div
-            onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={handleDrop}
-            onClick={() => fileInputRef.current?.click()}
-            className={cx(
-              'flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-6 py-6 text-center transition-colors',
-              dragOver ? 'border-accent bg-accent/5' : 'border-border bg-muted/10 hover:border-accent/50 hover:bg-muted/30',
-              uploading && 'pointer-events-none opacity-50'
-            )}
-          >
-            <input type="file" className="hidden" ref={fileInputRef} onChange={handleFileChange} multiple />
-            {uploading ? (
-              <div className="flex items-center gap-2">
-                <div className="h-5 w-5 animate-spin rounded-full border-2 border-accent border-t-transparent" />
-                <span className="text-sm font-semibold text-accent">Uploading…</span>
-              </div>
-            ) : (
-              <>
-                <UploadCloud size={20} className="text-muted-foreground" />
-                <span className="text-sm font-semibold">+ Add attachment</span>
-                <span className="text-xs text-muted-foreground">PDF • PPT • DOC • Image • Audio • Video</span>
-              </>
-            )}
-          </div>
+          <div 
+            className="hidden h-1" 
+            onDragOver={e => { e.preventDefault(); setDragOver(true); }} 
+          />
 
-          {/* YouTube URL */}
-          <div className="flex gap-2">
+          <div className="flex gap-2 pt-2">
             <input
               className={cx(inputClass, 'flex-1 text-sm')}
               value={youtubeUrl}
@@ -264,6 +238,10 @@ export default function NoteModal({ initial, onClose }) {
             <Button type="button" variant="quiet" onClick={addYouTube} disabled={!youtubeUrl.trim()}>
               Add
             </Button>
+          </div>
+          
+          <div className="text-center text-[10px] text-muted-foreground">
+            Supported types: PDF • PPT • DOC • Images • Audio • Video • Voice Recordings
           </div>
         </div>
       </div>

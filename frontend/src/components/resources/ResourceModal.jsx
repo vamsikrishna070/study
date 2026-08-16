@@ -1,31 +1,17 @@
 import { useState, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { UploadCloud, FileText, Image as ImageIcon, Video, Music, File, X, ExternalLink, Youtube } from 'lucide-react';
+import { UploadCloud } from 'lucide-react';
 import { getGetResourcesQueryKey, useCreateResource, useGetSubjects, uploadFile } from '../../services/apiHooks.js';
 import { Button, Field, Modal, cx, inputClass } from '../shared.jsx';
+import VoiceRecorder from '../shared/VoiceRecorder.jsx';
+import AttachmentCard from '../shared/AttachmentCard.jsx';
 
 const RESOURCE_TYPES = [
-  { value: 'Link', label: 'Web Link' },
-  { value: 'YouTube', label: 'YouTube Video' },
-  { value: 'Document', label: 'PDF / Document' },
-  { value: 'Presentation', label: 'Presentation' },
-  { value: 'Image', label: 'Image' },
-  { value: 'Audio', label: 'Audio' },
-  { value: 'Video', label: 'Video' },
-  { value: 'Other', label: 'Other File' },
+  { value: 'link', label: 'Web Link' },
+  { value: 'youtube', label: 'YouTube Video' },
+  { value: 'file', label: 'File Upload' },
+  { value: 'recording', label: 'Voice Recording' },
 ];
-
-const FILE_TYPES = ['Document', 'Presentation', 'Image', 'Audio', 'Video', 'Other'];
-const LINK_TYPES = ['Link', 'YouTube'];
-
-function FileIcon({ mimeType, type }) {
-  if (mimeType?.startsWith('image/') || type === 'Image') return <ImageIcon size={24} />;
-  if (mimeType?.startsWith('video/') || type === 'Video') return <Video size={24} />;
-  if (mimeType?.startsWith('audio/') || type === 'Audio') return <Music size={24} />;
-  if (type === 'YouTube') return <Youtube size={24} />;
-  if (mimeType === 'application/pdf' || type === 'Document') return <FileText size={24} />;
-  return <File size={24} />;
-}
 
 export default function ResourceModal({ onClose }) {
   const qc = useQueryClient();
@@ -39,7 +25,7 @@ export default function ResourceModal({ onClose }) {
   const [form, setForm] = useState({
     title: '',
     url: '',
-    resourceType: 'Link',
+    resourceType: 'link',
     subjectId: '',
     topic: '',
     description: '',
@@ -48,23 +34,25 @@ export default function ResourceModal({ onClose }) {
     tags: ''
   });
   const [fileData, setFileData] = useState(null);
+  const [recordingDuration, setRecordingDuration] = useState(0);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-  const isFileType = FILE_TYPES.includes(form.resourceType);
-  const isLinkType = LINK_TYPES.includes(form.resourceType);
+
+  const isLinkType = form.resourceType === 'link' || form.resourceType === 'youtube';
+  const isFileType = form.resourceType === 'file';
+  const isRecordingType = form.resourceType === 'recording';
 
   const processFile = async (file) => {
     setUploading(true);
     try {
       const data = await uploadFile(file);
-      setFileData(data);
+      setFileData({
+        ...data,
+        mimeType: file.type,
+        size: file.size,
+        originalName: data.originalName || file.name,
+      });
       if (!form.title) set('title', file.name.replace(/\.[^.]+$/, ''));
-      if (file.type.startsWith('image/')) set('resourceType', 'Image');
-      else if (file.type.startsWith('video/')) set('resourceType', 'Video');
-      else if (file.type.startsWith('audio/')) set('resourceType', 'Audio');
-      else if (file.type === 'application/pdf') set('resourceType', 'Document');
-      else if (file.type.includes('presentation') || file.type.includes('powerpoint')) set('resourceType', 'Presentation');
-      else set('resourceType', 'Other');
     } catch {
       alert('Upload failed. Please try again.');
     } finally {
@@ -84,14 +72,42 @@ export default function ResourceModal({ onClose }) {
     if (file) processFile(file);
   };
 
+  const handleRecordingSave = async ({ file, title, duration }) => {
+    setUploading(true);
+    try {
+      const data = await uploadFile(file);
+      setFileData({
+        ...data,
+        mimeType: file.type,
+        size: file.size,
+        originalName: title,
+        duration,
+      });
+      setRecordingDuration(duration);
+      if (!form.title) set('title', title);
+    } catch {
+      alert('Upload failed. Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const submit = (e) => {
     e.preventDefault();
     const data = {
       ...form,
+      resourceType: form.resourceType,
       rating: Number(form.rating),
       watched: form.watched === 'true',
       tags: form.tags.split(',').map(t => t.trim()).filter(Boolean),
-      fileData: fileData || undefined,
+      fileData: fileData ? {
+        publicId: fileData.publicId,
+        originalName: fileData.originalName,
+        mimeType: fileData.mimeType,
+        size: fileData.size,
+        duration: fileData.duration || recordingDuration || undefined,
+      } : undefined,
+      url: isLinkType ? form.url : (fileData?.url || ''),
     };
     create.mutate({ data }, {
       onSuccess: () => {
@@ -101,9 +117,12 @@ export default function ResourceModal({ onClose }) {
     });
   };
 
-  const urlLabel = form.resourceType === 'YouTube' ? 'YouTube URL' : 'URL';
-  const urlPlaceholder = form.resourceType === 'YouTube' ? 'https://youtube.com/watch?v=...' : 'https://';
-  const canSubmit = !create.isPending && !uploading && (isLinkType ? form.url : fileData);
+  const canSubmit = !create.isPending && !uploading && form.title && (
+    isLinkType ? form.url : (isFileType || isRecordingType) ? fileData : false
+  );
+
+  const urlLabel = form.resourceType === 'youtube' ? 'YouTube URL' : 'URL';
+  const urlPlaceholder = form.resourceType === 'youtube' ? 'https://youtube.com/watch?v=...' : 'https://';
 
   return (
     <Modal
@@ -131,6 +150,7 @@ export default function ResourceModal({ onClose }) {
                 set('resourceType', e.target.value);
                 setFileData(null);
                 set('url', '');
+                setRecordingDuration(0);
               }}
             >
               {RESOURCE_TYPES.map(t => (
@@ -143,26 +163,26 @@ export default function ResourceModal({ onClose }) {
           </Field>
         </div>
 
-        {/* Row 2: URL (for Link/YouTube) OR File Uploader (for files) */}
-        {isLinkType ? (
+        {/* Row 2: Conditional input based on resource type */}
+        {isLinkType && (
           <Field label={urlLabel}>
             <input required type="url" className={inputClass} value={form.url} onChange={e => set('url', e.target.value)} placeholder={urlPlaceholder} />
           </Field>
-        ) : (
+        )}
+
+        {isFileType && (
           <Field label="File">
             {fileData ? (
-              <div className="flex items-center gap-4 rounded-xl border border-border bg-muted/30 px-4 py-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <FileIcon mimeType={fileData.mimeType} type={form.resourceType} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold">{fileData.originalName}</p>
-                  <p className="text-xs text-muted-foreground">{Math.round(fileData.size / 1024)} KB</p>
-                </div>
-                <button type="button" onClick={() => setFileData(null)} className="shrink-0 rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive">
-                  <X size={16} />
-                </button>
-              </div>
+              <AttachmentCard
+                attachment={{
+                  type: 'file',
+                  originalName: fileData.originalName,
+                  mimeType: fileData.mimeType,
+                  size: fileData.size,
+                  url: fileData.url,
+                }}
+                onRemove={() => setFileData(null)}
+              />
             ) : (
               <div
                 onDragOver={e => { e.preventDefault(); setDragOver(true); }}
@@ -191,6 +211,31 @@ export default function ResourceModal({ onClose }) {
                   </>
                 )}
               </div>
+            )}
+          </Field>
+        )}
+
+        {isRecordingType && (
+          <Field label="Recording">
+            {fileData ? (
+              <AttachmentCard
+                attachment={{
+                  type: 'recording',
+                  originalName: fileData.originalName,
+                  mimeType: fileData.mimeType,
+                  size: fileData.size,
+                  url: fileData.url,
+                  duration: recordingDuration,
+                }}
+                onRemove={() => { setFileData(null); setRecordingDuration(0); }}
+              />
+            ) : uploading ? (
+              <div className="flex items-center justify-center gap-2 rounded-xl border border-border bg-muted/10 p-6">
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+                <span className="text-sm font-semibold text-accent">Uploading recording…</span>
+              </div>
+            ) : (
+              <VoiceRecorder onSave={handleRecordingSave} onCancel={() => set('resourceType', 'link')} />
             )}
           </Field>
         )}

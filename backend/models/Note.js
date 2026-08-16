@@ -10,11 +10,15 @@ const noteSchema = new mongoose.Schema({
   tags: [{ type: String, trim: true }],
   priority: { type: String, enum: ['low', 'medium', 'high', 'exam'], default: 'medium' },
   attachments: [{
+    type: { type: String, default: 'file' }, // 'file', 'recording', 'link', 'youtube', 'image', 'document', 'audio', 'video'
     url: String,
     publicId: String,
     originalName: String,
     mimeType: String,
-    size: Number
+    size: Number,
+    thumbnailUrl: String,
+    duration: Number,
+    metadata: mongoose.Schema.Types.Mixed
   }]
 }, { timestamps: true });
 

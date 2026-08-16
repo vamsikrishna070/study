@@ -13,7 +13,7 @@ import {
 
 export default function SettingsPage() {
   const [dark, setDark] = useState(
-    () => localStorage.getItem("study-arena-theme") === "dark",
+    () => localStorage.getItem("study-arena-theme") === "dark"
   );
   const { user, logout, updateProfile } = useAuth();
   const subscribePush = useSubscribePush();

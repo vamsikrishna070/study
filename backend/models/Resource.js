@@ -5,12 +5,16 @@ const resourceSchema = new mongoose.Schema({
   subject: { type: mongoose.Schema.Types.ObjectId, ref: 'Subject', default: null },
   topic: { type: String, default: '' },
   title: { type: String, required: true, trim: true },
+  resourceType: { type: String, default: 'file' }, // 'file', 'recording', 'link', 'youtube', 'image', 'document', 'audio', 'video'
   url: { type: String, trim: true },
   fileData: {
     publicId: String,
     originalName: String,
     mimeType: String,
-    size: Number
+    size: Number,
+    thumbnailUrl: String,
+    duration: Number,
+    metadata: mongoose.Schema.Types.Mixed
   },
   description: { type: String, default: '' },
   notes: { type: String, default: '' },
