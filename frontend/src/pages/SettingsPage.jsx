@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef } from "react";
-import { Moon, Sun, Trophy, ToggleLeft, ToggleRight, Camera, X } from "lucide-react";
+import { Moon, Sun, Trophy, ToggleLeft, ToggleRight, Camera, Bell, BellOff, ShieldAlert, CheckCircle } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useSubscribePush, uploadFile } from "../services/apiHooks.js";
+import apiClient from "../services/apiClient.js";
 import Shell from "../components/Shell.jsx";
 import {
   Button,
@@ -10,6 +11,19 @@ import {
   cx,
   inputClass,
 } from "../components/shared.jsx";
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
+const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY || "BDRsqjlRFYZJS6XPGnKTa9BmgczZN8WH_p4JtMch3fzVBcEEwMjMN1JeGrYb45XCJpsD-U92BQ8k-2_7Tahzwf4";
 
 export default function SettingsPage() {
   const [dark, setDark] = useState(
@@ -34,6 +48,38 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  // Push notification state
+  const [pushState, setPushState] = useState("loading"); // loading | unsupported | denied | idle | subscribing | enabled | error
+  const [pushError, setPushError] = useState("");
+
+  useEffect(() => {
+    checkPushState();
+  }, []);
+
+  const checkPushState = async () => {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+      setPushState("unsupported");
+      return;
+    }
+    if (Notification.permission === "denied") {
+      setPushState("denied");
+      return;
+    }
+    try {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg) {
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) {
+          setPushState("enabled");
+          return;
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+    setPushState("idle");
+  };
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
@@ -81,28 +127,181 @@ export default function SettingsPage() {
     setIsSaving(false);
   };
 
-  const setupNotifications = async () => {
+  const enableNotifications = async () => {
+    setPushError("");
+    setPushState("subscribing");
+
     try {
+      // Step 1: Check browser support
       if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-        alert("Push notifications are not supported by your browser.");
+        setPushState("unsupported");
         return;
       }
+
+      // Step 2: Request permission
       const perm = await Notification.requestPermission();
-      if (perm !== "granted") return;
+      if (perm === "denied") {
+        setPushState("denied");
+        return;
+      }
+      if (perm !== "granted") {
+        setPushState("idle");
+        setPushError("Notification permission was not granted.");
+        return;
+      }
 
-      const reg = await navigator.serviceWorker.register("/sw.js");
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey:
-          "BDRsqjlRFYZJS6XPGnKTa9BmgczZN8WH_p4JtMch3fzVBcEEwMjMN1JeGrYb45XCJpsD-U92BQ8k-2_7Tahzwf4", // Public VAPID Key from backend env
-      });
+      // Step 3: Register service worker
+      let reg;
+      try {
+        reg = await navigator.serviceWorker.register("/sw.js");
+        await navigator.serviceWorker.ready;
+      } catch (swErr) {
+        console.error("Service Worker registration failed:", swErr);
+        setPushState("error");
+        setPushError("Service Worker could not be registered. Make sure you are on HTTPS.");
+        return;
+      }
 
-      await subscribePush.mutateAsync(sub.toJSON());
-      alert("Push notifications enabled!");
+      // Step 4: Subscribe to push
+      let sub;
+      try {
+        const convertedKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: convertedKey,
+        });
+      } catch (subErr) {
+        console.error("Push subscription failed:", subErr);
+        setPushState("error");
+        setPushError("Push subscription could not be created. The VAPID key may be invalid.");
+        return;
+      }
+
+      // Step 5: Send to backend
+      try {
+        await subscribePush.mutateAsync(sub.toJSON());
+      } catch (apiErr) {
+        console.error("Backend subscription save failed:", apiErr);
+        setPushState("error");
+        setPushError("Unable to save subscription to the server. Check your connection.");
+        return;
+      }
+
+      setPushState("enabled");
     } catch (err) {
-      console.error(err);
-      alert("Failed to enable notifications.");
+      console.error("Unexpected push setup error:", err);
+      setPushState("error");
+      setPushError(err.message || "An unexpected error occurred.");
     }
+  };
+
+  const disableNotifications = async () => {
+    setPushError("");
+    try {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg) {
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) {
+          // Remove from backend
+          try {
+            await apiClient.post("/notifications/unsubscribe", { endpoint: sub.endpoint });
+          } catch (e) {
+            // Backend may not have this endpoint yet; that's ok
+          }
+          await sub.unsubscribe();
+        }
+      }
+      setPushState("idle");
+    } catch (err) {
+      console.error("Disable notifications error:", err);
+      setPushError("Could not disable notifications.");
+    }
+  };
+
+  const renderPushSection = () => {
+    if (pushState === "loading") {
+      return (
+        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+          Checking notification status…
+        </div>
+      );
+    }
+
+    if (pushState === "unsupported") {
+      return (
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
+            <ShieldAlert size={17} className="text-muted-foreground" />
+          </div>
+          <div>
+            <p className="text-sm font-bold">Not Supported</p>
+            <p className="text-xs text-muted-foreground">Push notifications are not supported in this browser.</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (pushState === "denied") {
+      return (
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-destructive/10">
+            <BellOff size={17} className="text-destructive" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-destructive">Blocked</p>
+            <p className="text-xs text-muted-foreground">Notifications are blocked. Enable them in your browser settings.</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (pushState === "enabled") {
+      return (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent/15">
+              <CheckCircle size={17} className="text-accent" />
+            </div>
+            <div>
+              <p className="text-sm font-bold">Enabled</p>
+              <p className="text-xs text-muted-foreground">You'll receive push notifications for reminders.</p>
+            </div>
+          </div>
+          <Button variant="quiet" onClick={disableNotifications} className="h-8 px-3 text-xs">
+            Disable
+          </Button>
+        </div>
+      );
+    }
+
+    // idle, subscribing, or error
+    return (
+      <div>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary">
+              <Bell size={17} />
+            </div>
+            <div>
+              <p className="text-sm font-bold">Push Notifications</p>
+              <p className="text-xs text-muted-foreground">Get reminded when tasks are due</p>
+            </div>
+          </div>
+          <Button
+            variant="quiet"
+            onClick={enableNotifications}
+            disabled={pushState === "subscribing"}
+            className="h-8 px-3 text-xs"
+          >
+            {pushState === "subscribing" ? "Enabling…" : "Enable"}
+          </Button>
+        </div>
+        {pushError && (
+          <p className="mt-3 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">{pushError}</p>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -260,22 +459,8 @@ export default function SettingsPage() {
                 )}
               </button>
             </div>
-            <div className="mt-4 flex items-center justify-between rounded-xl border border-border bg-background p-4">
-              <div className="flex items-center gap-3">
-                <div>
-                  <p className="text-sm font-bold">Push Notifications</p>
-                  <p className="text-xs text-muted-foreground">
-                    Get reminded when tasks are due
-                  </p>
-                </div>
-              </div>
-              <Button
-                variant="quiet"
-                onClick={setupNotifications}
-                className="h-8 px-3 text-xs"
-              >
-                Enable
-              </Button>
+            <div className="mt-4 rounded-xl border border-border bg-background p-4">
+              {renderPushSection()}
             </div>
           </section>
           <section className="rounded-2xl border border-destructive/20 bg-destructive/5 p-6 sm:p-8">
@@ -307,3 +492,4 @@ export default function SettingsPage() {
     </Shell>
   );
 }
+

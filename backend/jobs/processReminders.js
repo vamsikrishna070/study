@@ -43,10 +43,36 @@ async function processReminders() {
       reminder.lastFiredAt = now;
       if (reminder.scheduleType === 'one-time') {
         reminder.enabled = false;
-      } else if (reminder.scheduleType === 'daily') {
-        reminder.remindAt = new Date(reminder.remindAt.getTime() + 24 * 60 * 60 * 1000);
-      } else if (reminder.scheduleType === 'weekly') {
-        reminder.remindAt = new Date(reminder.remindAt.getTime() + 7 * 24 * 60 * 60 * 1000);
+      } else {
+        try {
+          const tz = reminder.timezone || 'UTC';
+          const formatter = new Intl.DateTimeFormat('en-US', {
+            timeZone: tz,
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+            hour12: false
+          });
+          const parts = formatter.formatToParts(reminder.remindAt);
+          const dateMap = {};
+          parts.forEach(p => dateMap[p.type] = p.value);
+          
+          let localDate = new Date(`${dateMap.year}-${dateMap.month}-${dateMap.day}T${dateMap.hour}:${dateMap.minute}:${dateMap.second}`);
+          if (reminder.scheduleType === 'daily') {
+            localDate.setDate(localDate.getDate() + 1);
+          } else if (reminder.scheduleType === 'weekly') {
+            localDate.setDate(localDate.getDate() + 7);
+          }
+          
+          // Convert back to UTC considering the new localDate in that timezone
+          // This ensures if 9:00 AM crossed DST, it remains 9:00 AM local time.
+          const localeString = localDate.toLocaleString('en-US', { timeZone: tz });
+          const baseOffset = new Date(localeString).getTime() - localDate.getTime();
+          reminder.remindAt = new Date(localDate.getTime() - baseOffset);
+        } catch (e) {
+          // Fallback if timezone math fails
+          const addTime = reminder.scheduleType === 'daily' ? 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000;
+          reminder.remindAt = new Date(reminder.remindAt.getTime() + addTime);
+        }
       }
       await reminder.save();
 

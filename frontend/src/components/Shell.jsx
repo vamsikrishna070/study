@@ -77,7 +77,10 @@ export default function Shell({ children }) {
       
       <div className="min-w-0 flex-1 md:ml-[248px] flex flex-col min-h-screen">
         <header className="sticky top-0 z-30 flex h-[72px] items-center justify-between border-b border-border/70 bg-background/90 px-5 backdrop-blur-md sm:px-8 lg:px-12">
-          <button className="focus-ring rounded-lg p-2 md:hidden" onClick={() => setMobileOpen(!mobileOpen)} data-testid="button-mobile-menu"><MoreHorizontal size={20} /></button>
+          <div className="md:hidden flex items-center gap-2 font-display text-xl leading-none">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-primary-foreground"><Target size={14} /></div>
+            StudyArena
+          </div>
           <div className="hidden md:block"><span className="font-mono text-[10px] uppercase tracking-[.2em] text-muted-foreground">Personal academic workspace</span></div>
           <div className="ml-auto flex items-center gap-4">
             <div className="hidden items-center gap-2 rounded-full bg-secondary px-3 py-1.5 text-xs font-semibold text-secondary-foreground sm:flex">
@@ -89,17 +92,20 @@ export default function Shell({ children }) {
           </div>
         </header>
         
-        <main className="page-in mx-auto w-full max-w-[1420px] px-5 py-8 sm:px-8 lg:px-12 lg:py-10 pb-24 md:pb-10 flex-1">
+        <main className="page-in mx-auto w-full max-w-[1420px] px-5 py-8 sm:px-8 lg:px-12 lg:py-10 pb-28 md:pb-10 flex-1">
           {children}
         </main>
       </div>
       
       <nav className="mobile-nav fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t border-border bg-card/95 px-2 py-2 backdrop-blur-md pb-safe md:hidden">
-        {navItems.filter(item => ['/', '/subjects', '/notes', '/tasks', '/reminders'].includes(item.href)).map(({ href, label, icon: Icon }) => (
+        {navItems.filter(item => ['/', '/subjects', '/tasks', '/exams'].includes(item.href)).map(({ href, label, icon: Icon }) => (
           <Link to={href} key={href} onClick={() => setMobileOpen(false)} className={cx('flex flex-col items-center gap-1 rounded-lg px-3 py-1.5 text-[10px] font-bold transition-colors', location === href ? 'text-accent' : 'text-muted-foreground')} data-testid={`link-mobile-${label.toLowerCase()}`}>
             <Icon size={18} /><span>{label}</span>
           </Link>
         ))}
+        <button onClick={() => setMobileOpen(true)} className="flex flex-col items-center gap-1 rounded-lg px-3 py-1.5 text-[10px] font-bold text-muted-foreground transition-colors" data-testid="button-mobile-more">
+          <MoreHorizontal size={18} /><span>More</span>
+        </button>
       </nav>
     </div>
   );

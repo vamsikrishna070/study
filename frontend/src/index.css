@@ -47,3 +47,4 @@
 .modal-backdrop { background: rgba(24,32,49,.48); backdrop-filter: blur(4px); }
 @media (max-width: 767px) { .desktop-sidebar { display: none; } .mobile-nav { display: flex; } }
 @media (min-width: 768px) { .mobile-nav { display: none; } }
+.pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }

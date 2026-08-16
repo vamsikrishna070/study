@@ -13,6 +13,7 @@ const reminderSchema = new mongoose.Schema({
   unit: { type: mongoose.Schema.Types.ObjectId, ref: 'Unit' },
   topic: { type: mongoose.Schema.Types.ObjectId, ref: 'Topic' },
   lastFiredAt: { type: Date },
+  timezone: { type: String, default: 'UTC' },
   enabled: { type: Boolean, default: true },
   notificationEnabled: { type: Boolean, default: true },
 }, { timestamps: true });

@@ -17,11 +17,14 @@ export const getGetTasksQueryKey = () => ['tasks'];
 export const getGetExamsQueryKey = () => ['exams'];
 export const getGetResourcesQueryKey = () => ['resources'];
 export const getGetProgressQueryKey = () => ['progress'];
+export const getGetSyllabiQueryKey = () => ['syllabi'];
 
 export const useGetDashboard = (options) =>
   query(getGetDashboardQueryKey(), () => apiClient.get('/dashboard'), options);
 export const useGetSubjects = (options) =>
   query(getGetSubjectsQueryKey(), () => apiClient.get('/subjects'), options);
+export const useGetSyllabi = (options) =>
+  query(getGetSyllabiQueryKey(), () => apiClient.get('/syllabus'), options);
 export const useGetNotes = (params, options) =>
   query(getGetNotesQueryKey(params), () => apiClient.get('/notes', { params }), options);
 export const useGetTasks = (options) =>

@@ -5,7 +5,6 @@ import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const pdfParse = require('pdf-parse');
 
-// Dummy fetch because node 18+ has native fetch
 export async function extractSyllabus(req, res) {
   try {
     const subject = await Subject.findOne({ _id: req.params.id, user: req.user._id });
@@ -16,11 +15,6 @@ export async function extractSyllabus(req, res) {
       return res.status(400).json({ success: false, message: 'Syllabus file data is required' });
     }
 
-    // Save to subject
-    subject.syllabusFile = fileData;
-    await subject.save();
-
-    // Fetch PDF from Cloudinary URL
     const response = await fetch(fileData.url);
     if (!response.ok) {
       throw new Error(`Failed to fetch PDF from URL: ${response.statusText}`);
@@ -28,62 +22,86 @@ export async function extractSyllabus(req, res) {
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Extract text
     const pdfData = await pdfParse(buffer);
     const text = pdfData.text;
 
     if (!text || text.trim().length < 50) {
       return res.status(422).json({ 
         success: false, 
-        message: 'This PDF appears to be scanned or contains no extractable text. Text extraction was not sufficient.',
+        message: 'This PDF appears to be scanned or image-based.',
         scanned: true
       });
     }
 
-    // Very naive pattern matching to find Units and Topics
-    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    // Parsing Logic tailored for SRM AP
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
     const units = [];
     let currentUnit = null;
+    let pendingTopic = '';
 
-    const unitRegex = /^(UNIT|MODULE|CHAPTER)\s+([IVXLCDM\d]+|ONE|TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN)(?:[\s\-\:]+)?(.*)?$/i;
+    const pushPendingTopic = () => {
+      if (pendingTopic && currentUnit) {
+        let cleaned = pendingTopic.replace(/[\d\s,]+$/, '').trim(); // remove trailing metadata "3 3 1,2"
+        cleaned = cleaned.replace(/^[-•*o]\s*/, '').trim(); // remove leading dashes
+        if (cleaned.length > 2) {
+          currentUnit.topics.push({ name: cleaned });
+        }
+        pendingTopic = '';
+      }
+    };
+
+    const unitRegex = /^UNIT\s+(\d+)(?:\s*(?:—|-|:)\s*(.*))?/i;
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      const unitMatch = line.match(unitRegex);
 
+      if (line.match(/Course Utilization Plan – Lab/i) || line.match(/Total theory contact hours/i) || line.match(/Total Contact Hours/i)) {
+        break; // Stop parsing at Lab or end of Theory
+      }
+
+      const unitMatch = line.match(unitRegex);
       if (unitMatch) {
-        let title = unitMatch[3] ? unitMatch[3].trim() : '';
-        if (!title && i + 1 < lines.length && !lines[i+1].match(unitRegex)) {
-          // Sometimes title is on the next line
-          title = lines[i+1];
+        pushPendingTopic();
+        const uNum = unitMatch[1];
+        let uName = unitMatch[2] ? unitMatch[2].trim() : '';
+        
+        if (!uName && i + 1 < lines.length && !lines[i+1].match(unitRegex) && !lines[i+1].match(/contact hours/i)) {
+          uName = lines[i+1];
         }
 
         currentUnit = {
-          name: `${unitMatch[1]} ${unitMatch[2]}`.toUpperCase() + (title ? ` - ${title}` : ''),
+          name: `UNIT ${uNum} - ${uName || 'Title'}`,
           topics: []
         };
         units.push(currentUnit);
-      } else if (currentUnit) {
-        // Assume non-unit lines are potential topics if they look somewhat like it
-        // E.g., "1.1 Introduction", "• Concept A", or just regular lines.
-        // We'll skip lines that are too long (probably paragraph text).
-        if (line.length < 150) {
-          // If it's a list item or starts with numbers
-          const topicClean = line.replace(/^[\d\.\-\•\*\s]+/, '').trim();
-          if (topicClean.length > 3) {
-            currentUnit.topics.push({ name: topicClean });
+        continue;
+      }
+
+      if (currentUnit) {
+        if (line.match(/contact hours/i) || line.match(/^Topics:/i) || line.match(/Unit No./i) || line.match(/CLOs/i)) {
+          continue; // ignore table headers and metadata
+        }
+
+        const isNewTopic = line.match(/^[-•*o]/);
+        if (isNewTopic) {
+          pushPendingTopic();
+          pendingTopic = line;
+        } else {
+          if (!pendingTopic) {
+            pendingTopic = line;
+          } else {
+            pendingTopic += ' ' + line;
           }
         }
       }
     }
+    pushPendingTopic();
 
-    // Filter out units with no topics or topics that are obviously garbage
-    const cleanUnits = units.map(u => ({
-      name: u.name,
-      topics: [...new Set(u.topics)].slice(0, 15) // max 15 topics to avoid crazy extraction
-    })).filter(u => u.topics.length > 0);
+    if (units.length === 0) {
+      return res.status(422).json({ success: false, message: 'Could not detect syllabus structure from this PDF.' });
+    }
 
-    res.json({ success: true, data: { units: cleanUnits } });
+    res.json({ success: true, data: { units } });
   } catch (error) {
     console.error('Syllabus extraction error:', error);
     res.status(500).json({ success: false, message: 'Failed to extract syllabus' });
@@ -100,7 +118,7 @@ export async function confirmSyllabus(req, res) {
       return res.status(400).json({ success: false, message: 'Units array is required' });
     }
 
-    // Bulk create
+    // Insert Units and Topics
     let unitOrder = 0;
     for (const u of units) {
       unitOrder++;
@@ -112,14 +130,17 @@ export async function confirmSyllabus(req, res) {
       });
 
       if (u.topics && Array.isArray(u.topics)) {
+        let topicOrder = 0;
         for (const t of u.topics) {
+          topicOrder++;
           await Topic.create({
             user: req.user._id,
             subject: subject._id,
             unit: unitDoc._id,
             title: t.name,
             status: 'not-started',
-            importance: 'medium'
+            importance: 'medium',
+            order: topicOrder
           });
         }
       }
@@ -127,7 +148,7 @@ export async function confirmSyllabus(req, res) {
 
     res.json({ success: true, message: 'Syllabus successfully saved' });
   } catch (error) {
-    console.error('Syllabus confirmation error:', error);
+    console.error('Confirm error:', error);
     res.status(500).json({ success: false, message: 'Failed to save syllabus' });
   }
 }

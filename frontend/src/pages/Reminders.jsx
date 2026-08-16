@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Bell, Check, Plus, Trash2, Clock, CalendarDays, Repeat } from 'lucide-react';
-import { getGetRemindersQueryKey, useCreateReminder, useDeleteReminder, useGetReminders, useUpdateReminder, useGetSubjects } from '../services/apiHooks.js';
+import { getGetRemindersQueryKey, useCreateReminder, useDeleteReminder, useGetReminders, useUpdateReminder, useGetSubjects, useGetSyllabi } from '../services/apiHooks.js';
 import Shell from '../components/Shell.jsx';
 import { Button, EmptyState, Field, LoadingBlock, Modal, PageHeading, QueryState, cx, inputClass } from '../components/shared.jsx';
 
@@ -31,6 +31,9 @@ function ReminderForm({ initial, onClose }) {
     return d.toISOString().slice(0, 16);
   };
 
+  const syllabiQuery = useGetSyllabi();
+  const syllabi = syllabiQuery.data || [];
+
   const [form, setForm] = useState({
     title: initial?.title || '',
     description: initial?.description || '',
@@ -38,19 +41,34 @@ function ReminderForm({ initial, onClose }) {
     category: initial?.category || 'general',
     priority: initial?.priority || 'medium',
     remindAt: getLocalDatetimeStr(initial?.remindAt),
-    subject: initial?.subject || ''
+    subject: initial?.subject || '',
+    unit: initial?.unit || '',
+    topic: initial?.topic || '',
+    notificationEnabled: initial?.notificationEnabled ?? true
   });
+
+  // Calculate available units and topics based on selected subject and unit
+  const selectedSyllabus = form.subject ? syllabi.find(s => s.subject?._id === form.subject || s.subject === form.subject) : null;
+  const availableUnits = selectedSyllabus?.units || [];
+  const selectedUnitData = form.unit ? availableUnits.find(u => u._id === form.unit) : null;
+  const availableTopics = selectedUnitData?.topics || [];
   
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   
   const submit = (e) => {
     e.preventDefault();
-    // Reconstruct payload
     const payload = {
       ...form,
       remindAt: new Date(form.remindAt).toISOString(), // UTC ISO String for backend
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
     };
-    if (!payload.subject) delete payload.subject; // Remove empty subject
+    if (!payload.subject) {
+      delete payload.subject;
+      delete payload.unit;
+      delete payload.topic;
+    }
+    if (!payload.unit) delete payload.unit;
+    if (!payload.topic) delete payload.topic;
 
     const done = () => {
       qc.invalidateQueries({ queryKey: getGetRemindersQueryKey() });
@@ -118,13 +136,50 @@ function ReminderForm({ initial, onClose }) {
             </Field>
 
             <Field label="Link to Subject">
-              <select className={inputClass} value={form.subject} onChange={e => set('subject', e.target.value)}>
+              <select className={inputClass} value={form.subject} onChange={e => { set('subject', e.target.value); set('unit', ''); set('topic', ''); }}>
                 <option value="">None</option>
                 {subjects.map(s => (
-                  <option key={s._id} value={s._id}>{s.code}</option>
+                  <option key={s._id} value={s._id}>{s.name} ({s.code})</option>
                 ))}
               </select>
             </Field>
+          </div>
+
+          {form.subject && availableUnits.length > 0 && (
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Field label="Unit (Optional)">
+                <select className={inputClass} value={form.unit} onChange={e => { set('unit', e.target.value); set('topic', ''); }}>
+                  <option value="">Select unit</option>
+                  {availableUnits.map(u => (
+                    <option key={u._id} value={u._id}>{u.name}</option>
+                  ))}
+                </select>
+              </Field>
+
+              {form.unit && availableTopics.length > 0 && (
+                <Field label="Topic (Optional)">
+                  <select className={inputClass} value={form.topic} onChange={e => set('topic', e.target.value)}>
+                    <option value="">Select topic</option>
+                    {availableTopics.map(t => (
+                      <option key={t._id} value={t._id}>{t.name}</option>
+                    ))}
+                  </select>
+                </Field>
+              )}
+            </div>
+          )}
+
+          <div className="flex items-center gap-3">
+            <input 
+              type="checkbox" 
+              id="notif-toggle" 
+              checked={form.notificationEnabled} 
+              onChange={e => set('notificationEnabled', e.target.checked)} 
+              className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" 
+            />
+            <label htmlFor="notif-toggle" className="text-sm font-medium">
+              Enable Push Notification
+            </label>
           </div>
         </div>
       </Modal>
