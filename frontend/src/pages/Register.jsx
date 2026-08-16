@@ -43,32 +43,35 @@ export default function Register() {
           
           <div className="grid gap-5 sm:grid-cols-2">
             <Field label="Full Name">
-              <input type="text" required className={inputClass} value={form.name} onChange={e => set('name', e.target.value)} placeholder="Vamsi Krishna" />
+              <input type="text" required className={inputClass} value={form.name} onChange={e => set('name', e.target.value)} placeholder="Enter Your Name" />
             </Field>
             <Field label="Email">
-              <input type="email" required className={inputClass} value={form.email} onChange={e => set('email', e.target.value)} placeholder="you@university.edu" />
+              <input type="email" required className={inputClass} value={form.email} onChange={e => set('email', e.target.value)} placeholder="Enter Your Email" />
             </Field>
           </div>
           
           <Field label="Password">
-            <input type="password" required className={inputClass} value={form.password} onChange={e => set('password', e.target.value)} />
+            <input type="password" required className={inputClass} value={form.password} onChange={e => set('password', e.target.value)} placeholder="Enter Your Password" />
+          </Field>
+          <Field label="Confirm Password">
+            <input type="password" required className={inputClass} value={form.password} onChange={e => set('password', e.target.value)} placeholder="Confirm Your Password" />
           </Field>
 
           <hr className="my-6 border-border" />
 
           <Field label="University">
-            <input type="text" className={inputClass} value={form.university} onChange={e => set('university', e.target.value)} placeholder="National Institute of Technology" />
+            <input type="text" className={inputClass} value={form.university} onChange={e => set('university', e.target.value)} placeholder="Enter Your University" />
           </Field>
 
           <div className="grid gap-5 sm:grid-cols-3">
             <Field label="Degree">
-              <input type="text" className={inputClass} value={form.degree} onChange={e => set('degree', e.target.value)} placeholder="B.Tech" />
+              <input type="text" className={inputClass} value={form.degree} onChange={e => set('degree', e.target.value)} placeholder="Enter Your Degree" />
             </Field>
             <Field label="Branch">
-              <input type="text" className={inputClass} value={form.branch} onChange={e => set('branch', e.target.value)} placeholder="CSE" />
+              <input type="text" className={inputClass} value={form.branch} onChange={e => set('branch', e.target.value)} placeholder="Enter Your Branch" />
             </Field>
             <Field label="Semester">
-              <select className={inputClass} value={form.semester} onChange={e => set('semester', e.target.value)}>
+              <select className={inputClass} value={form.semester} onChange={e => set('semester', e.target.value)} placeholder="Enter Your Semester">
                 {[1, 2, 3, 4, 5, 6, 7, 8].map(s => <option key={s} value={s}>Sem {s}</option>)}
               </select>
             </Field>
