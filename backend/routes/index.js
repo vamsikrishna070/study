@@ -17,8 +17,19 @@ import importantPointRoutes from './importantPointRoutes.js';
 import searchRoutes from './searchRoutes.js';
 import uploadRoutes from './uploadRoutes.js';
 
+import mongoose from 'mongoose';
+
 const router = Router();
-router.get('/health', (_req, res) => res.json({ success: true, data: { status: 'ok', service: 'StudyArena API' } }));
+router.get('/health', (_req, res) => {
+  const dbState = mongoose.connection.readyState;
+  const dbStatus = dbState === 1 ? 'connected' : dbState === 2 ? 'connecting' : 'disconnected';
+  res.json({ 
+    success: true, 
+    api: 'ok',
+    database: dbStatus,
+    message: 'StudyArena API is running'
+  });
+});
 router.use('/auth', authRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/subjects', subjectRoutes);
