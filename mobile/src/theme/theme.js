@@ -1,0 +1,93 @@
+import React, { createContext, useState, useEffect, useContext } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MD3LightTheme, MD3DarkTheme } from 'react-native-paper';
+
+export const typography = {
+  sans: { regular: 'Manrope_400Regular', medium: 'Manrope_500Medium', semiBold: 'Manrope_600SemiBold', bold: 'Manrope_700Bold', extraBold: 'Manrope_800ExtraBold' },
+  serif: { medium: 'Newsreader_500Medium', semiBold: 'Newsreader_600SemiBold' },
+  mono: { regular: 'DMMono_400Regular', medium: 'DMMono_500Medium' },
+};
+
+export const spacing = { xs: 4, sm: 8, md: 16, lg: 20, xl: 28, xxl: 36 };
+export const radii = { sm: 8, md: 12, lg: 16, xl: 20, xxl: 24, round: 9999 };
+
+const lightColors = {
+  background: '#f0ece3', foreground: '#232e43', primary: '#293656', primaryForeground: '#f8f6f0',
+  accent: '#df6b47', card: '#fbfaf8', cardBorder: '#e0dac8', muted: '#e7e2d8', mutedForeground: '#69758b', destructive: '#c92c2b'
+};
+
+// Export these immediately to prevent circular dependency ReferenceErrors in Hermes
+export const colors = lightColors; 
+export const theme = { ...MD3LightTheme, colors: { ...MD3LightTheme.colors, ...lightColors } };
+
+
+const darkColors = {
+  background: '#121212', foreground: '#e0e0e0', primary: '#a3b8cc', primaryForeground: '#121212',
+  accent: '#df6b47', card: '#1e1e1e', cardBorder: '#333333', muted: '#2c2c2c', mutedForeground: '#888888', destructive: '#ff5252'
+};
+
+const defaultThemeValue = {
+  isDark: false,
+  toggleTheme: () => {},
+  colors: lightColors,
+  typography,
+  spacing,
+  radii,
+  theme: {
+    ...MD3LightTheme,
+    colors: { ...MD3LightTheme.colors, ...lightColors }
+  }
+};
+
+export const ThemeContext = createContext(defaultThemeValue);
+
+export const ThemeProvider = ({ children }) => {
+  const [isDark, setIsDark] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem('theme').then(val => {
+      setIsDark(val === 'dark');
+      setIsLoaded(true);
+    });
+  }, []);
+
+  const toggleTheme = (val) => {
+    const nextDark = val !== undefined ? val : !isDark;
+    setIsDark(nextDark);
+    AsyncStorage.setItem('theme', nextDark ? 'dark' : 'light');
+  };
+
+  const currentColors = isDark ? darkColors : lightColors;
+
+  const paperTheme = {
+    ...(isDark ? MD3DarkTheme : MD3LightTheme),
+    colors: {
+      ...(isDark ? MD3DarkTheme.colors : MD3LightTheme.colors),
+      primary: currentColors.primary, onPrimary: currentColors.primaryForeground, secondary: currentColors.accent,
+      background: currentColors.background, surface: currentColors.card, onSurface: currentColors.foreground,
+      error: currentColors.destructive, outline: currentColors.cardBorder,
+    },
+    fonts: {
+      ...(isDark ? MD3DarkTheme.fonts : MD3LightTheme.fonts),
+      bodyMedium: { fontFamily: typography.sans.medium },
+      bodyLarge: { fontFamily: typography.sans.regular },
+      labelLarge: { fontFamily: typography.sans.bold },
+      titleLarge: { fontFamily: typography.sans.bold },
+      titleMedium: { fontFamily: typography.sans.semiBold },
+      titleSmall: { fontFamily: typography.sans.medium },
+      headlineMedium: { fontFamily: typography.serif.medium },
+      headlineSmall: { fontFamily: typography.serif.medium },
+    },
+  };
+
+  if (!isLoaded) return null;
+
+  return (
+    <ThemeContext.Provider value={{ isDark, toggleTheme, colors: currentColors, typography, spacing, radii, theme: paperTheme }}>
+      {children}
+    </ThemeContext.Provider>
+  );
+};
+
+export const useAppTheme = () => useContext(ThemeContext);

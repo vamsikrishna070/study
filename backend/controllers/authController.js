@@ -44,13 +44,13 @@ export async function register(req, res) {
 
   await user.save();
 
-  const emailSent = await sendEmail({
-    to: user.email,
-    subject: 'Verify your email - StudyArena',
-    text: `Your verification code is: ${otp}. It expires in 15 minutes.`,
-  });
-
-  if (!emailSent) {
+  try {
+    await sendEmail({
+      to: user.email,
+      subject: 'Verify your email - StudyArena',
+      text: `Your verification code is: ${otp}. It expires in 15 minutes.`,
+    });
+  } catch (error) {
     await User.deleteOne({ _id: user._id });
     return res.status(500).json({ success: false, message: 'Failed to send verification email' });
   }
@@ -100,13 +100,13 @@ export async function resendOtp(req, res) {
   user.otpExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
   await user.save();
 
-  const emailSent = await sendEmail({
-    to: user.email,
-    subject: 'Verify your email - StudyArena',
-    text: `Your verification code is: ${otp}. It expires in 15 minutes.`,
-  });
-
-  if (!emailSent) {
+  try {
+    await sendEmail({
+      to: user.email,
+      subject: 'Verify your email - StudyArena',
+      text: `Your verification code is: ${otp}. It expires in 15 minutes.`,
+    });
+  } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to send verification email' });
   }
 
@@ -140,11 +140,16 @@ export async function forgotPassword(req, res) {
   user.resetPasswordExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
   await user.save();
 
-  await sendEmail({
-    to: user.email,
-    subject: 'Password Reset - StudyArena',
-    text: `Your password reset code is: ${otp}. It expires in 15 minutes.`,
-  });
+  try {
+    await sendEmail({
+      to: user.email,
+      subject: 'Password Reset - StudyArena',
+      text: `Your password reset code is: ${otp}. It expires in 15 minutes.`,
+    });
+  } catch (error) {
+    // If it fails, log it, but we already said we return success anyway
+    console.error('Failed to send password reset email:', error.message);
+  }
 
   res.json({ success: true, message: 'If an account exists, a reset code was sent' });
 }

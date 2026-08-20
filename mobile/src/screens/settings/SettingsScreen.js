@@ -1,0 +1,375 @@
+import React, { useContext, useState } from 'react';
+import { View, StyleSheet, ScrollView, Text, TouchableOpacity, Switch, Alert, Image } from 'react-native';
+import { Camera, Moon, Sun, Trophy, LogOut, ToggleLeft, ToggleRight, Bell } from 'lucide-react-native';
+import { AuthContext } from '../../context/AuthContext';
+import { Header } from '../../components/ui/Header';
+import { PageHeading } from '../../components/ui/PageHeading';
+import { Button } from '../../components/ui/Button';
+import { Field } from '../../components/ui/Field';
+import { Input } from '../../components/ui/Input';
+import { typography, spacing, radii, useAppTheme, colors } from '../../theme/theme';
+import apiClient from '../../api/client';
+import * as ImagePicker from 'expo-image-picker';
+
+const SettingsScreen = ({ navigation }) => {
+  const { user, logout, setUser } = useContext(AuthContext);
+  const { isDark, toggleTheme, colors } = useAppTheme();
+  
+  const [form, setForm] = useState({
+    name: user?.name || '',
+    university: user?.university || '',
+    degree: user?.degree || '',
+    branch: user?.branch || '',
+    semester: String(user?.semester || '1'),
+  });
+
+  const [notifications, setNotifications] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const setFormValue = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      const data = { ...form, semester: Number(form.semester) };
+      const res = await apiClient.patch('/auth/profile', data);
+      setUser(res.data.user || res.data);
+      Alert.alert('Success', 'Profile updated successfully.');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to update profile.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleImagePick = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled) {
+        setIsSaving(true);
+        const fileUri = result.assets[0].uri;
+        
+        const formData = new FormData();
+        formData.append('file', {
+          uri: fileUri,
+          type: 'image/jpeg',
+          name: 'profile.jpg',
+        });
+
+        const uploadRes = await apiClient.post('/upload', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+
+        const fileData = uploadRes.data.data;
+        
+        const updateRes = await apiClient.patch('/auth/profile', { profileImageUrl: fileData.url });
+        setUser(updateRes.data.user || updateRes.data);
+        Alert.alert('Success', 'Profile picture updated.');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to update profile picture.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const ProfileImage = () => {
+    if (user?.profileImageUrl) {
+      return (
+        <View style={styles.imageWrapper}>
+          <Image source={{ uri: user.profileImageUrl }} style={styles.image} />
+        </View>
+      );
+    }
+    return (
+      <View style={[styles.imageWrapper, styles.imagePlaceholder]}>
+        <Text style={styles.imageText}>
+          {user?.name?.split(' ').map(p => p[0]).join('').slice(0, 2) || 'U'}
+        </Text>
+      </View>
+    );
+  };
+
+  return (
+    <View style={styles.container}>
+      <Header />
+      <ScrollView contentContainerStyle={styles.scroll}>
+        <PageHeading 
+          eyebrow="Your study desk" 
+          title="Settings" 
+          detail="Make the space fit how you work best."
+        />
+
+        {/* Profile Section */}
+        <View style={styles.section}>
+          <View style={styles.profileHeader}>
+            <View style={styles.imageContainer}>
+              <ProfileImage />
+              <TouchableOpacity style={styles.cameraIcon} activeOpacity={0.8} onPress={handleImagePick}>
+                <Camera size={16} color={colors.primaryForeground} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.profileHeaderText}>
+              <Text style={styles.sectionTitle}>Profile</Text>
+              <Text style={styles.sectionDetail}>A little context for a more personal workspace.</Text>
+            </View>
+          </View>
+
+          <View style={styles.form}>
+            <Field label="Name">
+              <Input value={form.name} onChangeText={t => setFormValue('name', t)} />
+            </Field>
+            <Field label="University">
+              <Input value={form.university} onChangeText={t => setFormValue('university', t)} />
+            </Field>
+            
+            <Field label="Degree">
+              <Input value={form.degree} onChangeText={t => setFormValue('degree', t)} />
+            </Field>
+            <Field label="Branch">
+              <Input value={form.branch} onChangeText={t => setFormValue('branch', t)} />
+            </Field>
+            <Field label="Semester">
+              <Input value={form.semester} onChangeText={t => setFormValue('semester', t)} keyboardType="numeric" />
+            </Field>
+
+            <View style={styles.saveAction}>
+              <Button onPress={handleSave} disabled={isSaving}>
+                {isSaving ? "Saving..." : "Save profile"}
+              </Button>
+            </View>
+          </View>
+        </View>
+
+        {/* Interface Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionEyebrow}>Interface</Text>
+          <Text style={styles.sectionTitle}>Appearance & Alerts</Text>
+          
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleRowLeft}>
+              <View style={styles.iconBox}>
+                {isDark ? <Moon size={20} color={colors.foreground} /> : <Sun size={20} color={colors.foreground} />}
+              </View>
+              <View>
+                <Text style={styles.toggleTitle}>{isDark ? "Night desk" : "Day desk"}</Text>
+                <Text style={styles.toggleDetail}>{isDark ? "A quieter, darker canvas" : "Warm light for clear thinking"}</Text>
+              </View>
+            </View>
+            <TouchableOpacity onPress={() => toggleTheme()} activeOpacity={0.7}>
+              {isDark ? <ToggleRight size={36} color={colors.accent} /> : <ToggleLeft size={36} color={colors.mutedForeground} />}
+            </TouchableOpacity>
+          </View>
+
+          <View style={[styles.toggleRow, { marginTop: spacing.md }]}>
+            <View style={styles.toggleRowLeft}>
+              <View style={styles.iconBox}>
+                <Bell size={20} color={colors.foreground} />
+              </View>
+              <View>
+                <Text style={styles.toggleTitle}>Push Notifications</Text>
+                <Text style={styles.toggleDetail}>Get reminded when tasks are due</Text>
+              </View>
+            </View>
+            <Switch value={notifications} onValueChange={setNotifications} color={colors.accent} />
+          </View>
+        </View>
+
+        {/* Account Section */}
+        <View style={[styles.section, styles.dangerSection]}>
+          <Text style={[styles.sectionTitle, { color: colors.destructive }]}>Account</Text>
+          <Text style={styles.sectionDetail}>Log out of your current session.</Text>
+          <Button variant="danger" onPress={logout} style={styles.logoutBtn}>
+            Log out
+          </Button>
+        </View>
+
+        {/* Bottom Banner */}
+        <View style={styles.banner}>
+          <Trophy size={24} color={colors.accent} />
+          <Text style={styles.bannerTitle}>A workspace with a pulse</Text>
+          <Text style={styles.bannerDetail}>
+            StudyArena is built for the quiet stretch between deciding to study
+            and actually beginning. Keep it honest, keep it useful.
+          </Text>
+          <View style={styles.bannerFooter}>
+            <Text style={styles.bannerVersion}>StudyArena · v1.0</Text>
+          </View>
+        </View>
+
+      </ScrollView>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
+  scroll: { padding: spacing.lg, paddingBottom: spacing.xxl },
+  section: {
+    backgroundColor: colors.card,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    padding: spacing.xl,
+    marginBottom: spacing.xl,
+  },
+  sectionEyebrow: {
+    fontFamily: typography.mono.regular,
+    fontSize: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 2,
+    color: colors.accent,
+    marginBottom: 4,
+  },
+  sectionTitle: {
+    fontFamily: typography.serif.medium,
+    fontSize: 24,
+    color: colors.foreground,
+  },
+  sectionDetail: {
+    fontFamily: typography.sans.regular,
+    fontSize: 14,
+    color: colors.mutedForeground,
+    marginTop: 2,
+  },
+  profileHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: spacing.xl,
+  },
+  imageContainer: {
+    position: 'relative',
+    marginRight: spacing.lg,
+  },
+  imageWrapper: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: colors.cardBorder,
+  },
+  image: {
+    width: '100%',
+    height: '100%',
+  },
+  imagePlaceholder: {
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 0,
+  },
+  imageText: {
+    fontFamily: typography.sans.bold,
+    fontSize: 20,
+    color: colors.primaryForeground,
+  },
+  cameraIcon: {
+    position: 'absolute',
+    bottom: -4,
+    right: -4,
+    backgroundColor: colors.foreground,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.card,
+  },
+  profileHeaderText: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  form: {
+    gap: spacing.md,
+  },
+  saveAction: {
+    alignItems: 'flex-end',
+    marginTop: spacing.sm,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    borderRadius: radii.xl,
+    padding: spacing.md,
+    marginTop: spacing.lg,
+  },
+  toggleRowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    flex: 1,
+  },
+  iconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.md,
+    backgroundColor: colors.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toggleTitle: {
+    fontFamily: typography.sans.bold,
+    fontSize: 14,
+    color: colors.foreground,
+  },
+  toggleDetail: {
+    fontFamily: typography.sans.regular,
+    fontSize: 12,
+    color: colors.mutedForeground,
+  },
+  dangerSection: {
+    backgroundColor: colors.destructive + '0D', // 5% opacity
+    borderColor: colors.destructive + '33', // 20% opacity
+  },
+  logoutBtn: {
+    marginTop: spacing.xl,
+    alignSelf: 'flex-start',
+  },
+  banner: {
+    backgroundColor: colors.accent + '1A', // 10% opacity
+    borderColor: colors.accent + '33', // 20% opacity
+    borderWidth: 1,
+    borderRadius: radii.xl,
+    padding: spacing.xl,
+  },
+  bannerTitle: {
+    fontFamily: typography.serif.medium,
+    fontSize: 24,
+    color: colors.foreground,
+    marginTop: spacing.md,
+  },
+  bannerDetail: {
+    fontFamily: typography.sans.regular,
+    fontSize: 14,
+    color: colors.mutedForeground,
+    lineHeight: 24,
+    marginTop: spacing.sm,
+  },
+  bannerFooter: {
+    borderTopWidth: 1,
+    borderTopColor: colors.accent + '33',
+    paddingTop: spacing.md,
+    marginTop: spacing.lg,
+  },
+  bannerVersion: {
+    fontFamily: typography.mono.regular,
+    fontSize: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 2,
+    color: colors.mutedForeground,
+  }
+});
+
+export default SettingsScreen;

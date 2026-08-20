@@ -1,0 +1,106 @@
+import React from 'react';
+import { Dimensions } from 'react-native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createDrawerNavigator } from '@react-navigation/drawer';
+import { createStackNavigator } from '@react-navigation/stack';
+import { LayoutDashboard, BookOpen, ListChecks, CalendarDays } from 'lucide-react-native';
+import { colors, typography } from '../theme/theme';
+
+import DashboardScreen from '../screens/dashboard/DashboardScreen';
+import SubjectsScreen from '../screens/subjects/SubjectsScreen';
+import SubjectDetailScreen from '../screens/subjects/SubjectDetailScreen';
+import TasksScreen from '../screens/tasks/TasksScreen';
+import ExamsScreen from '../screens/exams/ExamsScreen';
+import NotesScreen from '../screens/notes/NotesScreen';
+
+import SyllabusScreen from '../screens/syllabus/SyllabusScreen';
+import ResourcesScreen from '../screens/resources/ResourcesScreen';
+import RemindersScreen from '../screens/reminders/RemindersScreen';
+import ProgressScreen from '../screens/progress/ProgressScreen';
+import SettingsScreen from '../screens/settings/SettingsScreen';
+import ProfileScreen from '../screens/profile/ProfileScreen';
+
+import Sidebar from '../components/navigation/Sidebar';
+
+const Tab = createBottomTabNavigator();
+const Drawer = createDrawerNavigator();
+const Stack = createStackNavigator();
+const { width } = Dimensions.get('window');
+
+const TabNavigator = () => {
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarStyle: {
+          backgroundColor: `${colors.card}F2`,
+          borderTopColor: colors.cardBorder,
+          borderTopWidth: 1,
+          height: 60,
+          paddingBottom: 8,
+          paddingTop: 8,
+        },
+        tabBarActiveTintColor: colors.accent,
+        tabBarInactiveTintColor: colors.mutedForeground,
+        tabBarLabelStyle: {
+          fontFamily: typography.sans.bold,
+          fontSize: 10,
+        },
+        tabBarIcon: ({ color }) => {
+          let IconComponent = LayoutDashboard;
+          if (route.name === 'OverviewTab') IconComponent = LayoutDashboard;
+          else if (route.name === 'SubjectsTab') IconComponent = BookOpen;
+          else if (route.name === 'TasksTab') IconComponent = ListChecks;
+          else if (route.name === 'ExamsTab') IconComponent = CalendarDays;
+          
+          return <IconComponent size={20} color={color} />;
+        },
+      })}
+    >
+      {/* Changed names to avoid duplicate route names across Sidebar and Tabs */}
+      <Tab.Screen name="OverviewTab" component={DashboardScreen} options={{ title: 'Overview' }} />
+      <Tab.Screen name="SubjectsTab" component={SubjectsScreen} options={{ title: 'Subjects' }} />
+      <Tab.Screen name="TasksTab" component={TasksScreen} options={{ title: 'Tasks' }} />
+      <Tab.Screen name="ExamsTab" component={ExamsScreen} options={{ title: 'Exams' }} />
+    </Tab.Navigator>
+  );
+};
+
+const DrawerNavigator = () => {
+  return (
+    <Drawer.Navigator 
+      drawerContent={(props) => <Sidebar {...props} />}
+      screenOptions={{ 
+        headerShown: false,
+        drawerType: 'slide',
+        drawerStyle: {
+          width: width * 0.8,
+        },
+        overlayColor: 'rgba(0,0,0,0.5)',
+      }}
+    >
+      <Drawer.Screen name="HomeDrawer" component={TabNavigator} />
+      
+      <Drawer.Screen name="Syllabus" component={SyllabusScreen} />
+      <Drawer.Screen name="Resources" component={ResourcesScreen} />
+      <Drawer.Screen name="Reminders" component={RemindersScreen} />
+      <Drawer.Screen name="Progress" component={ProgressScreen} />
+      <Drawer.Screen name="Settings" component={SettingsScreen} />
+      <Drawer.Screen name="Profile" component={ProfileScreen} />
+    </Drawer.Navigator>
+  );
+};
+
+const MainNavigator = () => {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="DrawerRoot" component={DrawerNavigator} />
+      <Stack.Screen name="SubjectDetail" component={SubjectDetailScreen} />
+      <Stack.Screen name="Tasks" component={TasksScreen} />
+      <Stack.Screen name="Exams" component={ExamsScreen} />
+      <Stack.Screen name="Notes" component={NotesScreen} />
+    </Stack.Navigator>
+  );
+};
+
+export default MainNavigator;
