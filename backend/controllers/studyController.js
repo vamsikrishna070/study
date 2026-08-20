@@ -313,7 +313,9 @@ export async function deleteExam(req, res) {
 }
 
 export async function getResources(req, res) {
-  const items = await populateItems(Resource, { user: req.user._id });
+  const filter = { user: req.user._id };
+  if (req.query.subjectId) filter.subject = req.query.subjectId;
+  const items = await populateItems(Resource, filter);
   res.json({ success: true, data: items.map(serialize) });
 }
 export async function createResource(req, res) {

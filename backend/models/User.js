@@ -16,6 +16,11 @@ const userSchema = new mongoose.Schema({
     email: { type: Boolean, default: true },
     push: { type: Boolean, default: true },
   },
+  isVerified: { type: Boolean, default: false },
+  otp: { type: String, select: false },
+  otpExpires: { type: Date, select: false },
+  resetPasswordOtp: { type: String, select: false },
+  resetPasswordExpires: { type: Date, select: false },
 }, { timestamps: true });
 
 userSchema.pre('save', async function hashPassword() {

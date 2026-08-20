@@ -1,5 +1,7 @@
+import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import { generateToken } from '../utils/generateToken.js';
+import { sendEmail } from '../utils/sendEmail.js';
 
 const publicUser = (user) => ({
   id: user._id,
@@ -13,24 +15,128 @@ const publicUser = (user) => ({
   profileImageUrl: user.profileImageUrl,
   profileImagePublicId: user.profileImagePublicId,
   notificationPreferences: user.notificationPreferences,
+  isVerified: user.isVerified,
 });
+
+const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 
 export async function register(req, res) {
   const { name, email, password, university, degree, branch, batch, semester } = req.body;
   if (!name || !email || !password) return res.status(400).json({ success: false, message: 'Name, email, and password are required' });
   if (password.length < 6) return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+  
   const existing = await User.findOne({ email });
-  if (existing) return res.status(409).json({ success: false, message: 'An account with that email already exists' });
-  const user = await User.create({ name, email, password, university, degree, branch, batch, semester });
-  res.status(201).json({ success: true, data: { user: publicUser(user), token: generateToken(user._id) } });
+  if (existing) {
+    if (existing.isVerified) {
+      return res.status(409).json({ success: false, message: 'An account with that email already exists' });
+    } else {
+      // Allow re-registering if not verified
+      await User.deleteOne({ _id: existing._id });
+    }
+  }
+  
+  const user = new User({ name, email, password, university, degree, branch, batch, semester });
+  
+  const otp = generateOTP();
+  user.otp = await bcrypt.hash(otp, 10);
+  user.otpExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+  user.isVerified = false;
+
+  await user.save();
+
+  const emailSent = await sendEmail({
+    to: user.email,
+    subject: 'Verify your email - StudyArena',
+    text: `Your verification code is: ${otp}. It expires in 15 minutes.`,
+  });
+
+  if (!emailSent) {
+    await User.deleteOne({ _id: user._id });
+    return res.status(500).json({ success: false, message: 'Failed to send verification email' });
+  }
+
+  res.status(201).json({ success: true, message: 'Verification email sent' });
+}
+
+export async function verifyEmail(req, res) {
+  const { email, otp } = req.body;
+  if (!email || !otp) return res.status(400).json({ success: false, message: 'Email and OTP are required' });
+
+  const user = await User.findOne({ email }).select('+otp +otpExpires');
+  if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+  if (user.isVerified) return res.status(400).json({ success: false, message: 'Account is already verified' });
+  
+  if (!user.otp || !user.otpExpires || user.otpExpires < new Date()) {
+    return res.status(400).json({ success: false, message: 'OTP expired or invalid' });
+  }
+
+  const isValid = await bcrypt.compare(otp, user.otp);
+  if (!isValid) return res.status(400).json({ success: false, message: 'Invalid OTP' });
+
+  user.isVerified = true;
+  user.otp = undefined;
+  user.otpExpires = undefined;
+  await user.save();
+
+  res.json({ success: true, data: { user: publicUser(user), token: generateToken(user._id) } });
 }
 
 export async function login(req, res) {
   const { email, password } = req.body;
-  const user = await User.findOne({ email }).select('+password');
+  const user = await User.findOne({ email }).select('+password +isVerified');
   if (!user || !(await user.comparePassword(password || ''))) {
     return res.status(401).json({ success: false, message: 'Invalid email or password' });
   }
+  if (!user.isVerified) {
+    return res.status(403).json({ success: false, message: 'Please verify your email before logging in', unverified: true });
+  }
+  res.json({ success: true, data: { user: publicUser(user), token: generateToken(user._id) } });
+}
+
+export async function forgotPassword(req, res) {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ success: false, message: 'Email is required' });
+
+  const user = await User.findOne({ email });
+  if (!user) {
+    // Return success anyway to prevent email enumeration
+    return res.json({ success: true, message: 'If an account exists, a reset code was sent' });
+  }
+
+  const otp = generateOTP();
+  user.resetPasswordOtp = await bcrypt.hash(otp, 10);
+  user.resetPasswordExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+  await user.save();
+
+  await sendEmail({
+    to: user.email,
+    subject: 'Password Reset - StudyArena',
+    text: `Your password reset code is: ${otp}. It expires in 15 minutes.`,
+  });
+
+  res.json({ success: true, message: 'If an account exists, a reset code was sent' });
+}
+
+export async function resetPassword(req, res) {
+  const { email, otp, newPassword } = req.body;
+  if (!email || !otp || !newPassword) return res.status(400).json({ success: false, message: 'Email, OTP, and new password are required' });
+  if (newPassword.length < 6) return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+
+  const user = await User.findOne({ email }).select('+resetPasswordOtp +resetPasswordExpires');
+  if (!user) return res.status(404).json({ success: false, message: 'Invalid request' });
+  
+  if (!user.resetPasswordOtp || !user.resetPasswordExpires || user.resetPasswordExpires < new Date()) {
+    return res.status(400).json({ success: false, message: 'OTP expired or invalid' });
+  }
+
+  const isValid = await bcrypt.compare(otp, user.resetPasswordOtp);
+  if (!isValid) return res.status(400).json({ success: false, message: 'Invalid OTP' });
+
+  user.password = newPassword;
+  user.resetPasswordOtp = undefined;
+  user.resetPasswordExpires = undefined;
+  await user.save();
+
   res.json({ success: true, data: { user: publicUser(user), token: generateToken(user._id) } });
 }
 
