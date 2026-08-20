@@ -31,6 +31,10 @@ export const sendEmail = async ({ to, subject, text, html }) => {
       `;
     }
 
+    if (!process.env.BREVO_API_KEY) {
+      throw new Error('BREVO_API_KEY environment variable is not configured.');
+    }
+
     const payload = {
       sender: {
         name: fromName,
@@ -48,9 +52,9 @@ export const sendEmail = async ({ to, subject, text, html }) => {
     const response = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
       headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'api-key': process.env.BREVO_API_KEY
+        'accept': 'application/json',
+        'api-key': process.env.BREVO_API_KEY,
+        'content-type': 'application/json'
       },
       body: JSON.stringify(payload)
     });
