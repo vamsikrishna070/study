@@ -21,8 +21,9 @@ const publicUser = (user) => ({
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 
 export async function register(req, res) {
-  const { name, email, password, university, degree, branch, batch, semester } = req.body;
+  let { name, email, password, university, degree, branch, batch, semester } = req.body;
   if (!name || !email || !password) return res.status(400).json({ success: false, message: 'Name, email, and password are required' });
+  email = email.trim().toLowerCase();
   if (password.length < 6) return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
   
   const existing = await User.findOne({ email });
@@ -59,8 +60,9 @@ export async function register(req, res) {
 }
 
 export async function verifyEmail(req, res) {
-  const { email, otp } = req.body;
+  let { email, otp } = req.body;
   if (!email || !otp) return res.status(400).json({ success: false, message: 'Email and OTP are required' });
+  email = email.trim().toLowerCase();
 
   const user = await User.findOne({ email }).select('+otp +otpExpires');
   if (!user) return res.status(404).json({ success: false, message: 'User not found' });
@@ -82,8 +84,9 @@ export async function verifyEmail(req, res) {
 }
 
 export async function resendOtp(req, res) {
-  const { email } = req.body;
+  let { email } = req.body;
   if (!email) return res.status(400).json({ success: false, message: 'Email is required' });
+  email = email.trim().toLowerCase();
 
   const user = await User.findOne({ email }).select('+otpExpires');
   if (!user) return res.status(404).json({ success: false, message: 'User not found' });
@@ -114,7 +117,9 @@ export async function resendOtp(req, res) {
 }
 
 export async function login(req, res) {
-  const { email, password } = req.body;
+  let { email, password } = req.body;
+  if (!email || !password) return res.status(400).json({ success: false, message: 'Email and password are required' });
+  email = email.trim().toLowerCase();
   const user = await User.findOne({ email }).select('+password +isVerified');
   if (!user || !(await user.comparePassword(password || ''))) {
     return res.status(401).json({ success: false, message: 'Invalid email or password' });
@@ -126,8 +131,9 @@ export async function login(req, res) {
 }
 
 export async function forgotPassword(req, res) {
-  const { email } = req.body;
+  let { email } = req.body;
   if (!email) return res.status(400).json({ success: false, message: 'Email is required' });
+  email = email.trim().toLowerCase();
 
   const user = await User.findOne({ email });
   if (!user) {
@@ -154,9 +160,10 @@ export async function forgotPassword(req, res) {
 }
 
 export async function resetPassword(req, res) {
-  const { email, otp, newPassword } = req.body;
+  let { email, otp, newPassword } = req.body;
   if (!email || !otp || !newPassword) return res.status(400).json({ success: false, message: 'Email, OTP, and new password are required' });
   if (newPassword.length < 6) return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+  email = email.trim().toLowerCase();
 
   const user = await User.findOne({ email }).select('+resetPasswordOtp +resetPasswordExpires');
   if (!user) return res.status(404).json({ success: false, message: 'Invalid request' });

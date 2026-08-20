@@ -106,7 +106,10 @@ export function AuthProvider({ children }) {
         return { success: true, message: data.message };
       }
     } catch (error) {
-      return { success: false, message: error.response?.data?.message || 'Failed to send reset email' };
+      if (error.response) {
+        return { success: false, message: error.response.data?.message || 'Failed to send reset email' };
+      }
+      return { success: false, message: 'Unable to connect to StudyArena. Please check your internet connection.' };
     }
   };
 
@@ -122,7 +125,10 @@ export function AuthProvider({ children }) {
         return { success: true };
       }
     } catch (error) {
-      return { success: false, message: error.response?.data?.message || 'Failed to reset password' };
+      if (error.response) {
+        return { success: false, message: error.response.data?.message || 'Failed to reset password' };
+      }
+      return { success: false, message: 'Unable to connect to StudyArena. Please check your internet connection.' };
     }
   };
 

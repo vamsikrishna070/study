@@ -28,7 +28,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
         // Specifically expecting "This email is not registered. Please check the email address or create an account." on 404
         setErrorMsg(error.response.data?.message || 'Failed to send reset code.');
       } else {
-        setErrorMsg('Network error. Please check your connection.');
+        setErrorMsg('Unable to connect to StudyArena. Please check your internet connection.');
       }
     } finally {
       setLoading(false);
