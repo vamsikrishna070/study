@@ -7,6 +7,9 @@ import { AuthProvider } from './context/AuthContext.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
+import VerifyEmail from './pages/VerifyEmail.jsx';
+import ForgotPassword from './pages/ForgotPassword.jsx';
+import ResetPassword from './pages/ResetPassword.jsx';
 import { DashboardPage } from './pages/DashboardPage.jsx';
 import { SubjectsPage } from './pages/SubjectsPage.jsx';
 import SubjectDetail from './pages/SubjectDetail.jsx';
@@ -30,6 +33,9 @@ function Router() {
   return <ErrorBoundary resetKey={location}><Routes>
     <Route path="/login" element={<Login />} />
     <Route path="/register" element={<Register />} />
+    <Route path="/verify-email" element={<VerifyEmail />} />
+    <Route path="/forgot-password" element={<ForgotPassword />} />
+    <Route path="/reset-password" element={<ResetPassword />} />
     <Route path="/" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
     <Route path="/subjects" element={<ProtectedRoute><SubjectsPage /></ProtectedRoute>} />
     <Route path="/subjects/:id" element={<ProtectedRoute><SubjectDetail /></ProtectedRoute>} />

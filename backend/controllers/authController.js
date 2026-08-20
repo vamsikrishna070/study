@@ -81,6 +81,38 @@ export async function verifyEmail(req, res) {
   res.json({ success: true, data: { user: publicUser(user), token: generateToken(user._id) } });
 }
 
+export async function resendOtp(req, res) {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ success: false, message: 'Email is required' });
+
+  const user = await User.findOne({ email }).select('+otpExpires');
+  if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+  if (user.isVerified) return res.status(400).json({ success: false, message: 'Account is already verified' });
+
+  // Cooldown check (60 seconds)
+  // otpExpires was set to Date.now() + 15 mins. If it's > Date.now() + 14 mins, then < 1 min has passed.
+  if (user.otpExpires && user.otpExpires > new Date(Date.now() + 14 * 60 * 1000)) {
+    return res.status(429).json({ success: false, message: 'Please wait before requesting a new OTP' });
+  }
+
+  const otp = generateOTP();
+  user.otp = await bcrypt.hash(otp, 10);
+  user.otpExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+  await user.save();
+
+  const emailSent = await sendEmail({
+    to: user.email,
+    subject: 'Verify your email - StudyArena',
+    text: `Your verification code is: ${otp}. It expires in 15 minutes.`,
+  });
+
+  if (!emailSent) {
+    return res.status(500).json({ success: false, message: 'Failed to send verification email' });
+  }
+
+  res.json({ success: true, message: 'A new verification code has been sent' });
+}
+
 export async function login(req, res) {
   const { email, password } = req.body;
   const user = await User.findOne({ email }).select('+password +isVerified');
@@ -88,7 +120,7 @@ export async function login(req, res) {
     return res.status(401).json({ success: false, message: 'Invalid email or password' });
   }
   if (!user.isVerified) {
-    return res.status(403).json({ success: false, message: 'Please verify your email before logging in', unverified: true });
+    return res.json({ success: false, message: 'Please verify your email before logging in', unverified: true });
   }
   res.json({ success: true, data: { user: publicUser(user), token: generateToken(user._id) } });
 }

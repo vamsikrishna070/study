@@ -50,8 +50,13 @@ export function AuthProvider({ children }) {
         setUser(data.data.user);
         setIsAuthenticated(true);
         return { success: true };
+      } else {
+        return { success: false, unverified: data.unverified, message: data.message || 'Login failed' };
       }
     } catch (error) {
+      if (error.response?.data?.unverified) {
+        return { success: false, unverified: true, message: error.response.data.message };
+      }
       return { success: false, message: error.response?.data?.message || 'Login failed' };
     }
   };
@@ -60,6 +65,18 @@ export function AuthProvider({ children }) {
     try {
       const { data } = await apiClient.post('/auth/register', userData);
       if (data.success) {
+        // Registration now sends an OTP, no longer logging the user in immediately
+        return { success: true, message: data.message };
+      }
+    } catch (error) {
+      return { success: false, message: error.response?.data?.message || 'Registration failed' };
+    }
+  };
+
+  const verifyEmail = async (email, otp) => {
+    try {
+      const { data } = await apiClient.post('/auth/verify-email', { email, otp });
+      if (data.success) {
         localStorage.setItem('studyarena_token', data.data.token);
         apiClient.defaults.headers.common['Authorization'] = `Bearer ${data.data.token}`;
         setUser(data.data.user);
@@ -67,7 +84,45 @@ export function AuthProvider({ children }) {
         return { success: true };
       }
     } catch (error) {
-      return { success: false, message: error.response?.data?.message || 'Registration failed' };
+      return { success: false, message: error.response?.data?.message || 'Verification failed' };
+    }
+  };
+
+  const resendOtp = async (email) => {
+    try {
+      const { data } = await apiClient.post('/auth/resend-otp', { email });
+      if (data.success) {
+        return { success: true, message: data.message };
+      }
+    } catch (error) {
+      return { success: false, message: error.response?.data?.message || 'Failed to resend OTP' };
+    }
+  };
+
+  const forgotPassword = async (email) => {
+    try {
+      const { data } = await apiClient.post('/auth/forgot-password', { email });
+      if (data.success) {
+        return { success: true, message: data.message };
+      }
+    } catch (error) {
+      return { success: false, message: error.response?.data?.message || 'Failed to send reset email' };
+    }
+  };
+
+  const resetPassword = async (email, otp, newPassword) => {
+    try {
+      const { data } = await apiClient.post('/auth/reset-password', { email, otp, newPassword });
+      if (data.success) {
+        // Reset password logs user in
+        localStorage.setItem('studyarena_token', data.data.token);
+        apiClient.defaults.headers.common['Authorization'] = `Bearer ${data.data.token}`;
+        setUser(data.data.user);
+        setIsAuthenticated(true);
+        return { success: true };
+      }
+    } catch (error) {
+      return { success: false, message: error.response?.data?.message || 'Failed to reset password' };
     }
   };
 
@@ -96,7 +151,11 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated, isLoading, login, register, logout, updateProfile }}>
+    <AuthContext.Provider value={{ 
+      user, isAuthenticated, isLoading, 
+      login, register, verifyEmail, resendOtp, forgotPassword, resetPassword, 
+      logout, updateProfile 
+    }}>
       {children}
     </AuthContext.Provider>
   );

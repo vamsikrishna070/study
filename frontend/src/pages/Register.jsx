@@ -27,7 +27,7 @@ export default function Register() {
     const { confirmPassword, ...payload } = form;
     const res = await register({ ...payload, semester: Number(form.semester) });
     if (res.success) {
-      navigate('/', { replace: true });
+      navigate('/verify-email', { replace: true, state: { email: form.email } });
     } else {
       setError(res.message);
       setIsSubmitting(false);

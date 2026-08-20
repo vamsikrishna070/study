@@ -1,15 +1,14 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import { cx, Button, Field, inputClass } from '../components/shared.jsx';
-import { GraduationCap } from 'lucide-react';
+import { Button, Field, inputClass } from '../components/shared.jsx';
+import { KeyRound } from 'lucide-react';
 
-export default function Login() {
+export default function ForgotPassword() {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { login } = useAuth();
+  const { forgotPassword } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -17,11 +16,9 @@ export default function Login() {
     setError('');
     setIsSubmitting(true);
 
-    const res = await login(email, password);
+    const res = await forgotPassword(email);
     if (res.success) {
-      navigate('/', { replace: true });
-    } else if (res.unverified) {
-      navigate('/verify-email', { replace: true, state: { email, message: 'Please verify your email first. We sent a verification code to your email.' } });
+      navigate('/reset-password', { state: { email } });
     } else {
       setError(res.message);
       setIsSubmitting(false);
@@ -33,10 +30,10 @@ export default function Login() {
       <div className="w-full max-w-md space-y-8 rounded-3xl border border-card-border bg-card p-8 sm:p-10">
         <div className="text-center">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
-            <GraduationCap size={28} />
+            <KeyRound size={28} />
           </div>
-          <h1 className="mt-6 font-display text-3xl tracking-tight">Welcome back</h1>
-          <p className="mt-2 text-sm text-muted-foreground">Log in to your StudyArena desk.</p>
+          <h1 className="mt-6 font-display text-3xl tracking-tight">Forgot Password</h1>
+          <p className="mt-2 text-sm text-muted-foreground">Enter your email to receive a reset code.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-5">
@@ -52,33 +49,16 @@ export default function Login() {
               placeholder="Enter Your Email" 
             />
           </Field>
-          
-          <Field label="Password">
-            <input 
-              type="password" 
-              required 
-              className={inputClass} 
-              value={password} 
-              onChange={e => setPassword(e.target.value)} 
-              placeholder="Enter Your Password" 
-            />
-          </Field>
 
-          <div className="flex justify-end">
-            <Link to="/forgot-password" className="text-sm font-medium text-accent hover:underline">
-              Forgot Password?
-            </Link>
-          </div>
-
-          <Button type="submit" className="w-full justify-center mt-6" disabled={isSubmitting}>
-            {isSubmitting ? 'Logging in...' : 'Log in'}
+          <Button type="submit" className="w-full justify-center mt-6" disabled={isSubmitting || !email}>
+            {isSubmitting ? 'Sending...' : 'Send Reset Code'}
           </Button>
         </form>
 
         <p className="mt-6 text-center text-sm text-muted-foreground">
-          New to StudyArena?{' '}
-          <Link to="/register" className="font-bold text-accent hover:underline">
-            Create an account
+          Remember your password?{' '}
+          <Link to="/login" className="font-bold text-accent hover:underline">
+            Log in
           </Link>
         </p>
       </div>
