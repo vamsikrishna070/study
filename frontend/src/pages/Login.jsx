@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { cx, Button, Field, inputClass } from '../components/shared.jsx';
-import { GraduationCap } from 'lucide-react';
+import { GraduationCap, Eye, EyeOff } from 'lucide-react';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { login } = useAuth();
@@ -54,14 +55,23 @@ export default function Login() {
           </Field>
           
           <Field label="Password">
-            <input 
-              type="password" 
-              required 
-              className={inputClass} 
-              value={password} 
-              onChange={e => setPassword(e.target.value)} 
-              placeholder="Enter Your Password" 
-            />
+            <div className="relative">
+              <input 
+                type={showPassword ? "text" : "password"} 
+                required 
+                className={inputClass + " pr-10"} 
+                value={password} 
+                onChange={e => setPassword(e.target.value)} 
+                placeholder="Enter Your Password" 
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </Field>
 
           <div className="flex justify-end">

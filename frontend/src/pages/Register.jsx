@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { cx, Button, Field, inputClass } from '../components/shared.jsx';
-import { GraduationCap } from 'lucide-react';
+import { GraduationCap, Eye, EyeOff } from 'lucide-react';
 
 export default function Register() {
   const [form, setForm] = useState({ name: '', email: '', password: '', confirmPassword: '', university: '', degree: 'B.Tech', branch: 'CSE', semester: '1' });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { register } = useAuth();
@@ -58,10 +60,42 @@ export default function Register() {
           </div>
           
           <Field label="Password">
-            <input type="password" required className={inputClass} value={form.password} onChange={e => set('password', e.target.value)} placeholder="Enter Your Password" />
+            <div className="relative">
+              <input 
+                type={showPassword ? "text" : "password"} 
+                required 
+                className={inputClass + " pr-10"} 
+                value={form.password} 
+                onChange={e => set('password', e.target.value)} 
+                placeholder="Enter Your Password" 
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </Field>
           <Field label="Confirm Password">
-            <input type="password" required className={inputClass} value={form.confirmPassword} onChange={e => set('confirmPassword', e.target.value)} placeholder="Confirm Your Password" />
+            <div className="relative">
+              <input 
+                type={showConfirmPassword ? "text" : "password"} 
+                required 
+                className={inputClass + " pr-10"} 
+                value={form.confirmPassword} 
+                onChange={e => set('confirmPassword', e.target.value)} 
+                placeholder="Confirm Your Password" 
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </Field>
 
           <hr className="my-6 border-border" />
