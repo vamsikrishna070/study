@@ -1,10 +1,7 @@
-import { Resend } from 'resend';
-
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 export const sendEmail = async ({ to, subject, text, html }) => {
   try {
-    const fromEmail = process.env.RESEND_FROM || 'onboarding@resend.dev';
+    const fromName = process.env.BREVO_FROM_NAME || 'StudyArena';
+    const fromEmail = process.env.BREVO_FROM_EMAIL || 'creatorhub.studios07@gmail.com';
     
     // Auto-generate HTML if not provided, to preserve existing OTP functionality but make it production-quality
     let finalHtml = html;
@@ -34,17 +31,34 @@ export const sendEmail = async ({ to, subject, text, html }) => {
       `;
     }
 
-    const { data, error } = await resend.emails.send({
-      from: fromEmail,
-      to: [to],
+    const payload = {
+      sender: {
+        name: fromName,
+        email: fromEmail
+      },
+      to: [
+        {
+          email: to
+        }
+      ],
       subject,
-      text, // plain-text fallback
-      html: finalHtml,
+      htmlContent: finalHtml
+    };
+
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'api-key': process.env.BREVO_API_KEY
+      },
+      body: JSON.stringify(payload)
     });
 
-    if (error) {
-      console.error('Resend API Error:', error);
-      throw new Error('Failed to send email via Resend');
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Brevo API Error:', errorData);
+      throw new Error(errorData.message || 'Failed to send email via Brevo');
     }
 
     return true; // For backwards compatibility if any code relies on truthy return
