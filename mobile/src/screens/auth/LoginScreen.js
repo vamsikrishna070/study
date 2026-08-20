@@ -28,7 +28,7 @@ const LoginScreen = ({ navigation }) => {
         if (error.response.status === 401) {
           setErrorMsg('Invalid email or password');
         } else if (error.response.data?.unverified) {
-          navigation.navigate('VerifyOtp', { email });
+          navigation.navigate('VerifyOtp', { email, mode: 'email-verification' });
         } else {
           setErrorMsg(error.response.data?.message || 'Login failed.');
         }

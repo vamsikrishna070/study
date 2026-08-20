@@ -25,6 +25,11 @@ export const verifyEmail = async (email, otp) => {
   return payload;
 };
 
+export const resendOtp = async (email) => {
+  const response = await client.post('/auth/resend-otp', { email });
+  return response.data;
+};
+
 export const forgotPassword = async (email) => {
   const response = await client.post('/auth/forgot-password', { email });
   return response.data;

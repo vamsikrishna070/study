@@ -67,11 +67,11 @@ export async function verifyEmail(req, res) {
   if (user.isVerified) return res.status(400).json({ success: false, message: 'Account is already verified' });
   
   if (!user.otp || !user.otpExpires || user.otpExpires < new Date()) {
-    return res.status(400).json({ success: false, message: 'OTP expired or invalid' });
+    return res.status(400).json({ success: false, message: 'OTP expired. Please request a new OTP.' });
   }
 
   const isValid = await bcrypt.compare(otp, user.otp);
-  if (!isValid) return res.status(400).json({ success: false, message: 'Invalid OTP' });
+  if (!isValid) return res.status(400).json({ success: false, message: 'Invalid OTP.' });
 
   user.isVerified = true;
   user.otp = undefined;
@@ -131,8 +131,7 @@ export async function forgotPassword(req, res) {
 
   const user = await User.findOne({ email });
   if (!user) {
-    // Return success anyway to prevent email enumeration
-    return res.json({ success: true, message: 'If an account exists, a reset code was sent' });
+    return res.status(404).json({ success: false, message: 'This email is not registered. Please check the email address or create an account.' });
   }
 
   const otp = generateOTP();
@@ -163,11 +162,11 @@ export async function resetPassword(req, res) {
   if (!user) return res.status(404).json({ success: false, message: 'Invalid request' });
   
   if (!user.resetPasswordOtp || !user.resetPasswordExpires || user.resetPasswordExpires < new Date()) {
-    return res.status(400).json({ success: false, message: 'OTP expired or invalid' });
+    return res.status(400).json({ success: false, message: 'OTP expired. Please request a new OTP.' });
   }
 
   const isValid = await bcrypt.compare(otp, user.resetPasswordOtp);
-  if (!isValid) return res.status(400).json({ success: false, message: 'Invalid OTP' });
+  if (!isValid) return res.status(400).json({ success: false, message: 'Invalid OTP.' });
 
   user.password = newPassword;
   user.resetPasswordOtp = undefined;

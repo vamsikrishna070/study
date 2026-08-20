@@ -24,7 +24,7 @@ const RegisterScreen = ({ navigation }) => {
     setLoading(true);
     try {
       await register(name, email, password);
-      navigation.navigate('VerifyOtp', { email });
+      navigation.navigate('VerifyOtp', { email, mode: 'email-verification' });
     } catch (error) {
       if (error.response) {
         setErrorMsg(error.response.data?.message || 'Registration failed.');
