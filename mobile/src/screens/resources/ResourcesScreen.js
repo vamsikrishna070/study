@@ -296,16 +296,16 @@ const ResourcesScreen = ({ route, navigation }) => {
             </View>
             <ScrollView style={styles.modalScroll}>
               <Field label="Title">
-                <Input value={title} onChangeText={setTitle} placeholder="e.g. Intro to Calculus" />
+                <Input value={title} onChangeText={setTitle} placeholder="Enter resource title" />
               </Field>
               <Field label="URL">
-                <Input value={url} onChangeText={setUrl} placeholder="https://..." keyboardType="url" autoCapitalize="none" />
+                <Input value={url} onChangeText={setUrl} placeholder="Paste resource link" keyboardType="url" autoCapitalize="none" />
               </Field>
               <Field label="Description (Optional)">
                 <Input 
                   value={description} 
                   onChangeText={setDescription} 
-                  placeholder="Why is this useful?" 
+                  placeholder="Add resource description" 
                   multiline
                   style={{ minHeight: 80, alignItems: 'flex-start' }}
                   textAlignVertical="top"
@@ -313,7 +313,7 @@ const ResourcesScreen = ({ route, navigation }) => {
               </Field>
               {!paramSubjectId && (
                 <Field label="Subject ID (Optional)">
-                  <Input value={subjectId} onChangeText={setSubjectId} placeholder="Enter subject ID" />
+                  <Input value={subjectId} onChangeText={setSubjectId} placeholder="Select subject" />
                 </Field>
               )}
             </ScrollView>

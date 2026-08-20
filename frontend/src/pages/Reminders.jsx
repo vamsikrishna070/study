@@ -97,11 +97,11 @@ function ReminderForm({ initial, onClose }) {
       >
         <div className="space-y-5">
           <Field label="What to remember">
-            <input required className={inputClass} value={form.title} onChange={e => set('title', e.target.value)} placeholder="Register for next semester" />
+            <input required className={inputClass} value={form.title} onChange={e => set('title', e.target.value)} placeholder="Enter reminder title" />
           </Field>
 
           <Field label="Description (Optional)">
-            <textarea className={cx(inputClass, 'min-h-[60px] resize-y')} value={form.description} onChange={e => set('description', e.target.value)} placeholder="Additional context..." />
+            <textarea className={cx(inputClass, 'min-h-[60px] resize-y')} value={form.description} onChange={e => set('description', e.target.value)} placeholder="Add reminder details" />
           </Field>
           
           <div className="grid gap-5 sm:grid-cols-2">

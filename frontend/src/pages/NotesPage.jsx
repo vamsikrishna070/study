@@ -74,7 +74,7 @@ export function NotesPage() {
               className={cx(inputClass, 'pl-10')}
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search titles, content, tags…"
+              placeholder="Search notes..."
               data-testid="input-search-notes"
             />
             {search && (

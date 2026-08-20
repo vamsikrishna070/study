@@ -83,10 +83,10 @@ export default function VerifyEmail() {
               type="text" 
               required 
               maxLength={6}
-              className={inputClass + " text-center text-lg tracking-widest"} 
+              className={inputClass} 
               value={otp} 
               onChange={e => setOtp(e.target.value)} 
-              placeholder="000000" 
+              placeholder="Enter 6-digit OTP" 
             />
           </Field>
 

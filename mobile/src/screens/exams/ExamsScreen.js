@@ -199,10 +199,10 @@ const ExamsScreen = ({ route, navigation }) => {
             </View>
             <ScrollView style={styles.modalScroll}>
               <Field label="Exam Title">
-                <Input value={title} onChangeText={setTitle} placeholder="e.g. Midterm 1" />
+                <Input value={title} onChangeText={setTitle} placeholder="Enter exam name" />
               </Field>
               <Field label="Subject ID">
-                <Input value={subjectId} onChangeText={setSubjectId} placeholder="Enter subject ID" editable={!paramSubjectId} />
+                <Input value={subjectId} onChangeText={setSubjectId} placeholder="Select subject" editable={!paramSubjectId} />
               </Field>
               
               <View style={styles.row}>

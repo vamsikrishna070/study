@@ -159,14 +159,14 @@ export default function ResourceModal({ onClose }) {
             </select>
           </Field>
           <Field label="Title">
-            <input required className={inputClass} value={form.title} onChange={e => set('title', e.target.value)} placeholder="Name of this resource" />
+            <input required className={inputClass} value={form.title} onChange={e => set('title', e.target.value)} placeholder="Enter resource title" />
           </Field>
         </div>
 
         {/* Row 2: Conditional input based on resource type */}
         {isLinkType && (
           <Field label={urlLabel}>
-            <input required type="url" className={inputClass} value={form.url} onChange={e => set('url', e.target.value)} placeholder={urlPlaceholder} />
+            <input required type="url" className={inputClass} value={form.url} onChange={e => set('url', e.target.value)} placeholder="Paste resource link" />
           </Field>
         )}
 
@@ -249,7 +249,7 @@ export default function ResourceModal({ onClose }) {
             </select>
           </Field>
           <Field label="Topic">
-            <input className={inputClass} value={form.topic} onChange={e => set('topic', e.target.value)} placeholder="Optional topic" />
+            <input className={inputClass} value={form.topic} onChange={e => set('topic', e.target.value)} placeholder="Enter topic name" />
           </Field>
         </div>
 
@@ -275,12 +275,12 @@ export default function ResourceModal({ onClose }) {
 
         {/* Row 5: Tags */}
         <Field label="Tags" hint="Separate with commas">
-          <input className={inputClass} value={form.tags} onChange={e => set('tags', e.target.value)} placeholder="e.g. video, tutorial, advanced" />
+          <input className={inputClass} value={form.tags} onChange={e => set('tags', e.target.value)} placeholder="Add tags" />
         </Field>
 
         {/* Row 6: Description */}
         <Field label="Description">
-          <textarea className={cx(inputClass, 'min-h-[88px] resize-y')} value={form.description} onChange={e => set('description', e.target.value)} placeholder="Why is this worth your time?" />
+          <textarea className={cx(inputClass, 'min-h-[88px] resize-y')} value={form.description} onChange={e => set('description', e.target.value)} placeholder="Add resource description" />
         </Field>
       </div>
     </Modal>

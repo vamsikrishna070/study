@@ -137,7 +137,7 @@ export default function NoteModal({ initial, onClose }) {
     >
       <div className="space-y-5">
         <Field label="Title">
-          <input required className={inputClass} value={form.title} onChange={e => set('title', e.target.value)} placeholder="The idea you want to remember" data-testid="input-note-title" />
+          <input required className={inputClass} value={form.title} onChange={e => set('title', e.target.value)} placeholder="Enter note title" data-testid="input-note-title" />
         </Field>
 
         <div className="grid gap-5 sm:grid-cols-2">
@@ -148,7 +148,7 @@ export default function NoteModal({ initial, onClose }) {
             </select>
           </Field>
           <Field label="Unit / Topic">
-            <input className={inputClass} value={form.topic} onChange={e => set('topic', e.target.value)} placeholder="e.g. Process scheduling" data-testid="input-note-topic" />
+            <input className={inputClass} value={form.topic} onChange={e => set('topic', e.target.value)} placeholder="Enter topic name" data-testid="input-note-topic" />
           </Field>
         </div>
 
@@ -162,7 +162,7 @@ export default function NoteModal({ initial, onClose }) {
             </select>
           </Field>
           <Field label="Tags" hint="Comma separated">
-            <input className={inputClass} value={form.tags} onChange={e => set('tags', e.target.value)} placeholder="revision, formula, key concept" data-testid="input-note-tags" />
+            <input className={inputClass} value={form.tags} onChange={e => set('tags', e.target.value)} placeholder="Add tags" data-testid="input-note-tags" />
           </Field>
         </div>
 
@@ -172,7 +172,7 @@ export default function NoteModal({ initial, onClose }) {
             className={cx(inputClass, 'min-h-[160px] resize-y font-mono text-sm leading-relaxed')}
             value={form.content}
             onChange={e => set('content', e.target.value)}
-            placeholder="Write your notes here…&#10;&#10;Tip: Use plain text or markdown-style formatting.&#10;- Bullet points&#10;**Bold** or *italic* hints"
+            placeholder="Write your notes here..."
             data-testid="textarea-note-content"
           />
         </Field>
@@ -232,7 +232,7 @@ export default function NoteModal({ initial, onClose }) {
               className={cx(inputClass, 'flex-1 text-sm')}
               value={youtubeUrl}
               onChange={e => setYoutubeUrl(e.target.value)}
-              placeholder="Paste a YouTube URL to attach…"
+              placeholder="Paste resource link"
               onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addYouTube(); } }}
             />
             <Button type="button" variant="quiet" onClick={addYouTube} disabled={!youtubeUrl.trim()}>

@@ -1,15 +1,34 @@
 import React, { useContext } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text, Image } from 'react-native';
-import { Menu, Target } from 'lucide-react-native';
-import { useNavigation } from '@react-navigation/native';
+import { Menu, Target, ArrowLeft } from 'lucide-react-native';
+import { useNavigation, DrawerActions, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthContext } from '../../context/AuthContext';
 import { colors, typography, spacing, radii } from '../../theme/theme';
 
-export const Header = () => {
+const getInitials = (name) => {
+  if (!name || typeof name !== 'string') {
+    return 'U';
+  }
+
+  return name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0].toUpperCase())
+    .join('');
+};
+
+export const Header = ({ showBack }) => {
   const navigation = useNavigation();
+  const route = useRoute();
   const { user } = useContext(AuthContext);
   const insets = useSafeAreaInsets();
+
+  // If a screen is nested (like Subjects -> Tasks), it will pass a subjectId or similar.
+  // We should show a back button instead of a hamburger menu to avoid Drawer errors.
+  const shouldShowBack = showBack !== undefined ? showBack : !!route.params?.subjectId;
 
   const ProfileAvatar = () => {
     if (user?.profileImageUrl) {
@@ -22,7 +41,7 @@ export const Header = () => {
     return (
       <View style={[styles.avatarContainer, styles.avatarPlaceholder]}>
         <Text style={styles.avatarText}>
-          {user?.name?.split(' ').map(p => p[0]).join('').slice(0, 2) || 'U'}
+          {getInitials(user?.name)}
         </Text>
       </View>
     );
@@ -34,12 +53,22 @@ export const Header = () => {
         {/* LEFT SECTION */}
         <View style={styles.leftSection}>
           <TouchableOpacity 
-            onPress={() => navigation.openDrawer()} 
+            onPress={() => {
+              if (shouldShowBack) {
+                if (navigation.canGoBack()) navigation.goBack();
+              } else {
+                if (typeof navigation.openDrawer === 'function') {
+                  navigation.openDrawer();
+                } else {
+                  navigation.dispatch(DrawerActions.openDrawer());
+                }
+              }
+            }} 
             style={styles.menuBtn}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            accessibilityLabel="Open navigation menu"
+            accessibilityLabel={shouldShowBack ? "Go back" : "Open navigation menu"}
           >
-            <Menu size={26} color={colors.foreground} />
+            {shouldShowBack ? <ArrowLeft size={26} color={colors.foreground} /> : <Menu size={26} color={colors.foreground} />}
           </TouchableOpacity>
         </View>
 

@@ -70,7 +70,7 @@ const LoginScreen = ({ navigation }) => {
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
-                placeholder="Enter Your Email"
+                placeholder="Enter your email address"
                 editable={!loading}
               />
             </Field>
@@ -80,7 +80,7 @@ const LoginScreen = ({ navigation }) => {
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
-                placeholder="Enter Your Password"
+                placeholder="Enter your password"
                 editable={!loading}
               />
             </Field>

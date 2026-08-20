@@ -70,7 +70,7 @@ function UnitForm({ subjectId, onClose, onSuccess }) {
               className={inputClass}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Memory Management"
+              placeholder="Enter unit name"
             />
           </Field>
         </div>
@@ -119,7 +119,7 @@ function TopicForm({ subjectId, unitId, onClose, onSuccess }) {
               className={inputClass}
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Virtual Memory"
+              placeholder="Enter topic name"
             />
           </Field>
         </div>
@@ -177,7 +177,7 @@ function ImportantPointForm({ subjectId, onClose, onSuccess }) {
               className={inputClass}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="A quick summary"
+              placeholder="Add a short description"
             />
           </Field>
           <Field label="Content">
@@ -186,7 +186,7 @@ function ImportantPointForm({ subjectId, onClose, onSuccess }) {
               className={cx(inputClass, "min-h-25 resize-y")}
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              placeholder="The core concept..."
+              placeholder="Add description"
             />
           </Field>
         </div>

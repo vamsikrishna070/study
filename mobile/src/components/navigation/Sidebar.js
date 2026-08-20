@@ -16,6 +16,7 @@ import {
   Settings
 } from 'lucide-react-native';
 import { DrawerContentScrollView } from '@react-navigation/drawer';
+import { DrawerActions } from '@react-navigation/native';
 import { AuthContext } from '../../context/AuthContext';
 import { colors, typography, spacing, radii } from '../../theme/theme';
 
@@ -39,6 +40,14 @@ const Sidebar = (props) => {
   const tabScreens = ['OverviewTab', 'SubjectsTab', 'TasksTab', 'ExamsTab'];
 
   const handleNavigation = (routeName) => {
+    // 1. First explicitly dispatch the close drawer action
+    if (typeof navigation.closeDrawer === 'function') {
+      navigation.closeDrawer();
+    } else {
+      navigation.dispatch(DrawerActions.closeDrawer());
+    }
+
+    // 2. Then navigate
     if (tabScreens.includes(routeName)) {
       navigation.navigate('DrawerRoot', {
         screen: 'HomeDrawer',
@@ -49,7 +58,6 @@ const Sidebar = (props) => {
         screen: routeName
       });
     }
-    navigation.closeDrawer();
   };
 
   const handleLogout = async () => {

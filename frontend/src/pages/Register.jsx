@@ -52,10 +52,10 @@ export default function Register() {
           
           <div className="grid gap-5 sm:grid-cols-2">
             <Field label="Full Name">
-              <input type="text" required className={inputClass} value={form.name} onChange={e => set('name', e.target.value)} placeholder="Enter Your Name" />
+              <input type="text" required className={inputClass} value={form.name} onChange={e => set('name', e.target.value)} placeholder="Enter your full name" />
             </Field>
             <Field label="Email">
-              <input type="email" required className={inputClass} value={form.email} onChange={e => set('email', e.target.value)} placeholder="Enter Your Email" />
+              <input type="email" required className={inputClass} value={form.email} onChange={e => set('email', e.target.value)} placeholder="Enter your email address" />
             </Field>
           </div>
           
@@ -67,7 +67,7 @@ export default function Register() {
                 className={inputClass + " pr-10"} 
                 value={form.password} 
                 onChange={e => set('password', e.target.value)} 
-                placeholder="Enter Your Password" 
+                placeholder="Create a password" 
               />
               <button
                 type="button"
@@ -86,7 +86,7 @@ export default function Register() {
                 className={inputClass + " pr-10"} 
                 value={form.confirmPassword} 
                 onChange={e => set('confirmPassword', e.target.value)} 
-                placeholder="Confirm Your Password" 
+                placeholder="Confirm your password" 
               />
               <button
                 type="button"
@@ -101,18 +101,18 @@ export default function Register() {
           <hr className="my-6 border-border" />
 
           <Field label="University">
-            <input type="text" className={inputClass} value={form.university} onChange={e => set('university', e.target.value)} placeholder="Enter Your University" />
+            <input type="text" className={inputClass} value={form.university} onChange={e => set('university', e.target.value)} placeholder="Enter university name" />
           </Field>
 
-          <div className="grid gap-5 sm:grid-cols-3">
-            <Field label="Degree">
-              <input type="text" className={inputClass} value={form.degree} onChange={e => set('degree', e.target.value)} placeholder="Enter Your Degree" />
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <Field label="Degree" optional>
+              <input type="text" className={inputClass} value={form.degree} onChange={e => set('degree', e.target.value)} placeholder="Enter degree name" />
             </Field>
-            <Field label="Branch">
-              <input type="text" className={inputClass} value={form.branch} onChange={e => set('branch', e.target.value)} placeholder="Enter Your Branch" />
+            <Field label="Branch" optional>
+              <input type="text" className={inputClass} value={form.branch} onChange={e => set('branch', e.target.value)} placeholder="Enter branch name" />
             </Field>
-            <Field label="Semester">
-              <select className={inputClass} value={form.semester} onChange={e => set('semester', e.target.value)} placeholder="Enter Your Semester">
+            <Field label="Semester" optional className="col-span-2">
+              <select className={inputClass} value={form.semester} onChange={e => set('semester', e.target.value)} placeholder="Enter semester">
                 {[1, 2, 3, 4, 5, 6, 7, 8].map(s => <option key={s} value={s}>Sem {s}</option>)}
               </select>
             </Field>

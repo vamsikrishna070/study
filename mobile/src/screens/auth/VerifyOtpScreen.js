@@ -147,7 +147,7 @@ const VerifyOtpScreen = ({ route, navigation }) => {
                 onChangeText={setOtp}
                 keyboardType="numeric"
                 maxLength={6}
-                placeholder="Enter 6-digit code"
+                placeholder={mode === 'password-reset' ? 'Enter 6-digit reset code' : 'Enter 6-digit OTP'}
                 editable={!loading}
               />
             </Field>
@@ -158,7 +158,7 @@ const VerifyOtpScreen = ({ route, navigation }) => {
                   value={newPassword}
                   onChangeText={setNewPassword}
                   secureTextEntry
-                  placeholder="Enter New Password"
+                  placeholder="Enter your new password"
                   editable={!loading}
                 />
               </Field>

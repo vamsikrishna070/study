@@ -65,7 +65,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
-                placeholder="Enter Your Email"
+                placeholder="Enter your registered email address"
                 editable={!loading}
               />
             </Field>

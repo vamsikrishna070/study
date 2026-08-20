@@ -65,7 +65,7 @@ const RegisterScreen = ({ navigation }) => {
                 value={name}
                 onChangeText={setName}
                 autoCapitalize="words"
-                placeholder="Enter Your Name"
+                placeholder="Enter your full name"
                 editable={!loading}
               />
             </Field>
@@ -76,7 +76,7 @@ const RegisterScreen = ({ navigation }) => {
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
-                placeholder="Enter Your Email"
+                placeholder="Enter your email address"
                 editable={!loading}
               />
             </Field>
@@ -86,7 +86,7 @@ const RegisterScreen = ({ navigation }) => {
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
-                placeholder="Create a Password"
+                placeholder="Create a password"
                 editable={!loading}
               />
             </Field>

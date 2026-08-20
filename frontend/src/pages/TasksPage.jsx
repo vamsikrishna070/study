@@ -51,7 +51,7 @@ function TaskForm({ initial, onClose, subjects }) {
       >
         <div className="space-y-5">
           <Field label="Task">
-            <input required className={inputClass} value={form.title} onChange={e => set('title', e.target.value)} placeholder="Review deadlock prevention" />
+            <input required className={inputClass} value={form.title} onChange={e => set('title', e.target.value)} placeholder="Enter task title" />
           </Field>
           <div className="grid gap-5 sm:grid-cols-2">
             <Field label="Subject">
@@ -79,7 +79,7 @@ function TaskForm({ initial, onClose, subjects }) {
             </Field>
           </div>
           <Field label="Description">
-            <textarea className={cx(inputClass, 'min-h-24 resize-y')} value={form.description} onChange={e => set('description', e.target.value)} placeholder="Any sub-tasks or notes?" />
+            <textarea className={cx(inputClass, 'min-h-24 resize-y')} value={form.description} onChange={e => set('description', e.target.value)} placeholder="Add task details" />
           </Field>
         </div>
       </Modal>

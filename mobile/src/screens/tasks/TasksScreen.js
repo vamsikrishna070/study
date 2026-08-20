@@ -210,10 +210,10 @@ const TasksScreen = ({ route, navigation }) => {
             </View>
             <ScrollView style={styles.modalScroll}>
               <Field label="Task Title">
-                <Input value={title} onChangeText={setTitle} placeholder="e.g. Read Chapter 5" />
+                <Input value={title} onChangeText={setTitle} placeholder="Enter task title" />
               </Field>
               <Field label="Description">
-                <Input value={description} onChangeText={setDescription} placeholder="Optional details" />
+                <Input value={description} onChangeText={setDescription} placeholder="Add task details" />
               </Field>
               
               <View style={styles.row}>

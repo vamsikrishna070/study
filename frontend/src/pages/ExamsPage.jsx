@@ -41,7 +41,7 @@ function ExamForm({ onClose, subjects }) {
       >
         <div className="space-y-5">
           <Field label="Exam name">
-            <input required className={inputClass} value={form.name} onChange={e => set('name', e.target.value)} placeholder="Operating Systems end semester" data-testid="input-exam-name" />
+            <input required className={inputClass} value={form.name} onChange={e => set('name', e.target.value)} placeholder="Enter exam name" data-testid="input-exam-name" />
           </Field>
           <div className="grid gap-5 sm:grid-cols-2">
             <Field label="Subject">
@@ -66,7 +66,7 @@ function ExamForm({ onClose, subjects }) {
               <input type="time" className={inputClass} value={form.time} onChange={e => set('time', e.target.value)} data-testid="input-exam-time" />
             </Field>
             <Field label="Venue">
-              <input className={inputClass} value={form.venue} onChange={e => set('venue', e.target.value)} placeholder="Room 204" data-testid="input-exam-venue" />
+              <input className={inputClass} value={form.venue} onChange={e => set('venue', e.target.value)} placeholder="Add exam details" data-testid="input-exam-venue" />
             </Field>
           </div>
         </div>

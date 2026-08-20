@@ -39,7 +39,11 @@
       [
         "expo-notifications",
         {
-          "sounds": []
+          "sounds": [
+            "./assets/sounds/default_alarm.wav",
+            "./assets/sounds/gentle_alarm.wav",
+            "./assets/sounds/study_bell.wav"
+          ]
         }
       ],
       [

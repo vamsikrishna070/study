@@ -187,13 +187,13 @@ const NotesScreen = ({ route, navigation }) => {
             </View>
             <ScrollView style={styles.modalScroll}>
               <Field label="Note Title">
-                <Input value={title} onChangeText={setTitle} placeholder="e.g. History Chapter 3" />
+                <Input value={title} onChangeText={setTitle} placeholder="Enter note title" />
               </Field>
               <Field label="Content">
                 <Input 
                   value={content} 
                   onChangeText={setContent} 
-                  placeholder="Write your note here..." 
+                  placeholder="Write your notes here..." 
                   multiline
                   style={{ minHeight: 120, alignItems: 'flex-start' }}
                   textAlignVertical="top"
@@ -204,7 +204,7 @@ const NotesScreen = ({ route, navigation }) => {
                   <Input 
                     value={subjectId} 
                     onChangeText={setSubjectId} 
-                    placeholder="Enter subject ID" 
+                    placeholder="Select subject" 
                   />
                 </Field>
               )}

@@ -14,12 +14,42 @@ export const setupNotifications = async () => {
   let hasPermission = false;
   
   if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('study-reminders', {
-      name: 'Study Reminders',
+    const baseConfig = {
       importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
+      vibrationPattern: [0, 500, 500, 500],
       lightColor: '#df6b47',
-      // use system default sound implicitly
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      audioAttributes: {
+        usage: Notifications.AndroidAudioUsage.ALARM,
+      },
+    };
+
+    // System Default channel
+    await Notifications.setNotificationChannelAsync('study-alarm-default', {
+      ...baseConfig,
+      name: 'Reminders (Default Sound)',
+      sound: true, // system default
+    });
+
+    // Default Custom Alarm channel
+    await Notifications.setNotificationChannelAsync('study-alarm-default-custom', {
+      ...baseConfig,
+      name: 'Reminders (Default Alarm)',
+      sound: 'default_alarm.wav',
+    });
+
+    // Gentle Alarm channel
+    await Notifications.setNotificationChannelAsync('study-alarm-gentle', {
+      ...baseConfig,
+      name: 'Reminders (Gentle)',
+      sound: 'gentle_alarm.wav',
+    });
+
+    // Study Bell channel
+    await Notifications.setNotificationChannelAsync('study-alarm-bell', {
+      ...baseConfig,
+      name: 'Reminders (Study Bell)',
+      sound: 'study_bell.wav',
     });
   }
 
@@ -51,52 +81,62 @@ export const scheduleReminderNotification = async (reminder) => {
     ? `${reminder.title}\n${reminder.description}`
     : reminder.title;
 
+  // Determine Channel ID
+  let channelId = 'study-alarm-default';
+  let soundFilename = true; // Use system default
+
+  if (reminder.soundId === 'default_alarm') {
+    channelId = 'study-alarm-default-custom';
+    soundFilename = 'default_alarm.wav';
+  } else if (reminder.soundId === 'gentle_alarm') {
+    channelId = 'study-alarm-gentle';
+    soundFilename = 'gentle_alarm.wav';
+  } else if (reminder.soundId === 'study_bell') {
+    channelId = 'study-alarm-bell';
+    soundFilename = 'study_bell.wav';
+  }
+
   let trigger;
   
   if (type === 'one-time') {
-    // DateTriggerInput — fires once at the exact date
     trigger = {
       type: Notifications.SchedulableTriggerInputTypes.DATE,
-      channelId: 'study-reminders',
+      channelId,
       date: triggerDate,
     };
   } else if (type === 'daily') {
-    // DailyTriggerInput — fires every day at hour:minute
     trigger = {
       type: Notifications.SchedulableTriggerInputTypes.DAILY,
-      channelId: 'study-reminders',
+      channelId,
       hour: triggerDate.getHours(),
       minute: triggerDate.getMinutes(),
     };
   } else if (type === 'weekly') {
-    // WeeklyTriggerInput — weekday: 1 = Sunday, 2 = Monday, ..., 7 = Saturday
-    let jsWeekday = triggerDate.getDay(); // JS: 0 = Sun, 1 = Mon, ..., 6 = Sat
+    let jsWeekday = triggerDate.getDay(); 
     if (reminder.weekdays && reminder.weekdays.length > 0) {
-      jsWeekday = reminder.weekdays[0]; // Use first selected weekday
+      jsWeekday = reminder.weekdays[0]; 
     }
-    const expoWeekday = jsWeekday + 1; // Expo: 1 = Sun, 2 = Mon, ..., 7 = Sat
+    const expoWeekday = jsWeekday + 1; 
     trigger = {
       type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
-      channelId: 'study-reminders',
+      channelId,
       weekday: expoWeekday,
       hour: triggerDate.getHours(),
       minute: triggerDate.getMinutes(),
     };
   } else if (type === 'monthly') {
-    // MonthlyTriggerInput — day (1-31), hour, minute
     trigger = {
       type: Notifications.SchedulableTriggerInputTypes.MONTHLY,
-      channelId: 'study-reminders',
+      channelId,
       day: reminder.repeatDayOfMonth || triggerDate.getDate(),
       hour: triggerDate.getHours(),
       minute: triggerDate.getMinutes(),
     };
   } else if (type === 'yearly') {
-    // YearlyTriggerInput — month (0-11 JS range), day (1-31), hour, minute
     trigger = {
       type: Notifications.SchedulableTriggerInputTypes.YEARLY,
-      channelId: 'study-reminders',
-      month: triggerDate.getMonth(), // 0 = Jan, 11 = Dec
+      channelId,
+      month: triggerDate.getMonth(), 
       day: reminder.repeatDayOfMonth || triggerDate.getDate(),
       hour: triggerDate.getHours(),
       minute: triggerDate.getMinutes(),
@@ -107,8 +147,10 @@ export const scheduleReminderNotification = async (reminder) => {
     content: {
       title,
       body,
-      vibrate: [0, 250, 250, 250],
-      sound: true, // System default — arbitrary local audio not supported for background notifications
+      vibrate: [0, 500, 500, 500],
+      sound: soundFilename,
+      priority: Notifications.AndroidNotificationPriority.MAX,
+      autoDismiss: false, // Keep it ringing
     },
     trigger,
   });

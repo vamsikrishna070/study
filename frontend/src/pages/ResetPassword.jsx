@@ -65,7 +65,7 @@ export default function ResetPassword() {
               className={inputClass + " text-center text-lg tracking-widest"} 
               value={otp} 
               onChange={e => setOtp(e.target.value)} 
-              placeholder="000000" 
+              placeholder="Enter 6-digit reset code" 
             />
           </Field>
 
@@ -76,7 +76,7 @@ export default function ResetPassword() {
               className={inputClass} 
               value={newPassword} 
               onChange={e => setNewPassword(e.target.value)} 
-              placeholder="Enter New Password" 
+              placeholder="Enter your new password" 
             />
           </Field>
           
@@ -87,7 +87,7 @@ export default function ResetPassword() {
               className={inputClass} 
               value={confirmPassword} 
               onChange={e => setConfirmPassword(e.target.value)} 
-              placeholder="Confirm New Password" 
+              placeholder="Confirm your new password" 
             />
           </Field>
 

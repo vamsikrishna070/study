@@ -161,19 +161,19 @@ const SubjectsScreen = ({ navigation }) => {
             </View>
             <ScrollView style={styles.modalScroll}>
               <Field label="Subject Name">
-                <Input value={name} onChangeText={setName} placeholder="e.g. Data Structures" />
+                <Input value={name} onChangeText={setName} placeholder="Enter subject name" />
               </Field>
               <Field label="Subject Code">
-                <Input value={code} onChangeText={setCode} placeholder="e.g. CS201" />
+                <Input value={code} onChangeText={setCode} placeholder="Enter subject code" />
               </Field>
               <Field label="Credits">
-                <Input value={credits} onChangeText={setCredits} keyboardType="numeric" placeholder="e.g. 3" />
+                <Input value={credits} onChangeText={setCredits} keyboardType="numeric" placeholder="Enter credits" />
               </Field>
               <Field label="Faculty/Professor">
-                <Input value={faculty} onChangeText={setFaculty} placeholder="e.g. Dr. Smith" />
+                <Input value={faculty} onChangeText={setFaculty} placeholder="Enter faculty details" />
               </Field>
               <Field label="Semester">
-                <Input value={semester} onChangeText={setSemester} keyboardType="numeric" placeholder="e.g. 4" />
+                <Input value={semester} onChangeText={setSemester} keyboardType="numeric" placeholder="Enter semester" />
               </Field>
             </ScrollView>
             <View style={[styles.modalFooter, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>

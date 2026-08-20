@@ -50,7 +50,7 @@ export default function Login() {
               className={inputClass} 
               value={email} 
               onChange={e => setEmail(e.target.value)} 
-              placeholder="Enter Your Email" 
+              placeholder="Enter your email address" 
             />
           </Field>
           
@@ -62,7 +62,7 @@ export default function Login() {
                 className={inputClass + " pr-10"} 
                 value={password} 
                 onChange={e => setPassword(e.target.value)} 
-                placeholder="Enter Your Password" 
+                placeholder="Enter your password" 
               />
               <button
                 type="button"

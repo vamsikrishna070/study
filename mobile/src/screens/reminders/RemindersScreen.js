@@ -8,12 +8,12 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import * as DocumentPicker from 'expo-document-picker';
 import { Bell, Plus, CalendarDays, Clock, Trash2, BellOff, ChevronRight, X, Repeat, Music } from 'lucide-react-native';
 import { getReminders, createReminder, updateReminder, deleteReminder } from '../../api/reminders';
+import { DrawerActions } from '@react-navigation/native';
 import {
-  scheduleReminderNotification,
-  cancelReminderNotification,
-  setupNotifications,
-  getAllScheduledNotifications,
-} from '../../services/NotificationService';
+  scheduleAlarm,
+  cancelAlarm,
+} from '../../services/AlarmModule';
+import { setupNotifications } from '../../services/NotificationService';
 import {
   getNotifId,
   setNotifId,
@@ -76,9 +76,7 @@ const RemindersScreen = ({ navigation }) => {
   // Recurrence & Audio State
   const [scheduleType, setScheduleType] = useState('one-time');
   const [weekdays, setWeekdays] = useState([]);
-  const [soundPreference, setSoundPreference] = useState('default');
-  const [soundName, setSoundName] = useState(null);
-  const [soundUri, setSoundUri] = useState(null);
+  const [soundId, setSoundId] = useState('default');
 
   // Date/time picker visibility (Android shows inline picker on press)
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -106,31 +104,19 @@ const RemindersScreen = ({ navigation }) => {
   }, []);
 
   const reconcileNotifications = useCallback(async (data) => {
-    // Get all currently scheduled system notification IDs
-    const scheduled = await getAllScheduledNotifications();
-    const scheduledIds = new Set(scheduled.map(n => n.identifier));
-    // Get our persisted reminder→notifId map
-    const storedMap = await getAllNotifIds();
-
+    // Relying on native persistence for exact alarms (handled on BOOT_COMPLETED natively)
+    // We can just iterate and ensure our DB has them scheduled
     for (const reminder of data) {
       if (!reminder.notificationEnabled) continue;
       const isRecurring = reminder.scheduleType && reminder.scheduleType !== 'one-time';
       if (!isRecurring && !isUpcoming(reminder.remindAt)) continue;
 
-      const storedNotifId = storedMap[reminder._id] || null;
-      const isAlreadyScheduled = storedNotifId && scheduledIds.has(storedNotifId);
-      if (!isAlreadyScheduled) {
-        // Schedule missing notification
-        const body = reminder.description
-          ? `${reminder.title}\n${reminder.description}`
-          : reminder.title;
-        try {
-          const notifId = await scheduleReminderNotification(reminder);
-          if (notifId) {
-            await setNotifId(reminder._id, notifId);
-          }
-        } catch (_) {}
-      }
+      // Note: We don't query native state here to avoid async overhead.
+      // AlarmManager handles duplicates safely (same ID updates the alarm).
+      try {
+        const timestamp = new Date(reminder.remindAt).getTime();
+        await scheduleAlarm(reminder._id, timestamp, reminder.title, reminder.soundId || 'default');
+      } catch (_) {}
     }
   }, []);
 
@@ -155,6 +141,15 @@ const RemindersScreen = ({ navigation }) => {
   // ─── Bottom Sheet ─────────────────────────────────────────────────────────────
 
   const openSheet = async (reminder = null) => {
+    try {
+      if (typeof navigation.closeDrawer === 'function') {
+        navigation.closeDrawer();
+      } else {
+        navigation.dispatch(DrawerActions.closeDrawer());
+      }
+    } catch (e) {
+      // Ignore if not rendered inside a drawer
+    }
     const now = new Date();
     if (reminder) {
       const storedNotifId = await getNotifId(reminder._id);
@@ -168,9 +163,7 @@ const RemindersScreen = ({ navigation }) => {
       setNotificationEnabled(reminder.notificationEnabled !== false);
       setScheduleType(reminder.scheduleType || 'one-time');
       setWeekdays(reminder.weekdays || []);
-      setSoundPreference(reminder.soundPreference || 'default');
-      setSoundName(reminder.soundName || null);
-      setSoundUri(reminder.soundUri || null);
+      setSoundId(reminder.soundId || 'default');
     } else {
       setEditingId(null);
       setEditingNotifId(null);
@@ -181,9 +174,7 @@ const RemindersScreen = ({ navigation }) => {
       setNotificationEnabled(true);
       setScheduleType('one-time');
       setWeekdays([]);
-      setSoundPreference('default');
-      setSoundName(null);
-      setSoundUri(null);
+      setSoundId('default');
     }
     setFormError(null);
     setShowDatePicker(false);
@@ -264,9 +255,7 @@ const RemindersScreen = ({ navigation }) => {
       scheduleType,
       weekdays,
       repeatDayOfMonth: remindAt.getDate(),
-      soundPreference,
-      soundName,
-      soundUri,
+      soundId,
     };
 
     try {
@@ -275,23 +264,16 @@ const RemindersScreen = ({ navigation }) => {
         const res = await updateReminder(editingId, payload);
         const updated = res.data || res;
 
-        // Cancel old notification
-        if (editingNotifId) {
-          await cancelReminderNotification(editingNotifId);
+        // Cancel old native alarm
+        await cancelAlarm(editingId);
+
+        // Schedule new native alarm
+        if (notificationEnabled) {
+          const timestamp = new Date(updated.remindAt).getTime();
+          await scheduleAlarm(editingId, timestamp, updated.title, updated.soundId || 'default');
         }
 
-        // Schedule new notification
-        let newNotifId = null;
-        if (notificationEnabled) {
-          newNotifId = await scheduleReminderNotification(updated);
-          if (newNotifId) {
-            await setNotifId(editingId, newNotifId);
-          } else {
-            await removeNotifId(editingId);
-          }
-        } else {
-          await removeNotifId(editingId);
-        }
+
 
         setReminders(prev => {
           const next = prev.map(r =>
@@ -306,12 +288,9 @@ const RemindersScreen = ({ navigation }) => {
         const created = res.data || res;
 
         // Schedule notification only after successful backend creation
-        let notifId = null;
         if (notificationEnabled) {
-          notifId = await scheduleReminderNotification(created);
-          if (notifId) {
-            await setNotifId(created._id, notifId);
-          }
+          const timestamp = new Date(created.remindAt).getTime();
+          await scheduleAlarm(created._id, timestamp, created.title, created.soundId || 'default');
         }
 
         setReminders(prev => {
@@ -347,11 +326,8 @@ const RemindersScreen = ({ navigation }) => {
           text: 'Delete', style: 'destructive', onPress: async () => {
             try {
               await deleteReminder(reminder._id);
-              // Cancel scheduled notification using our stored ID
-              const storedNotifId = await getNotifId(reminder._id);
-              if (storedNotifId) {
-                await cancelReminderNotification(storedNotifId);
-              }
+              // Cancel scheduled native alarm
+              await cancelAlarm(reminder._id);
               await removeNotifId(reminder._id);
               setReminders(prev => prev.filter(r => r._id !== reminder._id));
             } catch (e) {
@@ -379,24 +355,8 @@ const RemindersScreen = ({ navigation }) => {
     }
   };
 
-  const handleAudioSelect = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({ type: 'audio/*' });
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const file = result.assets[0];
-        setSoundPreference('local');
-        setSoundName(file.name);
-        setSoundUri(file.uri);
-      }
-    } catch (e) {
-      Alert.alert('Error', 'Failed to select audio file.');
-    }
-  };
-
-  const clearAudio = () => {
-    setSoundPreference('default');
-    setSoundName(null);
-    setSoundUri(null);
+  const handleAudioSelect = (id) => {
+    setSoundId(id);
   };
 
   // ─── Render Helpers ───────────────────────────────────────────────────────────
@@ -475,10 +435,14 @@ const RemindersScreen = ({ navigation }) => {
               </Text>
             </View>
           )}
-          {item.soundPreference === 'local' && item.soundName && (
+          {item.soundId && item.soundId !== 'default' && (
             <View style={styles.metaChip}>
               <Music size={12} color={colors.mutedForeground} />
-              <Text style={styles.metaText} numberOfLines={1}>{item.soundName}</Text>
+              <Text style={styles.metaText} numberOfLines={1}>
+                {item.soundId === 'default_alarm' ? 'Default Alarm' : 
+                 item.soundId === 'gentle_alarm' ? 'Gentle Alarm' : 
+                 item.soundId === 'study_bell' ? 'Study Bell' : 'Alarm'}
+              </Text>
             </View>
           )}
           <View style={[styles.statusChip, { backgroundColor: status.color + '22' }]}>
@@ -616,7 +580,7 @@ const RemindersScreen = ({ navigation }) => {
                 style={[styles.input, formError && !title.trim() && styles.inputError]}
                 value={title}
                 onChangeText={setTitle}
-                placeholder="e.g. Study Operating Systems"
+                placeholder="Enter reminder title"
                 placeholderTextColor={colors.mutedForeground}
                 returnKeyType="next"
                 autoFocus
@@ -628,7 +592,7 @@ const RemindersScreen = ({ navigation }) => {
                 style={[styles.input, styles.inputMultiline]}
                 value={description}
                 onChangeText={setDescription}
-                placeholder="e.g. Revise process scheduling"
+                placeholder="Add reminder details"
                 placeholderTextColor={colors.mutedForeground}
                 multiline
                 numberOfLines={2}
@@ -744,26 +708,36 @@ const RemindersScreen = ({ navigation }) => {
 
               {/* ── Notification Sound ───────────────────────────────────────── */}
               <Text style={[styles.fieldLabel, { marginTop: 4 }]}>Notification Sound</Text>
-              <TouchableOpacity
-                style={styles.pickerRow}
-                onPress={handleAudioSelect}
-                activeOpacity={0.7}
-              >
-                <Music size={18} color={colors.primary} style={{ marginRight: 10 }} />
-                <Text style={[styles.pickerText, !soundName && { color: colors.mutedForeground }]} numberOfLines={1}>
-                  {soundName || 'System default'}
-                </Text>
-                {soundName && (
-                  <TouchableOpacity onPress={clearAudio} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <X size={16} color={colors.mutedForeground} />
+              <View style={styles.recurrenceRow}>
+                {[
+                  { value: 'default', label: 'System Default' },
+                  { value: 'default_alarm', label: 'Default Alarm' },
+                  { value: 'gentle_alarm', label: 'Gentle Alarm' },
+                  { value: 'study_bell', label: 'Study Bell' },
+                ].map((opt) => (
+                  <TouchableOpacity
+                    key={opt.value}
+                    style={[
+                      styles.recurrenceChip,
+                      soundId === opt.value && styles.recurrenceChipActive,
+                    ]}
+                    onPress={() => handleAudioSelect(opt.value)}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.recurrenceChipText,
+                        soundId === opt.value && styles.recurrenceChipTextActive,
+                      ]}
+                    >
+                      {opt.label}
+                    </Text>
                   </TouchableOpacity>
-                )}
-              </TouchableOpacity>
-              {soundPreference === 'local' && (
-                <Text style={styles.audioDisclaimer}>
-                  Custom audio is saved as a preference. Android uses the system default sound for background notifications.
-                </Text>
-              )}
+                ))}
+              </View>
+              <Text style={styles.audioDisclaimer}>
+                Select an alarm sound. When triggered, your device will ring at high priority.
+              </Text>
 
               {/* Notification Toggle */}
               <View style={styles.switchRow}>

@@ -93,10 +93,10 @@ export default function SubjectModal({ initial, onClose }) {
       <div className="space-y-5">
         <div className="grid gap-5 sm:grid-cols-[1fr_120px]">
           <Field label="Subject name">
-            <input required className={inputClass} value={form.name} onChange={e => change('name', e.target.value)} placeholder="e.g. Operating Systems" data-testid="input-subject-name" />
+            <input required className={inputClass} value={form.name} onChange={e => change('name', e.target.value)} placeholder="Enter subject name" data-testid="input-subject-name" />
           </Field>
           <Field label="Code">
-            <input required className={inputClass} value={form.code} onChange={e => change('code', e.target.value)} placeholder="CS301" data-testid="input-subject-code" />
+            <input required className={inputClass} value={form.code} onChange={e => change('code', e.target.value)} placeholder="Enter subject code" data-testid="input-subject-code" />
           </Field>
         </div>
         
@@ -117,7 +117,7 @@ export default function SubjectModal({ initial, onClose }) {
         </div>
 
         <Field label="Faculty">
-          <input className={inputClass} value={form.faculty} onChange={e => change('faculty', e.target.value)} placeholder="Department or faculty" data-testid="input-subject-faculty" />
+          <input className={inputClass} value={form.faculty} onChange={e => change('faculty', e.target.value)} placeholder="Enter faculty details" data-testid="input-subject-faculty" />
         </Field>
 
         <Field label="Syllabus (Optional)">
@@ -164,7 +164,7 @@ export default function SubjectModal({ initial, onClose }) {
         </Field>
         
         <Field label="Description">
-          <textarea className={cx(inputClass, 'min-h-24 resize-y')} value={form.description} onChange={e => change('description', e.target.value)} placeholder="What is this subject really about?" data-testid="input-subject-description" />
+          <textarea className={cx(inputClass, 'min-h-24 resize-y')} value={form.description} onChange={e => change('description', e.target.value)} placeholder="Add a short description" data-testid="input-subject-description" />
         </Field>
         
         <Field label="Accent color">

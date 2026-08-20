@@ -45,7 +45,7 @@ export default function Search() {
           className={cx(inputClass, 'pl-11 py-4 text-lg')} 
           value={queryInput} 
           onChange={(e) => setQueryInput(e.target.value)} 
-          placeholder="What are you looking for?" 
+          placeholder="Search StudyArena..." 
         />
       </div>
 
