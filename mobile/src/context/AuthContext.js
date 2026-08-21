@@ -1,18 +1,18 @@
 import React, { createContext, useState, useEffect } from 'react';
 import { getToken, removeToken } from '../storage/token';
-import { loginUser, registerUser, logoutUser, getCurrentUser } from '../api/auth';
+import { loginUser, registerUser, verifyEmail, logoutUser, getCurrentUser } from '../api/auth';
 
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isNewRegistration, setIsNewRegistration] = useState(false);
 
   useEffect(() => {
     const loadUser = async () => {
       try {
         const token = await getToken();
-        // Ensure token is actually a string and not "null", "undefined", or empty
         if (token && token !== 'null' && token !== 'undefined') {
           try {
             const userData = await getCurrentUser();
@@ -38,6 +38,7 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     try {
       const data = await loginUser(email, password);
+      setIsNewRegistration(false);
       setUser(data.user || data);
       return data;
     } catch (error) {
@@ -49,7 +50,6 @@ export const AuthProvider = ({ children }) => {
   const register = async (name, email, password) => {
     try {
       const data = await registerUser(name, email, password);
-      // Registration successful, but email not verified. Don't set user.
       return data;
     } catch (error) {
       console.error('Register error:', error?.message || error);
@@ -59,8 +59,8 @@ export const AuthProvider = ({ children }) => {
 
   const verify = async (email, otp) => {
     try {
-      const { verifyEmail } = require('../api/auth');
       const data = await verifyEmail(email, otp);
+      setIsNewRegistration(true);
       setUser(data.user || data);
       return data;
     } catch (error) {
@@ -75,12 +75,23 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('Logout error:', error?.message || error);
     } finally {
+      setIsNewRegistration(false);
       setUser(null);
     }
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, verify, logout, setUser }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      loading, 
+      isNewRegistration,
+      setIsNewRegistration,
+      login, 
+      register, 
+      verify, 
+      logout, 
+      setUser 
+    }}>
       {children}
     </AuthContext.Provider>
   );

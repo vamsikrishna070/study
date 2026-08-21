@@ -5,10 +5,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { UploadCloud, Image as ImageIcon, Plus, Link, Youtube } from 'lucide-react-native';
 import { useAppTheme, useStyles } from '../../theme/theme';
+import { useAppDialog } from './AppDialog';
 import { Input } from './Input';
 import { Button } from './Button';
 import { AttachmentCard } from './AttachmentCard';
@@ -24,6 +24,7 @@ export function AttachmentUploader({
 }) {
   const { colors, typography, spacing, radii } = useAppTheme();
   const styles = useStyles(createStyles);
+  const { showError } = useAppDialog();
 
   const [uploading, setUploading] = useState(false);
   const [linkInput, setLinkInput] = useState('');
@@ -37,7 +38,7 @@ export function AttachmentUploader({
         onAttachmentsChange([...attachments, { type: 'file', ...uploaded }]);
       }
     } catch (err) {
-      Alert.alert('Upload Error', err.message || 'Failed to upload document.');
+      showError('Upload Error', err.message || 'Failed to upload document.');
     } finally {
       setUploading(false);
     }
@@ -51,7 +52,7 @@ export function AttachmentUploader({
         onAttachmentsChange([...attachments, { type: 'image', ...uploaded }]);
       }
     } catch (err) {
-      Alert.alert('Upload Error', err.message || 'Failed to upload image.');
+      showError('Upload Error', err.message || 'Failed to upload image.');
     } finally {
       setUploading(false);
     }

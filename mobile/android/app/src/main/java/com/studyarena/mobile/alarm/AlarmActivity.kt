@@ -59,4 +59,16 @@ class AlarmActivity : Activity() {
             finish()
         }
     }
+
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        // Dismiss alarm on back press
+        val id = intent.getStringExtra("id")
+        val serviceIntent = Intent(this, AlarmService::class.java).apply {
+            action = AlarmService.ACTION_DISMISS
+            putExtra("id", id)
+        }
+        startService(serviceIntent)
+        super.onBackPressed()
+    }
 }

@@ -4,55 +4,79 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:gravity="center"
-    android:background="#FAFAFA"
-    android:padding="24dp">
+    android:background="#121826"
+    android:padding="28dp">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="StudyArena"
-        android:textSize="20sp"
-        android:textColor="#df6b47"
-        android:textStyle="bold"
-        android:layout_marginBottom="16dp" />
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="REMINDER"
-        android:textSize="14sp"
-        android:textColor="#666666"
-        android:letterSpacing="0.1"
-        android:layout_marginBottom="32dp" />
-
-    <TextView
-        android:id="@+id/tvAlarmTitle"
+    <!-- Card Container -->
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Time to study"
-        android:textSize="28sp"
-        android:textColor="#111111"
-        android:textStyle="bold"
-        android:gravity="center"
-        android:layout_marginBottom="64dp" />
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:background="@drawable/rn_edit_text_material"
+        android:backgroundTint="#1C2436"
+        android:padding="28dp">
 
-    <Button
-        android:id="@+id/btnDismiss"
-        android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:text="DISMISS"
-        android:backgroundTint="#df6b47"
-        android:textColor="#FFFFFF"
-        android:textStyle="bold"
-        android:layout_marginBottom="16dp" />
+        <!-- StudyArena Header -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="StudyArena"
+            android:textSize="22sp"
+            android:textColor="#DF6B47"
+            android:textStyle="bold"
+            android:letterSpacing="0.05"
+            android:layout_marginBottom="4dp" />
 
-    <Button
-        android:id="@+id/btnSnooze"
-        android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:text="SNOOZE 5 MIN"
-        android:backgroundTint="#EEEEEE"
-        android:textColor="#333333"
-        android:textStyle="bold" />
+        <!-- Subtitle Badge -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="SCHEDULED STUDY REMINDER"
+            android:textSize="11sp"
+            android:textColor="#8F9BB3"
+            android:letterSpacing="0.15"
+            android:textStyle="bold"
+            android:layout_marginBottom="32dp" />
+
+        <!-- Alarm Title -->
+        <TextView
+            android:id="@+id/tvAlarmTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Time to study"
+            android:textSize="26sp"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:lineSpacingExtra="4dp"
+            android:layout_marginBottom="40dp" />
+
+        <!-- Dismiss Button -->
+        <Button
+            android:id="@+id/btnDismiss"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="DISMISS ALARM"
+            android:backgroundTint="#DF6B47"
+            android:textColor="#FFFFFF"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.05"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Snooze Button -->
+        <Button
+            android:id="@+id/btnSnooze"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="SNOOZE (5 MIN)"
+            android:backgroundTint="#293656"
+            android:textColor="#F8F6F0"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.05" />
+
+    </LinearLayout>
 
 </LinearLayout>

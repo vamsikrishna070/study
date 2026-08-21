@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { Dimensions } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { createStackNavigator } from '@react-navigation/stack';
 import { LayoutDashboard, BookOpen, ListChecks, CalendarDays } from 'lucide-react-native';
 import { typography, useAppTheme } from '../theme/theme';
+import { AuthContext } from '../context/AuthContext';
 
 import DashboardScreen from '../screens/dashboard/DashboardScreen';
 import SubjectsScreen from '../screens/subjects/SubjectsScreen';
@@ -19,6 +20,7 @@ import RemindersScreen from '../screens/reminders/RemindersScreen';
 import ProgressScreen from '../screens/progress/ProgressScreen';
 import SettingsScreen from '../screens/settings/SettingsScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
+import OnboardingScreen from '../screens/auth/OnboardingScreen';
 
 import Sidebar from '../components/navigation/Sidebar';
 
@@ -58,7 +60,6 @@ const TabNavigator = () => {
         },
       })}
     >
-      {/* Changed names to avoid duplicate route names across Sidebar and Tabs */}
       <Tab.Screen name="OverviewTab" component={DashboardScreen} options={{ title: 'Overview' }} />
       <Tab.Screen name="SubjectsTab" component={SubjectsScreen} options={{ title: 'Subjects' }} />
       <Tab.Screen name="TasksTab" component={TasksScreen} options={{ title: 'Tasks' }} />
@@ -95,9 +96,15 @@ const DrawerNavigator = () => {
 };
 
 const MainNavigator = () => {
+  const { isNewRegistration } = useContext(AuthContext);
+
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator 
+      initialRouteName={isNewRegistration ? 'Onboarding' : 'DrawerRoot'}
+      screenOptions={{ headerShown: false }}
+    >
       <Stack.Screen name="DrawerRoot" component={DrawerNavigator} />
+      <Stack.Screen name="Onboarding" component={OnboardingScreen} />
       <Stack.Screen name="SubjectDetail" component={SubjectDetailScreen} />
       <Stack.Screen name="Tasks" component={TasksScreen} />
       <Stack.Screen name="Exams" component={ExamsScreen} />

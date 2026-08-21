@@ -33,6 +33,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { Button } from '../../components/ui/Button';
 import { SelectPicker } from '../../components/ui/SelectPicker';
 import { WeekdaySelector } from '../../components/ui/WeekdaySelector';
+import { useAppDialog } from '../../components/ui/AppDialog';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '../../theme/theme';
 
@@ -73,6 +74,7 @@ const isToday = (remindAt) => {
 const RemindersScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const { colors, typography, spacing, radii, isDark } = useAppTheme();
+  const { showDialog, showError, showDeleteConfirm } = useAppDialog();
 
   // List state
   const [reminders, setReminders] = useState([]);
@@ -228,7 +230,7 @@ const RemindersScreen = ({ navigation }) => {
   const handlePickCustomAudio = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: ['audio/*', 'application/ogg', 'audio/mpeg', 'audio/wav', 'audio/x-wav', 'audio/mp4'],
+        type: 'audio/*',
         copyToCacheDirectory: true,
       });
       if (result.canceled || !result.assets || result.assets.length === 0) return;
@@ -254,7 +256,7 @@ const RemindersScreen = ({ navigation }) => {
       setSoundUri(destinationUri);
     } catch (e) {
       console.warn('Error selecting audio file:', e);
-      Alert.alert('Audio Picker', 'Could not access the selected audio file. Please try another file.');
+      showError('Audio Picker Error', 'Could not access the selected audio file. Please choose another audio file.');
     }
   };
 
@@ -266,7 +268,14 @@ const RemindersScreen = ({ navigation }) => {
       await stopAudioPreview();
       setPreviewingSound(optValue);
       const targetUri = customUri || (optValue === 'custom' ? soundUri : null);
-      await playAudioPreview(optValue, targetUri);
+      try {
+        const success = await playAudioPreview(optValue, targetUri);
+        if (!success && optValue === 'custom') {
+          showError('Unsupported Audio Format', 'Unable to play this custom audio file. Please select a standard MP3 or WAV file.');
+        }
+      } catch (err) {
+        showError('Audio Preview Error', 'Unable to preview the selected sound.');
+      }
     }
   };
 
@@ -307,10 +316,12 @@ const RemindersScreen = ({ navigation }) => {
     if (submitting) return;
 
     if (notificationEnabled && !notificationPermission) {
-      Alert.alert(
-        'Notification Permission Required',
-        'StudyArena needs notification permission to remind you at the scheduled time. Please enable it in your device Settings.',
-      );
+      showDialog({
+        type: 'warning',
+        title: 'Notification Permission Required',
+        message: 'StudyArena needs notification permission to remind you at the scheduled time. Please enable it in your device Settings.',
+        confirmText: 'OK',
+      });
       return;
     }
 
@@ -412,26 +423,21 @@ const RemindersScreen = ({ navigation }) => {
   // ─── Delete ───────────────────────────────────────────────────────────────────
 
   const handleDelete = (reminder) => {
-    Alert.alert(
-      'Delete Reminder',
-      `Delete "${reminder.title}"? This action cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete', style: 'destructive', onPress: async () => {
-            try {
-              await deleteReminder(reminder._id);
-              // Cancel scheduled native alarm
-              await cancelAlarm(reminder._id);
-              await removeNotifId(reminder._id);
-              setReminders(prev => prev.filter(r => r._id !== reminder._id));
-            } catch (e) {
-              Alert.alert('Error', 'Failed to delete the reminder. Please try again.');
-            }
-          },
-        },
-      ],
-    );
+    showDeleteConfirm({
+      title: 'Delete Reminder',
+      message: `Are you sure you want to delete "${reminder.title}"?\n\nThis action cannot be undone.`,
+      onConfirm: async () => {
+        try {
+          await deleteReminder(reminder._id);
+          // Cancel scheduled native alarm
+          await cancelAlarm(reminder._id);
+          await removeNotifId(reminder._id);
+          setReminders(prev => prev.filter(r => r._id !== reminder._id));
+        } catch (e) {
+          showError('Delete Failed', 'Failed to delete the reminder. Please try again.');
+        }
+      },
+    });
   };
 
   // ─── Date/Time Handlers ───────────────────────────────────────────────────────

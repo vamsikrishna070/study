@@ -36,11 +36,13 @@ import { SelectPicker } from '../../components/ui/SelectPicker';
 import { SyllabusReviewModal } from '../../components/subjects/SyllabusReviewModal';
 import { DocumentPreviewCard } from '../../components/ui/DocumentPreviewCard';
 import { pickAndUploadDocument } from '../../utils/fileUploader';
+import { useAppDialog } from '../../components/ui/AppDialog';
 import { useAppTheme, useStyles } from '../../theme/theme';
 
 const SyllabusScreen = ({ route, navigation }) => {
   const { colors, typography, spacing, radii } = useAppTheme();
   const styles = useStyles(createStyles);
+  const { showSuccess, showError, showDeleteConfirm, showDialog } = useAppDialog();
 
   const passedSubject = route?.params?.subject;
   const passedSubjectId = route?.params?.subjectId || passedSubject?._id || passedSubject?.id;
@@ -116,7 +118,7 @@ const SyllabusScreen = ({ route, navigation }) => {
 
   const handleUploadAndExtract = async () => {
     if (!subjectId) {
-      Alert.alert('Error', 'Please select a subject first.');
+      showError('Required Field', 'Please select a subject first.');
       return;
     }
 
@@ -152,14 +154,16 @@ const SyllabusScreen = ({ route, navigation }) => {
         setParsedUnits(extracted);
         setReviewVisible(true);
       } else {
-        Alert.alert(
-          'Syllabus Uploaded',
-          'Syllabus PDF was uploaded successfully. Text extraction could not detect units automatically, but the document is saved.'
-        );
+        showDialog({
+          type: 'info',
+          title: 'Syllabus Uploaded',
+          message: 'Syllabus PDF was uploaded successfully. Text extraction could not detect units automatically, but the document is saved.',
+          confirmText: 'OK',
+        });
       }
       loadData();
     } catch (e) {
-      Alert.alert('Extraction Failed', e?.response?.data?.message || e.message || 'Failed to extract syllabus.');
+      showError('Extraction Failed', e?.response?.data?.message || e.message || 'Failed to extract syllabus.');
     } finally {
       setUploadingPdf(false);
       setExtracting(false);
@@ -181,10 +185,15 @@ const SyllabusScreen = ({ route, navigation }) => {
         setParsedUnits(extracted);
         setReviewVisible(true);
       } else {
-        Alert.alert('Extraction Notice', 'Could not detect structured units from this PDF.');
+        showDialog({
+          type: 'info',
+          title: 'Extraction Notice',
+          message: 'Could not detect structured units from this PDF.',
+          confirmText: 'OK',
+        });
       }
     } catch (err) {
-      Alert.alert('Extraction Failed', err?.response?.data?.message || 'Failed to extract syllabus.');
+      showError('Extraction Failed', err?.response?.data?.message || 'Failed to extract syllabus.');
     } finally {
       setExtracting(false);
     }
@@ -192,15 +201,22 @@ const SyllabusScreen = ({ route, navigation }) => {
 
   const handleRemoveSyllabus = async () => {
     if (!subjectId) return;
-    try {
-      await updateSubject(subjectId, {
-        syllabusFile: { url: '', publicId: '', originalName: '', mimeType: '', size: 0 },
-      });
-      Alert.alert('Removed', 'Syllabus PDF has been removed.');
-      loadData();
-    } catch (err) {
-      Alert.alert('Error', 'Failed to remove syllabus PDF.');
-    }
+    showDeleteConfirm({
+      title: 'Remove Syllabus',
+      message: 'Are you sure you want to remove the syllabus PDF?',
+      confirmText: 'Remove',
+      onConfirm: async () => {
+        try {
+          await updateSubject(subjectId, {
+            syllabusFile: { url: '', publicId: '', originalName: '', mimeType: '', size: 0 },
+          });
+          showSuccess('Removed', 'Syllabus PDF has been removed.');
+          loadData();
+        } catch (err) {
+          showError('Error', 'Failed to remove syllabus PDF.');
+        }
+      },
+    });
   };
 
   const toggleTopic = async (topic) => {
@@ -227,7 +243,7 @@ const SyllabusScreen = ({ route, navigation }) => {
             : t
         )
       );
-      Alert.alert('Error', 'Failed to update topic status.');
+      showError('Update Failed', 'Failed to update topic status.');
     }
   };
 

@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Mic, Square, Play, Pause, Trash2, UploadCloud, X } from 'lucide-react-native';
 import { useAppTheme, useStyles } from '../../theme/theme';
+import { useAppDialog } from './AppDialog';
 import { Button } from './Button';
 import { Input } from './Input';
 import { Field } from './Field';
@@ -31,6 +32,7 @@ export function VoiceRecorderModal({
 }) {
   const { colors, typography, spacing, radii } = useAppTheme();
   const styles = useStyles(createStyles);
+  const { showError, showDialog } = useAppDialog();
 
   const [title, setTitle] = useState('');
   const [recordingStatus, setRecordingStatus] = useState('idle'); // idle | recording | stopped
@@ -101,7 +103,12 @@ export function VoiceRecorderModal({
     try {
       const hasPermission = await requestPermission();
       if (!hasPermission) {
-        Alert.alert('Permission Denied', 'Microphone permission is required to record audio.');
+        showDialog({
+          type: 'warning',
+          title: 'Permission Denied',
+          message: 'Microphone permission is required to record audio.',
+          confirmText: 'OK',
+        });
         return;
       }
 
@@ -116,7 +123,7 @@ export function VoiceRecorderModal({
       setRecordingStatus('recording');
       startTimer();
     } catch (err) {
-      Alert.alert('Recording Error', err.message || 'Failed to start recording.');
+      showError('Recording Error', err.message || 'Failed to start recording.');
     }
   };
 
@@ -133,7 +140,7 @@ export function VoiceRecorderModal({
       setRecordUri(uri);
       setRecordingStatus('stopped');
     } catch (err) {
-      Alert.alert('Recording Error', err.message || 'Failed to stop recording.');
+      showError('Recording Error', err.message || 'Failed to stop recording.');
     }
   };
 
@@ -163,7 +170,7 @@ export function VoiceRecorderModal({
 
   const handleSaveAndUpload = async () => {
     if (!recordUri && recordingStatus !== 'stopped') {
-      Alert.alert('No Recording', 'Please record audio before saving.');
+      showError('No Recording', 'Please record audio before saving.');
       return;
     }
 
@@ -195,7 +202,7 @@ export function VoiceRecorderModal({
       onSave?.(uploadedData);
       onClose();
     } catch (err) {
-      Alert.alert('Upload Failed', err.message || 'Could not upload voice recording.');
+      showError('Upload Failed', err.message || 'Could not upload voice recording.');
     } finally {
       setUploading(false);
     }

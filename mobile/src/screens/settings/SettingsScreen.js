@@ -7,6 +7,7 @@ import { PageHeading } from '../../components/ui/PageHeading';
 import { Button } from '../../components/ui/Button';
 import { Field } from '../../components/ui/Field';
 import { Input } from '../../components/ui/Input';
+import { useAppDialog } from '../../components/ui/AppDialog';
 import { typography, spacing, radii, useAppTheme, useStyles } from '../../theme/theme';
 import apiClient from '../../api/client';
 import { pickAndUploadImage } from '../../utils/fileUploader';
@@ -14,6 +15,7 @@ import { pickAndUploadImage } from '../../utils/fileUploader';
 const SettingsScreen = ({ navigation }) => {
   const { colors, typography, spacing, radii, theme, isDark, toggleTheme } = useAppTheme();
   const styles = useStyles(createStyles);
+  const { showSuccess, showError, showDialog } = useAppDialog();
 
   const { user, logout, setUser } = useContext(AuthContext);
   const [form, setForm] = useState({
@@ -35,9 +37,9 @@ const SettingsScreen = ({ navigation }) => {
       const data = { ...form, semester: Number(form.semester) };
       const res = await apiClient.patch('/auth/profile', data);
       setUser(res.data.user || res.data);
-      Alert.alert('Success', 'Profile updated successfully.');
+      showSuccess('Profile Saved', 'Your profile details have been updated.');
     } catch (error) {
-      Alert.alert('Error', 'Failed to update profile.');
+      showError('Update Failed', 'Failed to update profile settings. Please try again.');
     } finally {
       setIsSaving(false);
     }
@@ -53,13 +55,24 @@ const SettingsScreen = ({ navigation }) => {
       if (uploaded && uploaded.url) {
         const updateRes = await apiClient.patch('/auth/profile', { profileImageUrl: uploaded.url });
         setUser(updateRes.data.user || updateRes.data);
-        Alert.alert('Success', 'Profile picture updated.');
+        showSuccess('Profile Picture Updated', 'Your new profile picture has been saved.');
       }
     } catch (error) {
-      Alert.alert('Error', error.message || 'Failed to update profile picture.');
+      showError('Photo Upload Failed', error.message || 'Failed to update profile picture.');
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleLogout = () => {
+    showDialog({
+      type: 'destructive',
+      title: 'Log out',
+      message: 'Are you sure you want to log out of StudyArena?',
+      confirmText: 'Log out',
+      cancelText: 'Cancel',
+      onConfirm: logout,
+    });
   };
 
   return (
@@ -160,7 +173,7 @@ const SettingsScreen = ({ navigation }) => {
         <View style={[styles.section, styles.dangerSection]}>
           <Text style={[styles.sectionTitle, { color: colors.destructive }]}>Account</Text>
           <Text style={styles.sectionDetail}>Log out of your current session.</Text>
-          <Button variant="danger" onPress={logout} style={styles.logoutBtn}>
+          <Button variant="danger" onPress={handleLogout} style={styles.logoutBtn}>
             Log out
           </Button>
         </View>

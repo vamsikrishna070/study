@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Trash2, X, Check, BookOpen } from 'lucide-react-native';
 import { useAppTheme, useStyles } from '../../theme/theme';
+import { useAppDialog } from '../ui/AppDialog';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { confirmSyllabus } from '../../api/syllabus';
@@ -25,6 +26,7 @@ export function SyllabusReviewModal({
 }) {
   const { colors, typography, spacing, radii } = useAppTheme();
   const styles = useStyles(createStyles);
+  const { showError, showSuccess } = useAppDialog();
 
   const [units, setUnits] = useState(parsedUnits || []);
   const [saving, setSaving] = useState(false);
@@ -60,18 +62,18 @@ export function SyllabusReviewModal({
 
   const handleConfirm = async () => {
     if (units.length === 0) {
-      Alert.alert('Empty Syllabus', 'Please keep at least one unit.');
+      showError('Empty Syllabus', 'Please keep at least one unit before saving.');
       return;
     }
 
     setSaving(true);
     try {
       await confirmSyllabus(subjectId, units);
-      Alert.alert('Success', 'Syllabus successfully confirmed and saved!');
+      showSuccess('Syllabus Saved', 'Syllabus successfully confirmed and saved!');
       onSuccess?.();
       onClose?.();
     } catch (err) {
-      Alert.alert('Save Failed', err?.response?.data?.message || 'Failed to confirm syllabus.');
+      showError('Save Failed', err?.response?.data?.message || 'Failed to confirm syllabus.');
     } finally {
       setSaving(false);
     }

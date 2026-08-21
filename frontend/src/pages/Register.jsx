@@ -1,11 +1,35 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import { cx, Button, Field, inputClass } from '../components/shared.jsx';
-import { GraduationCap, Eye, EyeOff } from 'lucide-react';
+import { Button, Field, inputClass } from '../components/shared.jsx';
+import { GraduationCap, Eye, EyeOff, Check, X } from 'lucide-react';
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function calculatePasswordStrength(password) {
+  if (!password) return { score: 0, label: '', color: '' };
+  let score = 0;
+  if (password.length >= 8) score += 1;
+  if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score += 1;
+  if (/\d/.test(password)) score += 1;
+  if (/[^A-Za-z0-9]/.test(password)) score += 1;
+
+  switch (score) {
+    case 1:
+      return { score: 1, label: 'Weak', color: '#ef4444' };
+    case 2:
+      return { score: 2, label: 'Fair', color: '#f59e0b' };
+    case 3:
+      return { score: 3, label: 'Good', color: '#3b82f6' };
+    case 4:
+      return { score: 4, label: 'Strong', color: '#10b981' };
+    default:
+      return { score: 0, label: 'Too short', color: '#ef4444' };
+  }
+}
 
 export default function Register() {
-  const [form, setForm] = useState({ name: '', email: '', password: '', confirmPassword: '', university: '', degree: 'B.Tech', branch: 'CSE', semester: '1' });
+  const [form, setForm] = useState({ name: '', email: '', password: '', confirmPassword: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
@@ -13,32 +37,61 @@ export default function Register() {
   const { register } = useAuth();
   const navigate = useNavigate();
 
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const passwordStrength = useMemo(() => calculatePasswordStrength(form.password), [form.password]);
+
+  const set = (k, v) => {
+    setForm(f => ({ ...f, [k]: v }));
+    if (error) setError('');
+  };
+
+  const validate = () => {
+    const name = form.name.trim();
+    const email = form.email.trim().toLowerCase();
+
+    if (!name || name.length < 2) {
+      return 'Please enter your full name (at least 2 characters).';
+    }
+    if (!email || !EMAIL_REGEX.test(email)) {
+      return 'Please enter a valid email address.';
+    }
+    if (!form.password || form.password.length < 8) {
+      return 'Password must contain at least 8 characters.';
+    }
+    if (form.password !== form.confirmPassword) {
+      return 'Passwords do not match.';
+    }
+    return null;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    setIsSubmitting(true);
-
-    if (form.password !== form.confirmPassword) {
-      setError('Passwords do not match');
-      setIsSubmitting(false);
+    const validationError = validate();
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
-    const { confirmPassword, ...payload } = form;
-    const res = await register({ ...payload, semester: Number(form.semester) });
+    setError('');
+    setIsSubmitting(true);
+
+    const payload = {
+      name: form.name.trim(),
+      email: form.email.trim().toLowerCase(),
+      password: form.password,
+    };
+
+    const res = await register(payload);
     if (res.success) {
-      navigate('/verify-email', { replace: true, state: { email: form.email } });
+      navigate('/verify-email', { replace: true, state: { email: payload.email } });
     } else {
-      setError(res.message);
+      setError(res.message || 'Registration failed. Please try again.');
       setIsSubmitting(false);
     }
   };
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4 py-12">
-      <div className="w-full max-w-xl space-y-8 rounded-3xl border border-card-border bg-card p-8 sm:p-10">
+      <div className="w-full max-w-lg space-y-8 rounded-3xl border border-card-border bg-card p-8 sm:p-10 shadow-sm">
         <div className="text-center">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
             <GraduationCap size={28} />
@@ -48,16 +101,31 @@ export default function Register() {
         </div>
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-5">
-          {error && <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
+          {error && <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive font-medium">{error}</div>}
           
-          <div className="grid gap-5 sm:grid-cols-2">
-            <Field label="Full Name">
-              <input type="text" required className={inputClass} value={form.name} onChange={e => set('name', e.target.value)} placeholder="Enter your full name" />
-            </Field>
-            <Field label="Email">
-              <input type="email" required className={inputClass} value={form.email} onChange={e => set('email', e.target.value)} placeholder="Enter your email address" />
-            </Field>
-          </div>
+          <Field label="Full Name">
+            <input 
+              type="text" 
+              required 
+              className={inputClass} 
+              value={form.name} 
+              onChange={e => set('name', e.target.value)} 
+              placeholder="Enter your full name" 
+              disabled={isSubmitting}
+            />
+          </Field>
+
+          <Field label="Email Address">
+            <input 
+              type="email" 
+              required 
+              className={inputClass} 
+              value={form.email} 
+              onChange={e => set('email', e.target.value)} 
+              placeholder="Enter your email address" 
+              disabled={isSubmitting}
+            />
+          </Field>
           
           <Field label="Password">
             <div className="relative">
@@ -67,7 +135,8 @@ export default function Register() {
                 className={inputClass + " pr-10"} 
                 value={form.password} 
                 onChange={e => set('password', e.target.value)} 
-                placeholder="Create a password" 
+                placeholder="Create a strong password (8+ chars)" 
+                disabled={isSubmitting}
               />
               <button
                 type="button"
@@ -77,7 +146,30 @@ export default function Register() {
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
+
+            {form.password.length > 0 && (
+              <div className="mt-2 space-y-1">
+                <div className="flex gap-1.5 h-1">
+                  {[1, 2, 3, 4].map(step => (
+                    <div 
+                      key={step} 
+                      className="flex-1 rounded-full transition-all"
+                      style={{
+                        backgroundColor: passwordStrength.score >= step ? passwordStrength.color : 'var(--card-border, #e2e8f0)'
+                      }}
+                    />
+                  ))}
+                </div>
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Strength:</span>
+                  <span className="font-semibold" style={{ color: passwordStrength.color }}>
+                    {passwordStrength.label}
+                  </span>
+                </div>
+              </div>
+            )}
           </Field>
+
           <Field label="Confirm Password">
             <div className="relative">
               <input 
@@ -86,7 +178,8 @@ export default function Register() {
                 className={inputClass + " pr-10"} 
                 value={form.confirmPassword} 
                 onChange={e => set('confirmPassword', e.target.value)} 
-                placeholder="Confirm your password" 
+                placeholder="Re-enter your password" 
+                disabled={isSubmitting}
               />
               <button
                 type="button"
@@ -96,27 +189,23 @@ export default function Register() {
                 {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
+
+            {form.confirmPassword.length > 0 && (
+              <div className="mt-1 flex items-center gap-1.5 text-xs">
+                {form.password === form.confirmPassword ? (
+                  <>
+                    <Check size={14} className="text-green-500" />
+                    <span className="text-green-600 dark:text-green-400 font-medium">Passwords match</span>
+                  </>
+                ) : (
+                  <>
+                    <X size={14} className="text-destructive" />
+                    <span className="text-destructive font-medium">Passwords do not match</span>
+                  </>
+                )}
+              </div>
+            )}
           </Field>
-
-          <hr className="my-6 border-border" />
-
-          <Field label="University">
-            <input type="text" className={inputClass} value={form.university} onChange={e => set('university', e.target.value)} placeholder="Enter university name" />
-          </Field>
-
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <Field label="Degree" optional>
-              <input type="text" className={inputClass} value={form.degree} onChange={e => set('degree', e.target.value)} placeholder="Enter degree name" />
-            </Field>
-            <Field label="Branch" optional>
-              <input type="text" className={inputClass} value={form.branch} onChange={e => set('branch', e.target.value)} placeholder="Enter branch name" />
-            </Field>
-            <Field label="Semester" optional className="col-span-2">
-              <select className={inputClass} value={form.semester} onChange={e => set('semester', e.target.value)} placeholder="Enter semester">
-                {[1, 2, 3, 4, 5, 6, 7, 8].map(s => <option key={s} value={s}>Sem {s}</option>)}
-              </select>
-            </Field>
-          </div>
 
           <Button type="submit" className="w-full justify-center mt-6" disabled={isSubmitting}>
             {isSubmitting ? 'Creating account...' : 'Create account'}

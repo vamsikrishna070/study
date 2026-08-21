@@ -32,12 +32,14 @@ import { SyllabusReviewModal } from '../../components/subjects/SyllabusReviewMod
 import { getUnits, getTopics, updateTopicCompletion, extractSyllabus } from '../../api/syllabus';
 import { updateSubject, getSubjects } from '../../api/subjects';
 import { pickAndUploadDocument } from '../../utils/fileUploader';
+import { useAppDialog } from '../../components/ui/AppDialog';
 import { typography, spacing, radii, useAppTheme, useStyles } from '../../theme/theme';
 
 const SubjectDetailScreen = ({ route, navigation }) => {
   const { colors, typography, spacing, radii } = useAppTheme();
   const styles = useStyles(createStyles);
   const insets = useSafeAreaInsets();
+  const { showSuccess, showError, showDeleteConfirm, showDialog } = useAppDialog();
 
   const routeId = route.params?.id;
   const initialSubject = route.params?.subject || {};
@@ -128,7 +130,7 @@ const SubjectDetailScreen = ({ route, navigation }) => {
             : t
         )
       );
-      Alert.alert('Update Failed', 'Could not update topic status.');
+      showError('Update Failed', 'Could not update topic status.');
     }
   };
 
@@ -169,10 +171,12 @@ const SubjectDetailScreen = ({ route, navigation }) => {
           setParsedUnits(parsed);
           setReviewModalVisible(true);
         } catch (extractErr) {
-          Alert.alert(
-            'Syllabus Uploaded',
-            'Syllabus PDF was uploaded successfully. Text extraction could not detect units automatically, but you can view the PDF anytime.'
-          );
+          showDialog({
+            type: 'info',
+            title: 'Syllabus Uploaded',
+            message: 'Syllabus PDF was uploaded successfully. Text extraction could not detect units automatically, but you can view the PDF anytime.',
+            confirmText: 'Got It',
+          });
         } finally {
           setExtracting(false);
         }
@@ -180,7 +184,7 @@ const SubjectDetailScreen = ({ route, navigation }) => {
         loadData();
       }
     } catch (err) {
-      Alert.alert('Upload Failed', err.message || 'Could not upload syllabus PDF.');
+      showError('Upload Failed', err.message || 'Could not upload syllabus PDF.');
     } finally {
       setUploadingPdf(false);
       setUploadProgress(0);
@@ -201,7 +205,7 @@ const SubjectDetailScreen = ({ route, navigation }) => {
       setParsedUnits(parsed);
       setReviewModalVisible(true);
     } catch (err) {
-      Alert.alert(
+      showError(
         'Extraction Failed',
         err?.response?.data?.message || 'Could not extract syllabus units from this PDF.'
       );
@@ -211,22 +215,29 @@ const SubjectDetailScreen = ({ route, navigation }) => {
   };
 
   const handleRemoveSyllabus = async () => {
-    try {
-      await updateSubject(subjectId, {
-        syllabusFile: {
-          url: '',
-          publicId: '',
-          originalName: '',
-          mimeType: '',
-          size: 0,
-        },
-      });
-      setSubject((prev) => ({ ...prev, syllabusFile: null }));
-      Alert.alert('Syllabus Removed', 'Syllabus PDF has been detached from this subject.');
-      loadData();
-    } catch (err) {
-      Alert.alert('Error', 'Failed to remove syllabus.');
-    }
+    showDeleteConfirm({
+      title: 'Remove Syllabus',
+      message: 'Are you sure you want to detach the syllabus PDF from this subject?',
+      confirmText: 'Remove',
+      onConfirm: async () => {
+        try {
+          await updateSubject(subjectId, {
+            syllabusFile: {
+              url: '',
+              publicId: '',
+              originalName: '',
+              mimeType: '',
+              size: 0,
+            },
+          });
+          setSubject((prev) => ({ ...prev, syllabusFile: null }));
+          showSuccess('Syllabus Removed', 'Syllabus PDF has been detached from this subject.');
+          loadData();
+        } catch (err) {
+          showError('Error', 'Failed to remove syllabus.');
+        }
+      },
+    });
   };
 
   // ─── Metrics ──────────────────────────────────────────────────────────────────

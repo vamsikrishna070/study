@@ -43,6 +43,7 @@ import { RatingInput } from '../../components/ui/RatingInput';
 import { AttachmentCard } from '../../components/ui/AttachmentCard';
 import { VoiceRecorderModal } from '../../components/ui/VoiceRecorderModal';
 import { pickAndUploadDocument, pickAndUploadImage } from '../../utils/fileUploader';
+import { useAppDialog } from '../../components/ui/AppDialog';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme, useStyles } from '../../theme/theme';
 
@@ -93,6 +94,7 @@ const ResourcesScreen = ({ route, navigation }) => {
   const styles = useStyles(createStyles);
   const insets = useSafeAreaInsets();
   const { logout } = useContext(AuthContext);
+  const { showError, showDeleteConfirm } = useAppDialog();
 
   const paramSubjectId = route?.params?.subjectId || null;
   const paramOpenCreate = route?.params?.openCreate || false;
@@ -170,7 +172,7 @@ const ResourcesScreen = ({ route, navigation }) => {
         }
       }
     } catch (err) {
-      Alert.alert('Upload Failed', err.message || 'Could not upload file.');
+      showError('Upload Failed', err.message || 'Could not upload file.');
     } finally {
       setUploadingFile(false);
     }
@@ -187,7 +189,7 @@ const ResourcesScreen = ({ route, navigation }) => {
         }
       }
     } catch (err) {
-      Alert.alert('Upload Failed', err.message || 'Could not upload image.');
+      showError('Upload Failed', err.message || 'Could not upload image.');
     } finally {
       setUploadingFile(false);
     }
@@ -203,17 +205,17 @@ const ResourcesScreen = ({ route, navigation }) => {
 
   const handleCreate = async () => {
     if (!title.trim()) {
-      Alert.alert('Validation Error', 'Resource title is required.');
+      showError('Validation Error', 'Resource title is required.');
       return;
     }
 
     const isLinkType = resourceType === 'link' || resourceType === 'youtube';
     if (isLinkType && !url.trim()) {
-      Alert.alert('Validation Error', 'URL is required for web / video links.');
+      showError('Validation Error', 'URL is required for web / video links.');
       return;
     }
     if ((resourceType === 'file' || resourceType === 'recording') && !fileData) {
-      Alert.alert('Validation Error', 'Please upload or record a file for this resource.');
+      showError('Validation Error', 'Please upload or record a file for this resource.');
       return;
     }
 
@@ -264,28 +266,25 @@ const ResourcesScreen = ({ route, navigation }) => {
         await loadData();
       }
     } catch (e) {
-      Alert.alert('Error', e?.response?.data?.message || 'Failed to save resource.');
+      showError('Error', e?.response?.data?.message || 'Failed to save resource.');
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleDelete = (id) => {
-    Alert.alert('Delete Resource', 'Are you sure you want to remove this resource?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await deleteResource(id);
-            setData((prev) => prev.filter((item) => (item._id || item.id) !== id));
-          } catch (e) {
-            Alert.alert('Error', 'Failed to delete resource.');
-          }
-        },
+    showDeleteConfirm({
+      title: 'Delete Resource',
+      message: 'Are you sure you want to remove this resource? This action cannot be undone.',
+      onConfirm: async () => {
+        try {
+          await deleteResource(id);
+          setData((prev) => prev.filter((item) => (item._id || item.id) !== id));
+        } catch (e) {
+          showError('Error', 'Failed to delete resource.');
+        }
       },
-    ]);
+    });
   };
 
   const handleToggleWatched = async (item) => {
@@ -306,7 +305,7 @@ const ResourcesScreen = ({ route, navigation }) => {
   const handleOpenResource = async (item) => {
     const targetUrl = (item.fileData && item.fileData.url) || item.url;
     if (!targetUrl) {
-      Alert.alert('Error', 'No URL or file available for this resource.');
+      showError('Error', 'No URL or file available for this resource.');
       return;
     }
 

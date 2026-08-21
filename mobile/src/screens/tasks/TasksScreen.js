@@ -35,6 +35,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Field } from '../../components/ui/Field';
 import { SelectPicker } from '../../components/ui/SelectPicker';
+import { useAppDialog } from '../../components/ui/AppDialog';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme, useStyles } from '../../theme/theme';
 
@@ -55,6 +56,7 @@ const TasksScreen = ({ route, navigation }) => {
   const styles = useStyles(createStyles);
   const insets = useSafeAreaInsets();
   const { logout } = useContext(AuthContext);
+  const { showError, showDeleteConfirm } = useAppDialog();
 
   const paramSubjectId = route?.params?.subjectId || null;
   const paramOpenCreate = route?.params?.openCreate || false;
@@ -81,42 +83,34 @@ const TasksScreen = ({ route, navigation }) => {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setError(null);
-      const [tasksRes, subsRes] = await Promise.all([getTasks(), getSubjects()]);
+      const [tasksRes, subjectsRes] = await Promise.all([
+        getTasks(paramSubjectId ? { subjectId: paramSubjectId } : {}),
+        getSubjects(),
+      ]);
 
-      let tasksData = tasksRes.data || tasksRes || [];
-      const subsData = subsRes.data || subsRes || [];
+      const tList = Array.isArray(tasksRes) ? tasksRes : tasksRes?.data || [];
+      const sList = Array.isArray(subjectsRes) ? subjectsRes : subjectsRes?.data || [];
 
-      if (paramSubjectId) {
-        tasksData = tasksData.filter(
-          (t) => (t.subject?._id || t.subject) === paramSubjectId || t.subjectId === paramSubjectId
-        );
-      }
-
-      setTasks(tasksData);
-      setSubjects(subsData);
-
-      if (!subjectId && subsData.length > 0) {
-        setSubjectId(subsData[0]._id || subsData[0].id);
-      }
-    } catch (e) {
-      if (e.response && e.response.status === 401) {
-        setError('Session expired. Please log in again.');
+      setTasks(tList);
+      setSubjects(sList);
+    } catch (err) {
+      if (err.response?.status === 401) {
         logout();
       } else {
-        setError('Failed to load tasks.');
+        setError(err.response?.data?.message || 'Failed to load tasks.');
       }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [paramSubjectId, logout]);
 
   useEffect(() => {
     loadData();
-  }, [paramSubjectId]);
+  }, [loadData]);
 
   useEffect(() => {
     if (paramOpenCreate) setModalVisible(true);
@@ -125,15 +119,15 @@ const TasksScreen = ({ route, navigation }) => {
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     loadData();
-  }, [paramSubjectId]);
+  }, [loadData]);
 
   const handleCreate = async () => {
     if (!title.trim()) {
-      Alert.alert('Validation Error', 'Task title is required.');
+      showError('Validation Error', 'Task title is required.');
       return;
     }
     if (!subjectId) {
-      Alert.alert('Validation Error', 'Please select a subject.');
+      showError('Validation Error', 'Please select a subject for this task.');
       return;
     }
 
@@ -163,7 +157,7 @@ const TasksScreen = ({ route, navigation }) => {
         await loadData();
       }
     } catch (e) {
-      Alert.alert('Error', e?.response?.data?.message || 'Failed to create task.');
+      showError('Error', e?.response?.data?.message || 'Failed to create task.');
     } finally {
       setSubmitting(false);
     }
@@ -182,27 +176,24 @@ const TasksScreen = ({ route, navigation }) => {
     try {
       await updateTask(taskId, { status: nextStatus });
     } catch (err) {
-      Alert.alert('Error', 'Failed to update task completion status.');
+      showError('Update Error', 'Failed to update task completion status.');
       loadData();
     }
   };
 
   const handleDelete = (id) => {
-    Alert.alert('Delete Task', 'Are you sure you want to delete this task?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await deleteTask(id);
-            setTasks((prev) => prev.filter((t) => (t._id || t.id) !== id));
-          } catch (e) {
-            Alert.alert('Error', 'Failed to delete task.');
-          }
-        },
+    showDeleteConfirm({
+      title: 'Delete Task',
+      message: 'Are you sure you want to delete this task? This action cannot be undone.',
+      onConfirm: async () => {
+        try {
+          await deleteTask(id);
+          setTasks((prev) => prev.filter((t) => (t._id || t.id) !== id));
+        } catch (e) {
+          showError('Delete Failed', 'Failed to delete task. Please try again.');
+        }
       },
-    ]);
+    });
   };
 
   const onDateChange = (event, selectedDate) => {

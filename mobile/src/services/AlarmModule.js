@@ -1,4 +1,4 @@
-import { NativeModules, Platform, Alert } from 'react-native';
+import { NativeModules, Platform } from 'react-native';
 
 const { AlarmModule } = NativeModules;
 
@@ -8,14 +8,7 @@ export const scheduleAlarm = async (id, timestamp, title, soundId, soundUri = nu
   try {
     const hasPermission = await AlarmModule.checkExactAlarmPermission();
     if (!hasPermission) {
-      Alert.alert(
-        'Exact Alarm Permission Required',
-        'To ensure reminders fire exactly on time, StudyArena needs the "Alarms & Reminders" permission. Please enable it in Settings.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Open Settings', onPress: () => AlarmModule.openExactAlarmSettings() }
-        ]
-      );
+      await AlarmModule.openExactAlarmSettings();
       return false;
     }
 
@@ -67,7 +60,6 @@ export const checkExactAlarmPermission = async () => {
 };
 
 export const openExactAlarmSettings = async () => {
-  if (Platform.OS !== 'android' || !AlarmModule) return;
+  if (Platform.OS !== 'android' || !AlarmModule) return false;
   return await AlarmModule.openExactAlarmSettings();
 };
-

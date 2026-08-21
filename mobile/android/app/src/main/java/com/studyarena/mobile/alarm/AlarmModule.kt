@@ -19,33 +19,50 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
 
     private var previewPlayer: MediaPlayer? = null
 
+    companion object {
+        private const val TAG = "AlarmModule"
+        private const val PREFS_NAME = "StudyArenaAlarms"
+    }
+
     override fun getName(): String {
         return "AlarmModule"
     }
 
     private fun getPrefs(): SharedPreferences {
-        return reactApplicationContext.getSharedPreferences("StudyArenaAlarms", Context.MODE_PRIVATE)
+        return reactApplicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     }
 
     @ReactMethod
     fun checkExactAlarmPermission(promise: Promise) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val alarmManager = reactApplicationContext.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            promise.resolve(alarmManager.canScheduleExactAlarms())
-        } else {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val alarmManager = reactApplicationContext.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+                val canSchedule = alarmManager?.canScheduleExactAlarms() ?: true
+                promise.resolve(canSchedule)
+            } else {
+                promise.resolve(true)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error checking exact alarm permission", e)
             promise.resolve(true)
         }
     }
 
     @ReactMethod
     fun openExactAlarmSettings(promise: Promise) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
-            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            reactApplicationContext.startActivity(intent)
-            promise.resolve(true)
-        } else {
-            promise.resolve(false)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                reactApplicationContext.startActivity(intent)
+                promise.resolve(true)
+            } else {
+                promise.resolve(false)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error opening exact alarm settings", e)
+            promise.reject("SETTINGS_ERROR", e.message)
         }
     }
 
@@ -53,9 +70,13 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
     fun scheduleAlarm(id: String, timestamp: Double, title: String, soundId: String, soundUri: String?, promise: Promise) {
         try {
             val context = reactApplicationContext
-            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            
-            // Check exact alarm permission on Android 12+
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+            if (alarmManager == null) {
+                promise.reject("ALARM_SERVICE_NULL", "AlarmManager service is unavailable")
+                return
+            }
+
+            // Check exact alarm permission on Android 12+ (API 31+)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
                 promise.reject("PERMISSION_DENIED", "Exact alarm permission not granted.")
                 return
@@ -64,10 +85,10 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
             // Calculate trigger time in milliseconds
             val triggerAtMillis = timestamp.toLong()
 
-            // Defensive check: Do not schedule alarms in the past or immediately
+            // Defensive check: Do not schedule alarms in the past
             if (triggerAtMillis <= System.currentTimeMillis()) {
-                Log.w("AlarmModule", "Refusing to schedule alarm in the past: $triggerAtMillis <= ${System.currentTimeMillis()}")
-                promise.reject("INVALID_TIMESTAMP", "Alarm trigger time must be strictly in the future. Selected: $triggerAtMillis, Current: ${System.currentTimeMillis()}")
+                Log.w(TAG, "Refusing to schedule alarm in the past: $triggerAtMillis <= ${System.currentTimeMillis()}")
+                promise.reject("INVALID_TIMESTAMP", "Alarm trigger time must be strictly in the future.")
                 return
             }
 
@@ -79,9 +100,9 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                     putExtra("soundUri", soundUri)
                 }
             }
-            
+
             val requestCode = id.hashCode()
-            
+
             val pendingIntent = PendingIntent.getBroadcast(
                 context,
                 requestCode,
@@ -89,11 +110,11 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
-            // Schedule the alarm using setAlarmClock for maximum reliability
+            // Schedule the alarm using setAlarmClock for high reliability
             val info = AlarmManager.AlarmClockInfo(triggerAtMillis, pendingIntent)
             alarmManager.setAlarmClock(info, pendingIntent)
 
-            // Persist the alarm state for device reboot
+            // Persist the alarm state for device reboot recovery
             val prefs = getPrefs()
             val alarmData = JSONObject().apply {
                 put("id", id)
@@ -106,10 +127,10 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
             }
             prefs.edit().putString(id, alarmData.toString()).apply()
 
-            Log.d("AlarmModule", "Successfully scheduled alarm for $id at $triggerAtMillis with soundId=$soundId")
+            Log.d(TAG, "Successfully scheduled alarm for id=$id at $triggerAtMillis with soundId=$soundId")
             promise.resolve(true)
         } catch (e: Exception) {
-            Log.e("AlarmModule", "Error scheduling alarm", e)
+            Log.e(TAG, "Error scheduling alarm", e)
             promise.reject("ALARM_ERROR", e.message)
         }
     }
@@ -118,11 +139,11 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
     fun cancelAlarm(id: String, promise: Promise) {
         try {
             val context = reactApplicationContext
-            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+
             val intent = Intent(context, AlarmReceiver::class.java)
             val requestCode = id.hashCode()
-            
+
             val pendingIntent = PendingIntent.getBroadcast(
                 context,
                 requestCode,
@@ -130,16 +151,16 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
-            alarmManager.cancel(pendingIntent)
-            
+            alarmManager?.cancel(pendingIntent)
+
             // Remove from persistence
             val prefs = getPrefs()
             prefs.edit().remove(id).apply()
 
-            Log.d("AlarmModule", "Cancelled alarm $id")
+            Log.d(TAG, "Cancelled alarm id=$id")
             promise.resolve(true)
         } catch (e: Exception) {
-            Log.e("AlarmModule", "Error cancelling alarm", e)
+            Log.e(TAG, "Error cancelling alarm", e)
             promise.reject("CANCEL_ERROR", e.message)
         }
     }
@@ -152,14 +173,17 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
             val context = reactApplicationContext
             var player: MediaPlayer? = null
 
+            // 1. Try custom soundUri if provided and file exists
             if (!soundUri.isNullOrBlank()) {
                 try {
                     val uri = if (soundUri.startsWith("content://") || soundUri.startsWith("file://")) {
                         Uri.parse(soundUri)
                     } else {
-                        Uri.fromFile(File(soundUri))
+                        val file = File(soundUri)
+                        if (file.exists()) Uri.fromFile(file) else Uri.parse(soundUri)
                     }
-                    player = MediaPlayer().apply {
+
+                    val mp = MediaPlayer().apply {
                         setDataSource(context, uri)
                         setAudioAttributes(
                             AudioAttributes.Builder()
@@ -171,40 +195,50 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                         prepare()
                         start()
                     }
+                    player = mp
                 } catch (e: Exception) {
-                    Log.w("AlarmModule", "Failed to preview custom soundUri: $soundUri", e)
+                    Log.w(TAG, "Failed to preview custom soundUri: $soundUri", e)
                 }
             }
 
+            // 2. Fallback to built-in raw sound resources if custom sound couldn't be loaded
             if (player == null) {
                 val cleanSoundId = when {
                     soundId.isBlank() || soundId == "default" || soundId == "custom" -> "default_alarm"
                     else -> soundId
                 }
-                val resId = context.resources.getIdentifier(cleanSoundId, "raw", context.packageName)
-                val uri = if (resId != 0) {
-                    Uri.parse("android.resource://${context.packageName}/$resId")
-                } else {
-                    Uri.parse("android.resource://${context.packageName}/raw/default_alarm")
+
+                var resId = context.resources.getIdentifier(cleanSoundId, "raw", context.packageName)
+                if (resId == 0) {
+                    resId = context.resources.getIdentifier("default_alarm", "raw", context.packageName)
                 }
-                player = MediaPlayer().apply {
-                    setDataSource(context, uri)
-                    setAudioAttributes(
-                        AudioAttributes.Builder()
-                            .setUsage(AudioAttributes.USAGE_MEDIA)
-                            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                            .build()
-                    )
-                    isLooping = false
-                    prepare()
-                    start()
+
+                if (resId != 0) {
+                    val fallbackUri = Uri.parse("android.resource://${context.packageName}/$resId")
+                    val mp = MediaPlayer().apply {
+                        setDataSource(context, fallbackUri)
+                        setAudioAttributes(
+                            AudioAttributes.Builder()
+                                .setUsage(AudioAttributes.USAGE_MEDIA)
+                                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                                .build()
+                        )
+                        isLooping = false
+                        prepare()
+                        start()
+                    }
+                    player = mp
                 }
             }
 
-            previewPlayer = player
-            promise.resolve(true)
+            if (player != null) {
+                previewPlayer = player
+                promise.resolve(true)
+            } else {
+                promise.reject("AUDIO_PREVIEW_FAILED", "Could not initialize audio player for sound preview.")
+            }
         } catch (e: Exception) {
-            Log.e("AlarmModule", "Failed to play preview", e)
+            Log.e(TAG, "Failed to play preview", e)
             promise.reject("PREVIEW_ERROR", e.message)
         }
     }

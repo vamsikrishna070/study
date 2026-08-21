@@ -8,6 +8,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from './src/context/AuthContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import { ThemeProvider, useAppTheme } from './src/theme/theme';
+import { DialogProvider } from './src/components/ui/AppDialog';
 import { Provider as PaperProvider } from 'react-native-paper';
 
 import { StatusBar } from 'expo-status-bar';
@@ -18,9 +19,11 @@ const MainApp = () => {
   return (
     <PaperProvider theme={theme}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
-      <AuthProvider>
-        <AppNavigator />
-      </AuthProvider>
+      <DialogProvider>
+        <AuthProvider>
+          <AppNavigator />
+        </AuthProvider>
+      </DialogProvider>
     </PaperProvider>
   );
 };

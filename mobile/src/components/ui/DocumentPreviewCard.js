@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { FileText, Eye, Download, Share2, RefreshCw, Trash2, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react-native';
 import { useAppTheme, useStyles } from '../../theme/theme';
+import { useAppDialog } from './AppDialog';
 import { viewDocument, downloadDocument, shareDocument } from '../../utils/documentViewer';
 
 const formatSize = (bytes) => {
@@ -27,6 +28,7 @@ export const DocumentPreviewCard = ({
 }) => {
   const { colors, typography, spacing, radii } = useAppTheme();
   const styles = useStyles(createStyles);
+  const { showDeleteConfirm } = useAppDialog();
   const [downloading, setDownloading] = useState(false);
   const [sharing, setSharing] = useState(false);
 
@@ -55,14 +57,12 @@ export const DocumentPreviewCard = ({
   };
 
   const handleConfirmRemove = () => {
-    Alert.alert(
-      'Remove Syllabus PDF?',
-      'This will remove the attached syllabus document from this subject. You can upload a new syllabus at any time.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Remove', style: 'destructive', onPress: onRemove },
-      ]
-    );
+    showDeleteConfirm({
+      title: 'Remove Syllabus PDF?',
+      message: 'This will remove the attached syllabus document from this subject. You can upload a new syllabus at any time.',
+      confirmText: 'Remove',
+      onConfirm: onRemove,
+    });
   };
 
   return (

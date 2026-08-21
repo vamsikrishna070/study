@@ -35,6 +35,7 @@ import { SelectPicker } from '../../components/ui/SelectPicker';
 import { AttachmentUploader } from '../../components/ui/AttachmentUploader';
 import { AttachmentCard } from '../../components/ui/AttachmentCard';
 import { VoiceRecorderModal } from '../../components/ui/VoiceRecorderModal';
+import { useAppDialog } from '../../components/ui/AppDialog';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme, useStyles } from '../../theme/theme';
 
@@ -55,6 +56,7 @@ const NotesScreen = ({ route, navigation }) => {
   const styles = useStyles(createStyles);
   const insets = useSafeAreaInsets();
   const { logout } = useContext(AuthContext);
+  const { showError, showDeleteConfirm } = useAppDialog();
 
   const paramSubjectId = route?.params?.subjectId || null;
   const paramOpenCreate = route?.params?.openCreate || false;
@@ -129,11 +131,11 @@ const NotesScreen = ({ route, navigation }) => {
 
   const handleCreate = async () => {
     if (!title.trim() || !content.trim()) {
-      Alert.alert('Validation Error', 'Please enter both title and note content.');
+      showError('Validation Error', 'Please enter both title and note content.');
       return;
     }
     if (!subjectId) {
-      Alert.alert('Validation Error', 'Please select a subject.');
+      showError('Validation Error', 'Please select a subject for this note.');
       return;
     }
 
@@ -169,28 +171,25 @@ const NotesScreen = ({ route, navigation }) => {
         await loadData();
       }
     } catch (e) {
-      Alert.alert('Error', e?.response?.data?.message || 'Failed to save note.');
+      showError('Error', e?.response?.data?.message || 'Failed to save note.');
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleDelete = (id) => {
-    Alert.alert('Delete Note', 'Are you sure you want to remove this note? This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await deleteNote(id);
-            setData((prev) => prev.filter((item) => (item._id || item.id) !== id));
-          } catch (e) {
-            Alert.alert('Error', 'Failed to delete note.');
-          }
-        },
+    showDeleteConfirm({
+      title: 'Delete Note',
+      message: 'Are you sure you want to remove this note? This action cannot be undone.',
+      onConfirm: async () => {
+        try {
+          await deleteNote(id);
+          setData((prev) => prev.filter((item) => (item._id || item.id) !== id));
+        } catch (e) {
+          showError('Delete Failed', 'Failed to delete note. Please try again.');
+        }
       },
-    ]);
+    });
   };
 
   const handleVoiceSave = (recording) => {

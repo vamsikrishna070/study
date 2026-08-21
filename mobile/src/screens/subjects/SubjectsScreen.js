@@ -42,6 +42,7 @@ import { ColorPicker, SUBJECT_COLORS } from '../../components/ui/ColorPicker';
 import { AttachmentCard } from '../../components/ui/AttachmentCard';
 import { pickAndUploadDocument } from '../../utils/fileUploader';
 import { viewDocument } from '../../utils/documentViewer';
+import { useAppDialog } from '../../components/ui/AppDialog';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme, useStyles } from '../../theme/theme';
 
@@ -55,6 +56,7 @@ const SubjectsScreen = ({ navigation }) => {
   const styles = useStyles(createStyles);
   const insets = useSafeAreaInsets();
   const { logout } = useContext(AuthContext);
+  const { showSuccess, showError, showDeleteConfirm } = useAppDialog();
 
   const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -146,7 +148,7 @@ const SubjectsScreen = ({ navigation }) => {
         setSyllabusFile(uploaded);
       }
     } catch (err) {
-      Alert.alert('Upload Failed', err.message || 'Could not upload syllabus PDF.');
+      showError('Upload Failed', err.message || 'Could not upload syllabus PDF.');
     } finally {
       setUploadingFile(false);
     }
@@ -166,17 +168,17 @@ const SubjectsScreen = ({ navigation }) => {
             size: uploaded.size,
           },
         });
-        Alert.alert('Syllabus Uploaded', 'Syllabus PDF has been attached to this subject.');
+        showSuccess('Syllabus Uploaded', 'Syllabus PDF has been attached to this subject.');
         loadSubjects();
       }
     } catch (err) {
-      Alert.alert('Upload Failed', err.message || 'Could not upload syllabus.');
+      showError('Upload Failed', err.message || 'Could not upload syllabus.');
     }
   };
 
   const handleSubmit = async () => {
     if (!name.trim() || !code.trim()) {
-      Alert.alert('Required Fields', 'Please enter a subject name and code.');
+      showError('Required Fields', 'Please enter a subject name and code.');
       return;
     }
 
@@ -221,32 +223,25 @@ const SubjectsScreen = ({ navigation }) => {
       }
       setVisible(false);
     } catch (e) {
-      Alert.alert('Error', e?.response?.data?.message || 'Failed to save subject.');
+      showError('Error', e?.response?.data?.message || 'Failed to save subject.');
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleDelete = (id, subName) => {
-    Alert.alert(
-      'Delete Subject',
-      `Delete "${subName || 'this subject'}"? This action cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteSubject(id);
-              setSubjects((prev) => prev.filter((item) => (item._id || item.id) !== id));
-            } catch (e) {
-              Alert.alert('Error', 'Failed to delete subject.');
-            }
-          },
-        },
-      ]
-    );
+    showDeleteConfirm({
+      title: 'Delete Subject',
+      message: `Are you sure you want to delete "${subName || 'this subject'}"? This action cannot be undone.`,
+      onConfirm: async () => {
+        try {
+          await deleteSubject(id);
+          setSubjects((prev) => prev.filter((item) => (item._id || item.id) !== id));
+        } catch (e) {
+          showError('Delete Failed', 'Failed to delete subject. Please try again.');
+        }
+      },
+    });
   };
 
   return (

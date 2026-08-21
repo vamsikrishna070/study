@@ -36,6 +36,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Field } from '../../components/ui/Field';
 import { SelectPicker } from '../../components/ui/SelectPicker';
+import { useAppDialog } from '../../components/ui/AppDialog';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme, useStyles } from '../../theme/theme';
 
@@ -53,6 +54,7 @@ const ExamsScreen = ({ route, navigation }) => {
   const styles = useStyles(createStyles);
   const insets = useSafeAreaInsets();
   const { logout } = useContext(AuthContext);
+  const { showError, showDeleteConfirm } = useAppDialog();
 
   const paramSubjectId = route?.params?.subjectId || null;
   const paramOpenCreate = route?.params?.openCreate || false;
@@ -125,11 +127,11 @@ const ExamsScreen = ({ route, navigation }) => {
 
   const handleCreate = async () => {
     if (!name.trim()) {
-      Alert.alert('Validation Error', 'Exam title/name is required.');
+      showError('Validation Error', 'Exam title/name is required.');
       return;
     }
     if (!subjectId) {
-      Alert.alert('Validation Error', 'Please select a subject.');
+      showError('Validation Error', 'Please select a subject for this exam.');
       return;
     }
 
@@ -160,28 +162,25 @@ const ExamsScreen = ({ route, navigation }) => {
         await loadData();
       }
     } catch (e) {
-      Alert.alert('Error', e?.response?.data?.message || 'Failed to schedule exam.');
+      showError('Error', e?.response?.data?.message || 'Failed to schedule exam.');
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleDelete = (id) => {
-    Alert.alert('Delete Exam', 'Are you sure you want to remove this scheduled exam?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await deleteExam(id);
-            setExams((prev) => prev.filter((e) => (e._id || e.id) !== id));
-          } catch (e) {
-            Alert.alert('Error', 'Failed to delete exam.');
-          }
-        },
+    showDeleteConfirm({
+      title: 'Delete Exam',
+      message: 'Are you sure you want to remove this scheduled exam? This action cannot be undone.',
+      onConfirm: async () => {
+        try {
+          await deleteExam(id);
+          setExams((prev) => prev.filter((e) => (e._id || e.id) !== id));
+        } catch (e) {
+          showError('Delete Failed', 'Failed to delete exam. Please try again.');
+        }
       },
-    ]);
+    });
   };
 
   const onDateChange = (event, selectedDate) => {

@@ -34,13 +34,16 @@ class AlarmService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
-        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "StudyArena:AlarmWakeLock")
-        wakeLock?.acquire(10 * 60 * 1000L /*10 minutes*/)
+        try {
+            val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+            wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "StudyArena:AlarmWakeLock")
+            wakeLock?.acquire(10 * 60 * 1000L /*10 minutes*/)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to acquire wake lock", e)
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // Defensive check: Do not execute or ring on null intents (e.g. system restarts)
         if (intent == null) {
             Log.d(TAG, "onStartCommand received null intent. Stopping service.")
             stopSelf()
@@ -60,8 +63,8 @@ class AlarmService : Service() {
             val soundId = intent.getStringExtra("soundId") ?: "default_alarm"
             val soundUri = intent.getStringExtra("soundUri")
 
-            // Re-schedule for 5 mins
-            val newTime = System.currentTimeMillis() + (5 * 60 * 1000)
+            // Re-schedule for 5 minutes later
+            val newTime = System.currentTimeMillis() + (5 * 60 * 1000L)
             Log.d(TAG, "Snooze action received for reminder $id. Rescheduling at $newTime")
 
             val alarmIntent = Intent(this, AlarmReceiver::class.java).apply {
@@ -80,8 +83,8 @@ class AlarmService : Service() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
-            val alarmManager = getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
-            alarmManager.setAlarmClock(android.app.AlarmManager.AlarmClockInfo(newTime, pendingIntent), pendingIntent)
+            val alarmManager = getSystemService(Context.ALARM_SERVICE) as? android.app.AlarmManager
+            alarmManager?.setAlarmClock(android.app.AlarmManager.AlarmClockInfo(newTime, pendingIntent), pendingIntent)
 
             stopAlarm()
             return START_NOT_STICKY
@@ -101,7 +104,7 @@ class AlarmService : Service() {
         createNotificationChannel()
 
         val fullScreenIntent = Intent(this, AlarmActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             putExtra("id", id)
             putExtra("title", title)
             putExtra("soundId", soundId)
@@ -109,6 +112,7 @@ class AlarmService : Service() {
                 putExtra("soundUri", soundUri)
             }
         }
+
         val fullScreenPendingIntent = PendingIntent.getActivity(
             this,
             id.hashCode(),
@@ -127,23 +131,45 @@ class AlarmService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val snoozeIntent = Intent(this, AlarmService::class.java).apply {
+            action = ACTION_SNOOZE
+            putExtra("id", id)
+            putExtra("title", title)
+            putExtra("soundId", soundId)
+            if (!soundUri.isNullOrBlank()) {
+                putExtra("soundUri", soundUri)
+            }
+        }
+        val snoozePendingIntent = PendingIntent.getService(
+            this,
+            (id + "_snooze").hashCode(),
+            snoozeIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("StudyArena Reminder")
+            .setContentTitle("StudyArena Scheduled Reminder")
             .setContentText(title)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setFullScreenIntent(fullScreenPendingIntent, true)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOngoing(true)
             .addAction(0, "Dismiss", dismissPendingIntent)
+            .addAction(0, "Snooze 5m", snoozePendingIntent)
             .build()
 
         startForeground(NOTIFICATION_ID, notification)
 
         playAlarmSound(soundId, soundUri)
 
-        // Launch activity explicitly to bring to front
-        startActivity(fullScreenIntent)
+        // Launch activity explicitly to show full-screen alarm screen
+        try {
+            startActivity(fullScreenIntent)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to startActivity for AlarmActivity", e)
+        }
 
         return START_NOT_STICKY
     }
@@ -160,7 +186,8 @@ class AlarmService : Service() {
                     val uri = if (soundUri.startsWith("content://") || soundUri.startsWith("file://")) {
                         Uri.parse(soundUri)
                     } else {
-                        Uri.fromFile(File(soundUri))
+                        val file = File(soundUri)
+                        if (file.exists()) Uri.fromFile(file) else Uri.parse(soundUri)
                     }
                     val mp = MediaPlayer().apply {
                         setDataSource(this@AlarmService, uri)
@@ -175,7 +202,7 @@ class AlarmService : Service() {
                         start()
                     }
                     player = mp
-                    Log.d(TAG, "Playing custom audio from $soundUri")
+                    Log.d(TAG, "Playing custom alarm audio from $soundUri")
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to play custom soundUri: $soundUri", e)
                 }
@@ -188,26 +215,28 @@ class AlarmService : Service() {
                     else -> soundId
                 }
 
-                val resId = resources.getIdentifier(cleanSoundId, "raw", packageName)
-                val fallbackUri = if (resId != 0) {
-                    Uri.parse("android.resource://$packageName/$resId")
-                } else {
-                    Uri.parse("android.resource://$packageName/raw/default_alarm")
+                var resId = resources.getIdentifier(cleanSoundId, "raw", packageName)
+                if (resId == 0) {
+                    resId = resources.getIdentifier("default_alarm", "raw", packageName)
                 }
 
-                player = MediaPlayer().apply {
-                    setDataSource(this@AlarmService, fallbackUri)
-                    setAudioAttributes(
-                        AudioAttributes.Builder()
-                            .setUsage(AudioAttributes.USAGE_ALARM)
-                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                            .build()
-                    )
-                    isLooping = true
-                    prepare()
-                    start()
+                if (resId != 0) {
+                    val fallbackUri = Uri.parse("android.resource://$packageName/$resId")
+                    val mp = MediaPlayer().apply {
+                        setDataSource(this@AlarmService, fallbackUri)
+                        setAudioAttributes(
+                            AudioAttributes.Builder()
+                                .setUsage(AudioAttributes.USAGE_ALARM)
+                                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                                .build()
+                        )
+                        isLooping = true
+                        prepare()
+                        start()
+                    }
+                    player = mp
+                    Log.d(TAG, "Playing built-in raw sound $cleanSoundId")
                 }
-                Log.d(TAG, "Playing built-in raw sound $cleanSoundId (resId=$resId)")
             }
 
             mediaPlayer = player
@@ -247,15 +276,16 @@ class AlarmService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Alarm Service Channel",
+                "StudyArena Alarm Notifications",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                setSound(null, null) // Sound is handled by MediaPlayer
+                setSound(null, null) // Audio is actively managed by MediaPlayer
                 enableVibration(true)
                 vibrationPattern = longArrayOf(0, 500, 500, 500)
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             }
             val manager = getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(channel)
+            manager?.createNotificationChannel(channel)
         }
     }
 }

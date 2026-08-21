@@ -1,27 +1,30 @@
-import React, { useState, useContext, useEffect } from 'react';
-import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Text } from 'react-native';
-import { KeyRound, Lock } from 'lucide-react-native';
+import React, { useState, useContext, useEffect, useRef } from 'react';
+import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Text, TouchableOpacity, TextInput } from 'react-native';
+import { KeyRound, Lock, ArrowLeft, RefreshCw, CheckCircle2 } from 'lucide-react-native';
 import { AuthContext } from '../../context/AuthContext';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Field } from '../../components/ui/Field';
 import { typography, radii, spacing, useAppTheme, useStyles } from '../../theme/theme';
-import { forgotPassword, resendOtp, resetPassword } from '../../api/auth';
+import { resendOtp, resetPassword } from '../../api/auth';
 
 const VerifyOtpScreen = ({ route, navigation }) => {
-  const { colors, typography, spacing, radii, theme } = useAppTheme();
+  const { colors, typography, spacing, radii } = useAppTheme();
   const styles = useStyles(createStyles);
-  const email = route.params?.email || '';
+  const email = route.params?.email || '';
   const mode = route.params?.mode || 'email-verification'; // 'email-verification' | 'password-reset'
   
   const { verify } = useContext(AuthContext);
   const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   
-  const [cooldown, setCooldown] = useState(0);
+  const [cooldown, setCooldown] = useState(60); // Start with 60s countdown since OTP was just sent
+  const inputRef = useRef(null);
 
   useEffect(() => {
     let timer;
@@ -33,16 +36,31 @@ const VerifyOtpScreen = ({ route, navigation }) => {
     return () => clearInterval(timer);
   }, [cooldown]);
 
+  const handleOtpChange = (val) => {
+    // Only accept numeric digits, maximum 6
+    const cleaned = val.replace(/[^0-9]/g, '').slice(0, 6);
+    setOtp(cleaned);
+    if (errorMsg) setErrorMsg('');
+  };
+
   const handleVerify = async () => {
     if (loading) return;
     
-    if (!otp) {
-      setErrorMsg('Please enter the verification code.');
+    const cleanedOtp = otp.trim();
+    if (!cleanedOtp || cleanedOtp.length !== 6) {
+      setErrorMsg('Please enter the full 6-digit verification code.');
       return;
     }
-    if (mode === 'password-reset' && !newPassword) {
-      setErrorMsg('Please enter a new password.');
-      return;
+    
+    if (mode === 'password-reset') {
+      if (!newPassword || newPassword.length < 8) {
+        setErrorMsg('New password must contain at least 8 characters.');
+        return;
+      }
+      if (newPassword !== confirmNewPassword) {
+        setErrorMsg('Passwords do not match.');
+        return;
+      }
     }
     
     setErrorMsg('');
@@ -51,28 +69,35 @@ const VerifyOtpScreen = ({ route, navigation }) => {
     
     try {
       if (mode === 'email-verification') {
-        await verify(email, otp);
-        // It will automatically update context and route to Dashboard
+        await verify(email, cleanedOtp);
+        // Note: AppNavigator automatically renders MainNavigator with initial route Onboarding
       } else if (mode === 'password-reset') {
-        await resetPassword(email, otp, newPassword);
-        // After reset, token is set, context should ideally reload or we navigate manually
-        setSuccessMsg('Password reset successfully!');
-        // Small delay before navigating to login to show success message if not auto-navigating
+        await resetPassword(email, cleanedOtp, newPassword);
+        setSuccessMsg('Password reset successfully! Redirecting to login...');
         setTimeout(() => {
           navigation.navigate('Login');
-        }, 1500);
+        }, 1200);
       }
     } catch (error) {
       if (error.response) {
-        if (error.response.status === 500) {
-          setErrorMsg(mode === 'password-reset' ? 'Unable to reset password. Please try again.' : 'Unable to verify email. Please try again.');
+        if (error.response.status === 400) {
+          const msg = error.response.data?.message || '';
+          if (msg.toLowerCase().includes('expired')) {
+            setErrorMsg('Verification code expired. Please tap "Resend Code" below.');
+          } else if (msg.toLowerCase().includes('invalid')) {
+            setErrorMsg('Invalid verification code. Please check and try again.');
+          } else {
+            setErrorMsg(msg || 'Verification failed. Please check the code.');
+          }
+        } else if (error.response.status === 404) {
+          setErrorMsg('Account not found. Please register again.');
         } else {
-          setErrorMsg(error.response.data?.message || 'Verification failed.');
+          setErrorMsg('Unable to verify code. Please try again shortly.');
         }
       } else if (error.request) {
-        setErrorMsg('Unable to connect to StudyArena.');
+        setErrorMsg('Unable to connect to StudyArena. Please check your internet connection.');
       } else {
-        setErrorMsg('An unexpected error occurred.');
+        setErrorMsg('An unexpected error occurred. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -80,39 +105,49 @@ const VerifyOtpScreen = ({ route, navigation }) => {
   };
 
   const handleResend = async () => {
-    if (loading || cooldown > 0) return;
+    if (resending || loading || cooldown > 0) return;
     
     setErrorMsg('');
     setSuccessMsg('');
-    setLoading(true);
+    setResending(true);
     
     try {
-      if (mode === 'email-verification') {
-        await resendOtp(email, 'registration');
-      } else {
-        await resendOtp(email, 'password_reset');
-      }
-      setSuccessMsg('A new verification code has been sent.');
+      const purpose = mode === 'email-verification' ? 'registration' : 'password_reset';
+      await resendOtp(email, purpose);
+      setSuccessMsg('A fresh verification code has been sent to your email.');
       setCooldown(60);
+      setOtp('');
+      inputRef.current?.focus();
     } catch (error) {
       if (error.response) {
-        setErrorMsg(error.response.data?.message || 'Failed to resend code.');
+        if (error.response.status === 429) {
+          setErrorMsg('Please wait a moment before requesting another code.');
+        } else {
+          setErrorMsg(error.response.data?.message || 'Failed to resend code. Please try again.');
+        }
       } else if (error.request) {
-        setErrorMsg('Unable to connect to StudyArena.');
+        setErrorMsg('Unable to connect to StudyArena. Please check your connection.');
       } else {
         setErrorMsg('An unexpected error occurred.');
       }
     } finally {
-      setLoading(false);
+      setResending(false);
     }
   };
+
+  // Render 6 visual boxes for OTP digits
+  const otpDigits = otp.padEnd(6, ' ').split('');
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.card}>
           <View style={styles.header}>
             <View style={styles.iconContainer}>
@@ -126,8 +161,8 @@ const VerifyOtpScreen = ({ route, navigation }) => {
               {mode === 'password-reset' ? 'Reset Password' : 'Verify your email'}
             </Text>
             <Text style={styles.subtitle}>
-              We've sent a 6-digit verification code to:{'\n'}
-              <Text style={{ fontFamily: typography.sans.medium, color: colors.foreground }}>{email}</Text>
+              We sent a 6-digit verification code to:{'\n'}
+              <Text style={styles.emailHighlight}>{email || 'your email'}</Text>
             </Text>
           </View>
 
@@ -138,61 +173,115 @@ const VerifyOtpScreen = ({ route, navigation }) => {
               </View>
             )}
             {!!successMsg && (
-              <View style={[styles.errorContainer, { backgroundColor: `${colors.primary}1A` }]}>
-                <Text style={[styles.errorText, { color: colors.primary }]}>{successMsg}</Text>
+              <View style={styles.successContainer}>
+                <CheckCircle2 size={16} color="#10B981" style={{ marginRight: 6 }} />
+                <Text style={styles.successText}>{successMsg}</Text>
               </View>
             )}
 
-            <Field label="6-Digit Code">
-              <Input
+            <Field label="6-Digit Verification Code">
+              {/* Visual 6-box OTP display */}
+              <TouchableOpacity
+                style={styles.otpBoxesContainer}
+                activeOpacity={1}
+                onPress={() => inputRef.current?.focus()}
+              >
+                {otpDigits.map((digit, index) => {
+                  const isCurrent = otp.length === index;
+                  const isFilled = digit !== ' ';
+                  return (
+                    <View
+                      key={index}
+                      style={[
+                        styles.otpBox,
+                        isCurrent && styles.otpBoxActive,
+                        isFilled && styles.otpBoxFilled,
+                      ]}
+                    >
+                      <Text style={styles.otpBoxText}>{isFilled ? digit : ''}</Text>
+                    </View>
+                  );
+                })}
+              </TouchableOpacity>
+
+              {/* Hidden text input capturing typed / pasted digits */}
+              <TextInput
+                ref={inputRef}
                 value={otp}
-                onChangeText={setOtp}
+                onChangeText={handleOtpChange}
                 keyboardType="numeric"
                 maxLength={6}
-                placeholder={mode === 'password-reset' ? 'Enter 6-digit reset code' : 'Enter 6-digit OTP'}
+                autoFocus={true}
+                textContentType="oneTimeCode"
+                autoComplete="sms-otp"
                 editable={!loading}
+                style={styles.hiddenInput}
               />
             </Field>
 
             {mode === 'password-reset' && (
-              <Field label="New Password">
-                <Input
-                  value={newPassword}
-                  onChangeText={setNewPassword}
-                  secureTextEntry
-                  placeholder="Enter your new password"
-                  editable={!loading}
-                />
-              </Field>
+              <>
+                <Field label="New Password">
+                  <Input
+                    value={newPassword}
+                    onChangeText={setNewPassword}
+                    secureTextEntry
+                    placeholder="Enter new password (8+ chars)"
+                    editable={!loading}
+                  />
+                </Field>
+
+                <Field label="Confirm New Password">
+                  <Input
+                    value={confirmNewPassword}
+                    onChangeText={setConfirmNewPassword}
+                    secureTextEntry
+                    placeholder="Confirm new password"
+                    editable={!loading}
+                  />
+                </Field>
+              </>
             )}
 
             <Button
               onPress={handleVerify}
               loading={loading}
-              disabled={loading}
+              disabled={loading || otp.length < 6}
               style={styles.submitButton}
             >
               {mode === 'password-reset' ? 'Reset Password' : 'Verify Email'}
             </Button>
           </View>
 
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Didn't receive the code? </Text>
-            <Text 
-              style={[styles.footerLink, cooldown > 0 && styles.footerLinkDisabled]} 
-              onPress={handleResend}
-              disabled={cooldown > 0}
-            >
-              {cooldown > 0 ? `Resend OTP in ${cooldown}s` : 'Resend OTP'}
-            </Text>
+          {/* Resend OTP Row */}
+          <View style={styles.resendSection}>
+            <Text style={styles.resendPrompt}>Didn't receive the code? </Text>
+            {cooldown > 0 ? (
+              <Text style={styles.cooldownText}>Resend in {cooldown}s</Text>
+            ) : (
+              <TouchableOpacity
+                onPress={handleResend}
+                disabled={resending || loading}
+                activeOpacity={0.7}
+                style={styles.resendButton}
+              >
+                <RefreshCw size={14} color={colors.accent} style={{ marginRight: 4 }} />
+                <Text style={styles.resendLink}>
+                  {resending ? 'Sending...' : 'Resend Code'}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
-          <View style={[styles.footer, { marginTop: spacing.md }]}>
-            <Text 
-              style={styles.footerLink} 
+
+          <View style={styles.backRow}>
+            <TouchableOpacity 
+              style={styles.backButton}
               onPress={() => navigation.navigate('Login')}
+              activeOpacity={0.7}
             >
-              Back to log in
-            </Text>
+              <ArrowLeft size={16} color={colors.mutedForeground} style={{ marginRight: 4 }} />
+              <Text style={styles.backButtonText}>Back to log in</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
@@ -201,8 +290,16 @@ const VerifyOtpScreen = ({ route, navigation }) => {
 };
 
 const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  scrollContent: { flexGrow: 1, justifyContent: 'center', padding: spacing.md },
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    padding: spacing.lg,
+    paddingVertical: spacing.xxl,
+  },
   card: {
     backgroundColor: colors.card,
     borderRadius: 24,
@@ -215,19 +312,145 @@ const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.crea
     shadowRadius: 28,
     elevation: 2,
   },
-  header: { alignItems: 'center', marginBottom: spacing.xl },
-  iconContainer: {
-    width: 56, height: 56, borderRadius: radii.xl, backgroundColor: colors.primary,
-    alignItems: 'center', justifyContent: 'center', marginBottom: spacing.lg,
+  header: {
+    alignItems: 'center',
+    marginBottom: spacing.xl,
   },
-  title: { fontFamily: typography.serif.medium, fontSize: 32, color: colors.foreground, letterSpacing: -0.5, textAlign: 'center' },
-  subtitle: { fontFamily: typography.sans.regular, fontSize: 14, color: colors.mutedForeground, marginTop: spacing.xs, textAlign: 'center', lineHeight: 20 },
-  form: { marginBottom: spacing.xl },
-  errorContainer: { backgroundColor: `${colors.destructive}1A`, padding: spacing.sm, borderRadius: radii.sm, marginBottom: spacing.md },
-  errorText: { fontFamily: typography.sans.medium, fontSize: 14, color: colors.destructive, textAlign: 'center' },
-  submitButton: { marginTop: spacing.md },
-  footer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
-  footerText: { fontFamily: typography.sans.regular, fontSize: 14, color: colors.mutedForeground },
-  footerLink: { fontFamily: typography.sans.bold, fontSize: 14, color: colors.accent },
-  footerLinkDisabled: { color: colors.mutedForeground, opacity: 0.7 }
-});export default VerifyOtpScreen;
+  iconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: radii.xl,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.lg,
+  },
+  title: {
+    fontFamily: typography.serif.medium,
+    fontSize: 28,
+    color: colors.foreground,
+    letterSpacing: -0.5,
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontFamily: typography.sans.regular,
+    fontSize: 14,
+    color: colors.mutedForeground,
+    marginTop: spacing.xs,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  emailHighlight: {
+    fontFamily: typography.sans.bold,
+    color: colors.foreground,
+  },
+  form: {
+    marginBottom: spacing.md,
+  },
+  errorContainer: {
+    backgroundColor: `${colors.destructive}1A`,
+    padding: spacing.sm,
+    borderRadius: radii.sm,
+    marginBottom: spacing.md,
+  },
+  errorText: {
+    fontFamily: typography.sans.medium,
+    fontSize: 13,
+    color: colors.destructive,
+    textAlign: 'center',
+  },
+  successContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#10B9811A',
+    padding: spacing.sm,
+    borderRadius: radii.sm,
+    marginBottom: spacing.md,
+  },
+  successText: {
+    fontFamily: typography.sans.medium,
+    fontSize: 13,
+    color: '#10B981',
+    textAlign: 'center',
+  },
+  otpBoxesContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginVertical: spacing.xs,
+  },
+  otpBox: {
+    flex: 1,
+    height: 52,
+    borderWidth: 1.5,
+    borderColor: colors.cardBorder,
+    borderRadius: radii.lg,
+    backgroundColor: colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  otpBoxActive: {
+    borderColor: colors.accent,
+    backgroundColor: `${colors.accent}0D`,
+  },
+  otpBoxFilled: {
+    borderColor: colors.primary,
+  },
+  otpBoxText: {
+    fontFamily: typography.sans.bold,
+    fontSize: 22,
+    color: colors.foreground,
+  },
+  hiddenInput: {
+    position: 'absolute',
+    opacity: 0.01,
+    width: 1,
+    height: 1,
+  },
+  submitButton: {
+    marginTop: spacing.md,
+  },
+  resendSection: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  resendPrompt: {
+    fontFamily: typography.sans.regular,
+    fontSize: 14,
+    color: colors.mutedForeground,
+  },
+  cooldownText: {
+    fontFamily: typography.sans.bold,
+    fontSize: 14,
+    color: colors.mutedForeground,
+  },
+  resendButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  resendLink: {
+    fontFamily: typography.sans.bold,
+    fontSize: 14,
+    color: colors.accent,
+  },
+  backRow: {
+    alignItems: 'center',
+    marginTop: spacing.lg,
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.xs,
+  },
+  backButtonText: {
+    fontFamily: typography.sans.medium,
+    fontSize: 14,
+    color: colors.mutedForeground,
+  },
+});
+
+export default VerifyOtpScreen;
