@@ -9,9 +9,11 @@ export default function ResetPassword() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
 
-  const { resetPassword } = useAuth();
+  const { resetPassword, resendOtp } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const email = location.state?.email;
@@ -22,9 +24,17 @@ export default function ResetPassword() {
     }
   }, [email, navigate]);
 
+  useEffect(() => {
+    if (cooldown > 0) {
+      const timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [cooldown]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
 
     if (newPassword !== confirmPassword) {
       setError('Passwords do not match');
@@ -38,6 +48,21 @@ export default function ResetPassword() {
     } else {
       setError(res.message);
       setIsSubmitting(false);
+    }
+  };
+
+  const handleResend = async () => {
+    if (cooldown > 0) return;
+    setError('');
+    setSuccess('');
+    setCooldown(60);
+
+    const res = await resendOtp(email, 'password_reset');
+    if (res.success) {
+      setSuccess(res.message || 'OTP resent successfully.');
+    } else {
+      setError(res.message);
+      setCooldown(0);
     }
   };
 
@@ -56,6 +81,7 @@ export default function ResetPassword() {
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-5">
           {error && <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
+          {success && <div className="rounded-lg bg-green-500/10 p-3 text-sm text-green-600 dark:text-green-400">{success}</div>}
           
           <Field label="Reset Code">
             <input 
@@ -95,6 +121,18 @@ export default function ResetPassword() {
             {isSubmitting ? 'Resetting...' : 'Reset Password'}
           </Button>
         </form>
+
+        <p className="mt-6 text-center text-sm text-muted-foreground">
+          Didn't receive the code?{' '}
+          <button 
+            type="button"
+            onClick={handleResend}
+            disabled={cooldown > 0}
+            className="font-bold text-accent hover:underline disabled:opacity-50 disabled:hover:no-underline"
+          >
+            {cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend Code'}
+          </button>
+        </p>
       </div>
     </div>
   );

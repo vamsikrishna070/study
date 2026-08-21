@@ -48,7 +48,7 @@ export async function register(req, res) {
   try {
     await sendEmail({
       to: user.email,
-      subject: 'Verify your email - StudyArena',
+      subject: 'StudyArena - Email Verification OTP',
       text: `Your verification code is: ${otp}. It expires in 15 minutes.`,
     });
   } catch (error) {
@@ -84,36 +84,65 @@ export async function verifyEmail(req, res) {
 }
 
 export async function resendOtp(req, res) {
-  let { email } = req.body;
+  let { email, purpose = 'registration' } = req.body;
   if (!email) return res.status(400).json({ success: false, message: 'Email is required' });
   email = email.trim().toLowerCase();
 
-  const user = await User.findOne({ email }).select('+otpExpires');
-  if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-  if (user.isVerified) return res.status(400).json({ success: false, message: 'Account is already verified' });
-
-  // Cooldown check (60 seconds)
-  // otpExpires was set to Date.now() + 15 mins. If it's > Date.now() + 14 mins, then < 1 min has passed.
-  if (user.otpExpires && user.otpExpires > new Date(Date.now() + 14 * 60 * 1000)) {
-    return res.status(429).json({ success: false, message: 'Please wait before requesting a new OTP' });
+  const user = await User.findOne({ email }).select('+otpExpires +resetPasswordExpires');
+  if (!user) {
+    if (purpose === 'password_reset') {
+      return res.json({ success: true, message: 'If an account exists, a reset code was sent' });
+    }
+    return res.status(404).json({ success: false, message: 'User not found' });
   }
 
-  const otp = generateOTP();
-  user.otp = await bcrypt.hash(otp, 10);
-  user.otpExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
-  await user.save();
+  if (purpose === 'registration') {
+    if (user.isVerified) return res.status(400).json({ success: false, message: 'Account is already verified' });
 
-  try {
-    await sendEmail({
-      to: user.email,
-      subject: 'Verify your email - StudyArena',
-      text: `Your verification code is: ${otp}. It expires in 15 minutes.`,
-    });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: 'Failed to send verification email' });
+    if (user.otpExpires && user.otpExpires > new Date(Date.now() + 14 * 60 * 1000)) {
+      return res.status(429).json({ success: false, message: 'Please wait before requesting a new OTP' });
+    }
+
+    const otp = generateOTP();
+    user.otp = await bcrypt.hash(otp, 10);
+    user.otpExpires = new Date(Date.now() + 15 * 60 * 1000);
+    await user.save();
+
+    try {
+      await sendEmail({
+        to: user.email,
+        subject: 'StudyArena - Email Verification OTP',
+        text: `Your verification code is: ${otp}. It expires in 15 minutes.`,
+      });
+    } catch (error) {
+      return res.status(500).json({ success: false, message: 'Failed to send verification email' });
+    }
+
+    return res.json({ success: true, message: 'A new verification code has been sent' });
+  } else if (purpose === 'password_reset') {
+    if (user.resetPasswordExpires && user.resetPasswordExpires > new Date(Date.now() + 14 * 60 * 1000)) {
+      return res.status(429).json({ success: false, message: 'Please wait before requesting a new OTP' });
+    }
+
+    const otp = generateOTP();
+    user.resetPasswordOtp = await bcrypt.hash(otp, 10);
+    user.resetPasswordExpires = new Date(Date.now() + 15 * 60 * 1000);
+    await user.save();
+
+    try {
+      await sendEmail({
+        to: user.email,
+        subject: 'StudyArena - Password Reset OTP',
+        text: `Your password reset code is: ${otp}. It expires in 15 minutes.`,
+      });
+    } catch (error) {
+      console.error('Failed to send password reset email:', error.message);
+    }
+
+    return res.json({ success: true, message: 'If an account exists, a reset code was sent' });
+  } else {
+    return res.status(400).json({ success: false, message: 'Invalid purpose' });
   }
-
-  res.json({ success: true, message: 'A new verification code has been sent' });
 }
 
 export async function login(req, res) {
@@ -148,7 +177,7 @@ export async function forgotPassword(req, res) {
   try {
     await sendEmail({
       to: user.email,
-      subject: 'Password Reset - StudyArena',
+      subject: 'StudyArena - Password Reset OTP',
       text: `Your password reset code is: ${otp}. It expires in 15 minutes.`,
     });
   } catch (error) {

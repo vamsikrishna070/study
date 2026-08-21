@@ -3,9 +3,10 @@ import { View, StyleSheet, ScrollView, Text, TouchableOpacity } from 'react-nati
 import { BookOpen, NotebookText, FolderOpen, ListChecks, CalendarClock, ChevronRight, ArrowLeft } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../../components/ui/Button';
-import { colors, typography, spacing, radii } from '../../theme/theme';
+import { typography, spacing, radii, useAppTheme, useStyles } from '../../theme/theme';
 
 const SubjectDetailScreen = ({ route, navigation }) => {
+  const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
   const { id, subject } = route.params;
 
@@ -115,7 +116,7 @@ const SubjectDetailScreen = ({ route, navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background },
   errorText: { fontFamily: typography.sans.medium, color: colors.destructive, marginBottom: spacing.lg },
@@ -164,6 +165,6 @@ const styles = StyleSheet.create({
   moduleTextContainer: { flex: 1 },
   moduleTitle: { fontFamily: typography.sans.bold, fontSize: 16, color: colors.foreground },
   moduleDesc: { fontFamily: typography.sans.regular, fontSize: 13, color: colors.mutedForeground, marginTop: 2 }
-});
+}));
 
 export default SubjectDetailScreen;

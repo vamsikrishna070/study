@@ -13,9 +13,10 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Field } from '../../components/ui/Field';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, typography, spacing, radii } from '../../theme/theme';
+import { typography, spacing, radii, useAppTheme, useStyles } from '../../theme/theme';
 
 const ExamsScreen = ({ route, navigation }) => {
+  const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
   const { logout } = useContext(AuthContext);
   const [exams, setExams] = useState([]);
@@ -252,7 +253,7 @@ const ExamsScreen = ({ route, navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background },
   scroll: { padding: spacing.lg, paddingBottom: spacing.xxl },
@@ -277,6 +278,6 @@ const styles = StyleSheet.create({
   pickerButtonText: { fontFamily: typography.sans.regular, fontSize: 16, color: colors.foreground },
   modalFooter: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.md, padding: spacing.lg, borderTopWidth: 1, borderTopColor: colors.cardBorder, backgroundColor: `${colors.muted}33` },
   modalBtn: { minWidth: 100 }
-});
+}));
 
 export default ExamsScreen;

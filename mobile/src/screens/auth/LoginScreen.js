@@ -5,9 +5,10 @@ import { AuthContext } from '../../context/AuthContext';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Field } from '../../components/ui/Field';
-import { colors, typography, radii, spacing } from '../../theme/theme';
+import { typography, radii, spacing, useAppTheme, useStyles } from '../../theme/theme';
 
 const LoginScreen = ({ navigation }) => {
+  const { colors } = useAppTheme();
   const { login } = useContext(AuthContext);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -118,7 +119,7 @@ const LoginScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -206,6 +207,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.accent,
   }
-});
+}));
 
 export default LoginScreen;

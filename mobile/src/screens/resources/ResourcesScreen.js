@@ -14,9 +14,10 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Field } from '../../components/ui/Field';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, typography, spacing, radii } from '../../theme/theme';
+import { typography, spacing, radii, useAppTheme, useStyles } from '../../theme/theme';
 
 const ResourceIcon = ({ type, mimeType }) => {
+  const { colors } = useAppTheme();
   if (mimeType?.includes('image')) return <ImageIcon size={20} color={colors.secondary} />;
   if (mimeType?.includes('video')) return <Video size={20} color={colors.secondary} />;
   if (mimeType?.includes('audio')) return <Music size={20} color={colors.secondary} />;
@@ -328,7 +329,7 @@ const ResourcesScreen = ({ route, navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background },
   listContent: { padding: spacing.lg, paddingBottom: spacing.xxl },
@@ -425,6 +426,6 @@ const styles = StyleSheet.create({
   modalScroll: { padding: spacing.lg },
   modalFooter: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.md, padding: spacing.lg, borderTopWidth: 1, borderTopColor: colors.cardBorder, backgroundColor: `${colors.muted}33` },
   modalBtn: { minWidth: 100 }
-});
+}));
 
 export default ResourcesScreen;

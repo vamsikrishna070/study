@@ -3,6 +3,7 @@ import { View, StyleSheet, FlatList } from 'react-native';
 import { Appbar, Text, ActivityIndicator } from 'react-native-paper';
 import { Button } from '../../components/ui/Button';
 const ProfileScreen = ({ navigation, route }) => {
+  const { colors, theme } = useAppTheme();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [data, setData] = useState([]);
@@ -54,9 +55,9 @@ const ProfileScreen = ({ navigation, route }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
-});
+}));
 
 export default ProfileScreen;

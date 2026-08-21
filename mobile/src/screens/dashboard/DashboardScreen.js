@@ -12,9 +12,10 @@ import { Card } from '../../components/ui/Card';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { QueryState } from '../../components/ui/QueryState';
 import { Button } from '../../components/ui/Button';
-import { colors, typography, spacing, radii } from '../../theme/theme';
+import { typography, spacing, radii, useAppTheme, useStyles } from '../../theme/theme';
 
 const DashboardScreen = ({ navigation }) => {
+  const { colors } = useAppTheme();
   const { user, logout } = useContext(AuthContext);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -156,7 +157,7 @@ const DashboardScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.create({
   container: { 
     flex: 1, 
     backgroundColor: colors.background 
@@ -206,6 +207,6 @@ const styles = StyleSheet.create({
     color: colors.mutedForeground,
     marginTop: 4,
   }
-});
+}));
 
 export default DashboardScreen;

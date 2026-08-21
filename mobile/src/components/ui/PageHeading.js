@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { colors, typography, spacing } from '../../theme/theme';
+import { typography, spacing, useAppTheme, useStyles } from '../../theme/theme';
 
 export function PageHeading({ eyebrow, title, detail, action, style }) {
   return (
@@ -15,7 +15,7 @@ export function PageHeading({ eyebrow, title, detail, action, style }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.create({
   container: {
     marginBottom: spacing.xl,
   },
@@ -47,4 +47,4 @@ const styles = StyleSheet.create({
   actionContainer: {
     marginTop: spacing.lg,
   }
-});
+}));

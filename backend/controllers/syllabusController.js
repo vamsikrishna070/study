@@ -375,6 +375,10 @@ export async function confirmSyllabus(req, res) {
         .json({ success: false, message: "Units array is required" });
     }
 
+    // Delete existing units and topics for this subject
+    await Unit.deleteMany({ subject: subject._id, user: req.user._id });
+    await Topic.deleteMany({ subject: subject._id, user: req.user._id });
+
     // Insert Units and Topics
     let unitOrder = 0;
     for (const u of units) {

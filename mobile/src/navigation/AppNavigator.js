@@ -4,9 +4,10 @@ import { View, ActivityIndicator } from 'react-native';
 import { AuthContext } from '../context/AuthContext';
 import AuthNavigator from './AuthNavigator';
 import MainNavigator from './MainNavigator';
-import { colors } from '../theme/theme';
+import { useAppTheme } from '../theme/theme';
 
 const AppNavigator = () => {
+  const { colors, theme } = useAppTheme();
   const { user, loading } = useContext(AuthContext);
 
   if (loading) {
@@ -17,8 +18,20 @@ const AppNavigator = () => {
     );
   }
 
+  const navTheme = {
+    dark: theme.dark,
+    colors: {
+      primary: colors.primary,
+      background: colors.background,
+      card: colors.card,
+      text: colors.foreground,
+      border: colors.cardBorder,
+      notification: colors.accent,
+    },
+  };
+
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={navTheme}>
       {user ? <MainNavigator /> : <AuthNavigator />}
     </NavigationContainer>
   );

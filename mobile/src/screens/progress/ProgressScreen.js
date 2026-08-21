@@ -6,9 +6,10 @@ import { AuthContext } from '../../context/AuthContext';
 import { Header } from '../../components/ui/Header';
 import { PageHeading } from '../../components/ui/PageHeading';
 import { QueryState } from '../../components/ui/QueryState';
-import { colors, typography, spacing, radii } from '../../theme/theme';
+import { typography, spacing, radii, useAppTheme, useStyles } from '../../theme/theme';
 
 const ProgressScreen = ({ navigation }) => {
+  const { colors } = useAppTheme();
   const { logout } = useContext(AuthContext);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -111,7 +112,7 @@ const ProgressScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background },
   scroll: { padding: spacing.lg, paddingBottom: spacing.xxl },
@@ -194,6 +195,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     borderRadius: radii.round,
   }
-});
+}));
 
 export default ProgressScreen;

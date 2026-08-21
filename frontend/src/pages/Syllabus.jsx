@@ -276,8 +276,8 @@ export default function Syllabus() {
 
       <div className="space-y-12">
         {displayedSubjects.map((subject) => {
-          const subjectUnits = units.filter((u) => u.subject === subject._id);
-          const subjectTopics = topics.filter((t) => t.subject === subject._id);
+          const subjectUnits = units.filter((u) => u.subjectId === subject._id);
+          const subjectTopics = topics.filter((t) => t.subjectId === subject._id);
           const compTopics = subjectTopics.filter(
             (t) => t.status === "completed",
           ).length;

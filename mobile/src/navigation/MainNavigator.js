@@ -4,7 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { createStackNavigator } from '@react-navigation/stack';
 import { LayoutDashboard, BookOpen, ListChecks, CalendarDays } from 'lucide-react-native';
-import { colors, typography } from '../theme/theme';
+import { typography, useAppTheme } from '../theme/theme';
 
 import DashboardScreen from '../screens/dashboard/DashboardScreen';
 import SubjectsScreen from '../screens/subjects/SubjectsScreen';
@@ -28,6 +28,7 @@ const Stack = createStackNavigator();
 const { width } = Dimensions.get('window');
 
 const TabNavigator = () => {
+  const { colors, theme } = useAppTheme();
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({

@@ -91,3 +91,9 @@ export const ThemeProvider = ({ children }) => {
 };
 
 export const useAppTheme = () => useContext(ThemeContext);
+
+import { useMemo } from 'react';
+export const useStyles = (createStyles) => {
+  const theme = useAppTheme();
+  return useMemo(() => createStyles(theme), [theme]);
+};

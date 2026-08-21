@@ -7,13 +7,13 @@ import { PageHeading } from '../../components/ui/PageHeading';
 import { Button } from '../../components/ui/Button';
 import { Field } from '../../components/ui/Field';
 import { Input } from '../../components/ui/Input';
-import { typography, spacing, radii, useAppTheme, colors } from '../../theme/theme';
+import { typography, spacing, radii, useAppTheme, useStyles } from '../../theme/theme';
 import apiClient from '../../api/client';
 import * as ImagePicker from 'expo-image-picker';
 
 const SettingsScreen = ({ navigation }) => {
   const { user, logout, setUser } = useContext(AuthContext);
-  const { isDark, toggleTheme, colors } = useAppTheme();
+  const { isDark, toggleTheme, colors, theme } = useAppTheme();
   
   const [form, setForm] = useState({
     name: user?.name || '',
@@ -208,7 +208,7 @@ const SettingsScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scroll: { padding: spacing.lg, paddingBottom: spacing.xxl },
   section: {
@@ -370,6 +370,6 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     color: colors.mutedForeground,
   }
-});
+}));
 
 export default SettingsScreen;

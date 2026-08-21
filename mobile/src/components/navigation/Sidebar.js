@@ -18,7 +18,7 @@ import {
 import { DrawerContentScrollView } from '@react-navigation/drawer';
 import { DrawerActions } from '@react-navigation/native';
 import { AuthContext } from '../../context/AuthContext';
-import { colors, typography, spacing, radii } from '../../theme/theme';
+import { typography, spacing, radii, useAppTheme, useStyles } from '../../theme/theme';
 
 const navItems = [
   { href: 'OverviewTab', label: 'Overview', icon: LayoutDashboard },
@@ -33,6 +33,7 @@ const navItems = [
 ];
 
 const Sidebar = (props) => {
+  const { colors } = useAppTheme();
   const { state, navigation } = props;
   const { user, logout } = useContext(AuthContext);
 
@@ -154,7 +155,7 @@ const Sidebar = (props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.card,
@@ -292,6 +293,6 @@ const styles = StyleSheet.create({
     marginLeft: spacing.sm,
     opacity: 0.7,
   }
-});
+}));
 
 export default Sidebar;

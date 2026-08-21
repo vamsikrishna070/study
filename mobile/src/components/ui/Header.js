@@ -4,7 +4,7 @@ import { Menu, Target, ArrowLeft } from 'lucide-react-native';
 import { useNavigation, DrawerActions, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthContext } from '../../context/AuthContext';
-import { colors, typography, spacing, radii } from '../../theme/theme';
+import { typography, spacing, radii, useAppTheme, useStyles } from '../../theme/theme';
 
 const getInitials = (name) => {
   if (!name || typeof name !== 'string') {
@@ -21,6 +21,7 @@ const getInitials = (name) => {
 };
 
 export const Header = ({ showBack }) => {
+  const { colors } = useAppTheme();
   const navigation = useNavigation();
   const route = useRoute();
   const { user } = useContext(AuthContext);
@@ -97,7 +98,7 @@ export const Header = ({ showBack }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.create({
   headerContainer: {
     backgroundColor: colors.background,
     borderBottomWidth: 1,
@@ -174,4 +175,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.primary,
   },
-});
+}));

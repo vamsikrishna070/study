@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { TextInput as RNTextInput, StyleSheet, View, TouchableOpacity } from 'react-native';
 import { Eye, EyeOff } from 'lucide-react-native';
-import { colors, typography, radii, spacing } from '../../theme/theme';
+import { typography, radii, spacing, useAppTheme, useStyles } from '../../theme/theme';
 
 export function Input({ 
   secureTextEntry, 
@@ -44,7 +44,7 @@ export function Input({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -74,4 +74,4 @@ const styles = StyleSheet.create({
     height: '100%',
     justifyContent: 'center',
   }
-});
+}));

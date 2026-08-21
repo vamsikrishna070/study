@@ -12,9 +12,10 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Field } from '../../components/ui/Field';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, typography, spacing, radii } from '../../theme/theme';
+import { typography, spacing, radii, useAppTheme, useStyles } from '../../theme/theme';
 
 const SubjectsScreen = ({ navigation }) => {
+  const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
   const { logout } = useContext(AuthContext);
   const [subjects, setSubjects] = useState([]);
@@ -187,7 +188,7 @@ const SubjectsScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scroll: { padding: spacing.lg, paddingBottom: spacing.xxl },
   card: { marginBottom: spacing.md, padding: spacing.md },
@@ -208,7 +209,7 @@ const styles = StyleSheet.create({
   modalScroll: { padding: spacing.lg },
   modalFooter: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.md, padding: spacing.lg, borderTopWidth: 1, borderTopColor: colors.cardBorder, backgroundColor: `${colors.muted}33` },
   modalBtn: { minWidth: 100 }
-});
+}));
 
 export default SubjectsScreen;
 

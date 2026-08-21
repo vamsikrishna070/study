@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { colors, typography, radii, spacing } from '../../theme/theme';
+import { typography, radii, spacing, useAppTheme, useStyles } from '../../theme/theme';
 
 export function Card({ 
   children, 
@@ -30,7 +30,7 @@ export function Card({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.create({
   card: {
     backgroundColor: colors.card,
     borderRadius: radii.xxl,
@@ -58,4 +58,4 @@ const styles = StyleSheet.create({
   content: {
     // Content takes the rest
   }
-});
+}));

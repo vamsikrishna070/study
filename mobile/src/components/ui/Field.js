@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { colors, typography, spacing } from '../../theme/theme';
+import { typography, spacing, useAppTheme, useStyles } from '../../theme/theme';
 
 export function Field({ label, hint, children, style }) {
   return (
@@ -12,7 +12,7 @@ export function Field({ label, hint, children, style }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.create({
   container: {
     marginBottom: spacing.md,
   },
@@ -30,4 +30,4 @@ const styles = StyleSheet.create({
     color: colors.mutedForeground,
     marginTop: spacing.xs,
   }
-});
+}));

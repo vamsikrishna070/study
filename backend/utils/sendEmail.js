@@ -1,7 +1,11 @@
+import nodemailer from 'nodemailer';
+
 export const sendEmail = async ({ to, subject, text, html }) => {
   try {
     const fromName = process.env.BREVO_FROM_NAME || 'StudyArena';
-    const fromEmail = process.env.BREVO_FROM_EMAIL || 'creatorhub.studios07@gmail.com';
+    // Use the Brevo SMTP User email as the sender if not specified, 
+    // because Brevo requires the sender email to be verified on the account.
+    const fromEmail = process.env.BREVO_FROM_EMAIL || process.env.BREVO_SMTP_USER || 'creatorhub.studios07@gmail.com';
     
     // Auto-generate HTML if not provided, to preserve existing OTP functionality but make it production-quality
     let finalHtml = html;
@@ -31,43 +35,32 @@ export const sendEmail = async ({ to, subject, text, html }) => {
       `;
     }
 
-    if (!process.env.BREVO_API_KEY) {
-      throw new Error('BREVO_API_KEY environment variable is not configured.');
+    if (!process.env.BREVO_SMTP_HOST || !process.env.BREVO_SMTP_USER || !process.env.BREVO_SMTP_PASSWORD) {
+      throw new Error('Brevo SMTP credentials are not fully configured in environment variables.');
     }
 
-    const payload = {
-      sender: {
-        name: fromName,
-        email: fromEmail
+    const transporter = nodemailer.createTransport({
+      host: process.env.BREVO_SMTP_HOST,
+      port: Number(process.env.BREVO_SMTP_PORT || 587),
+      secure: false,
+      auth: {
+        user: process.env.BREVO_SMTP_USER,
+        pass: process.env.BREVO_SMTP_PASSWORD,
       },
-      to: [
-        {
-          email: to
-        }
-      ],
-      subject,
-      htmlContent: finalHtml
-    };
-
-    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: {
-        'accept': 'application/json',
-        'api-key': process.env.BREVO_API_KEY,
-        'content-type': 'application/json'
-      },
-      body: JSON.stringify(payload)
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error('Brevo API Error:', errorData);
-      throw new Error(errorData.message || 'Failed to send email via Brevo');
-    }
+    const mailOptions = {
+      from: `"${fromName}" <${fromEmail}>`,
+      to,
+      subject,
+      text,
+      html: finalHtml,
+    };
 
-    return true; // For backwards compatibility if any code relies on truthy return
+    await transporter.sendMail(mailOptions);
+    return true;
   } catch (error) {
     console.error('Error sending email:', error.message);
-    throw error; // Throw so controller can handle appropriately
+    throw error;
   }
 };

@@ -4,10 +4,11 @@ import { Mail } from 'lucide-react-native';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Field } from '../../components/ui/Field';
-import { colors, typography, radii, spacing } from '../../theme/theme';
+import { typography, radii, spacing, useAppTheme, useStyles } from '../../theme/theme';
 import { forgotPassword } from '../../api/auth';
 
 const ForgotPasswordScreen = ({ navigation }) => {
+  const { colors } = useAppTheme();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -93,7 +94,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scrollContent: { flexGrow: 1, justifyContent: 'center', padding: spacing.md },
   card: {
@@ -121,6 +122,6 @@ const styles = StyleSheet.create({
   submitButton: { marginTop: spacing.md },
   footer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
   footerLink: { fontFamily: typography.sans.bold, fontSize: 14, color: colors.accent }
-});
+}));
 
 export default ForgotPasswordScreen;

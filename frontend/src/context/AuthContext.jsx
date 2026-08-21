@@ -88,12 +88,10 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const resendOtp = async (email) => {
+  const resendOtp = async (email, purpose = 'registration') => {
     try {
-      const { data } = await apiClient.post('/auth/resend-otp', { email });
-      if (data.success) {
-        return { success: true, message: data.message };
-      }
+      const { data } = await apiClient.post('/auth/resend-otp', { email, purpose });
+      return { success: true, message: data.message };
     } catch (error) {
       return { success: false, message: error.response?.data?.message || 'Failed to resend OTP' };
     }

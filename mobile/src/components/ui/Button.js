@@ -1,6 +1,6 @@
 import React from 'react';
 import { TouchableOpacity, Text, View, StyleSheet, ActivityIndicator } from 'react-native';
-import { colors, typography, radii, spacing } from '../../theme/theme';
+import { typography, radii, spacing, useAppTheme, useStyles } from '../../theme/theme';
 
 export function Button({ 
   children, 
@@ -67,7 +67,7 @@ export function Button({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.create({
   baseButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -90,4 +90,4 @@ const styles = StyleSheet.create({
   disabled: {
     opacity: 0.5,
   }
-});
+}));

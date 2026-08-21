@@ -9,10 +9,11 @@ import { PageHeading } from '../../components/ui/PageHeading';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { QueryState } from '../../components/ui/QueryState';
 import { Button } from '../../components/ui/Button';
-import { colors, typography, spacing, radii } from '../../theme/theme';
+import { typography, spacing, radii, useAppTheme, useStyles } from '../../theme/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const SyllabusScreen = ({ route, navigation }) => {
+  const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
   const passedSubject = route?.params?.subject;
   const passedSubjectId = route?.params?.subjectId || passedSubject?._id;
@@ -254,7 +255,6 @@ const SyllabusScreen = ({ route, navigation }) => {
                       setSubject(item);
                       setSubjectPickerVisible(false);
                       setUnits([]);
-                      loadData();
                     }}
                     activeOpacity={0.7}
                   >
@@ -273,7 +273,7 @@ const SyllabusScreen = ({ route, navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background },
   scroll: { padding: spacing.lg, paddingBottom: spacing.xxl },
@@ -377,6 +377,6 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     padding: spacing.sm,
   }
-});
+}));
 
 export default SyllabusScreen;

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { colors, typography, radii, spacing } from '../../theme/theme';
+import { typography, radii, spacing, useAppTheme, useStyles } from '../../theme/theme';
 
 export function EmptyState({ icon: Icon, title, detail, action, style }) {
   return (
@@ -15,7 +15,7 @@ export function EmptyState({ icon: Icon, title, detail, action, style }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.create({
   container: {
     backgroundColor: `${colors.card}80`, // 50% opacity hex
     borderRadius: radii.xxl,
@@ -53,4 +53,4 @@ const styles = StyleSheet.create({
   actionWrapper: {
     marginTop: spacing.lg,
   }
-});
+}));

@@ -25,8 +25,8 @@ export const verifyEmail = async (email, otp) => {
   return payload;
 };
 
-export const resendOtp = async (email) => {
-  const response = await client.post('/auth/resend-otp', { email });
+export const resendOtp = async (email, purpose = 'registration') => {
+  const response = await client.post('/auth/resend-otp', { email, purpose });
   return response.data;
 };
 

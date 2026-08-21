@@ -14,10 +14,10 @@ import { StatusBar } from 'expo-status-bar';
 
 // Inner app to consume theme
 const MainApp = () => {
-  const { colors, theme } = useAppTheme();
+  const { colors, theme, isDark } = useAppTheme();
   return (
     <PaperProvider theme={theme}>
-      <StatusBar style="auto" />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <AuthProvider>
         <AppNavigator />
       </AuthProvider>

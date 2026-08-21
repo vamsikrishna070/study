@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { X } from 'lucide-react-native';
 import { Button } from './Button';
-import { colors, typography, radii, spacing } from '../../theme/theme';
+import { typography, radii, spacing, useAppTheme, useStyles } from '../../theme/theme';
 
 export function QueryState({ error, onRetry, label = 'This section' }) {
   if (!error) return null;
@@ -20,7 +20,7 @@ export function QueryState({ error, onRetry, label = 'This section' }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.create({
   container: {
     backgroundColor: `${colors.destructive}0D`, // 5% opacity
     borderRadius: radii.xxl,
@@ -57,4 +57,4 @@ const styles = StyleSheet.create({
     minHeight: 40,
     paddingVertical: 8,
   }
-});
+}));
