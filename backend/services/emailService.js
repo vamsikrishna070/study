@@ -89,7 +89,7 @@ export const sendEmail = async ({ to, subject, text, html }) => {
   const apiKey = process.env.BREVO_API_KEY;
   if (!apiKey) {
     console.error('[EmailService] BREVO_API_KEY is not configured in environment variables.');
-    throw new Error('Email service is temporarily unavailable. Please check server configuration.');
+    throw new Error('Brevo API key is not configured.');
   }
 
   const fromEmail = process.env.BREVO_FROM_EMAIL || 'creatorhub.studios07@gmail.com';
