@@ -6,7 +6,7 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
-import { UploadCloud, Image as ImageIcon, Plus, Link, Youtube } from 'lucide-react-native';
+import { UploadCloud, Image as ImageIcon, Plus, Link, Video } from 'lucide-react-native';
 import { useAppTheme, useStyles } from '../../theme/theme';
 import { useAppDialog } from './AppDialog';
 import { Input } from './Input';

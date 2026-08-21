@@ -9,7 +9,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import { 
   Bell, Plus, CalendarDays, Clock, Trash2, BellOff, ChevronRight, X, 
-  Repeat, Music, Volume2, VolumeX, FolderMusic, Check, AlertCircle 
+  Repeat, Music, Volume2, VolumeX, FileMusic, Check, AlertCircle 
 } from 'lucide-react-native';
 import { getReminders, createReminder, updateReminder, deleteReminder } from '../../api/reminders';
 import { getSubjects } from '../../api/subjects';
@@ -913,7 +913,7 @@ const RemindersScreen = ({ navigation }) => {
                     onPress={handlePickCustomAudio}
                     activeOpacity={0.7}
                   >
-                    <FolderMusic size={16} color={colors.primary} />
+                    <FileMusic size={16} color={colors.primary} />
                     <Text style={styles.pickAudioBtnText}>
                       {soundUri ? 'Change Audio File' : 'Pick Audio File (MP3, WAV)'}
                     </Text>
