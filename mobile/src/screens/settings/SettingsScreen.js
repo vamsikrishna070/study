@@ -7,6 +7,7 @@ import { PageHeading } from '../../components/ui/PageHeading';
 import { Button } from '../../components/ui/Button';
 import { Field } from '../../components/ui/Field';
 import { Input } from '../../components/ui/Input';
+import { CollegePicker } from '../../components/ui/CollegePicker';
 import { useAppDialog } from '../../components/ui/AppDialog';
 import { typography, spacing, radii, useAppTheme, useStyles } from '../../theme/theme';
 import apiClient from '../../api/client';
@@ -20,6 +21,7 @@ const SettingsScreen = ({ navigation }) => {
   const { user, logout, setUser } = useContext(AuthContext);
   const [form, setForm] = useState({
     name: user?.name || '',
+    collegeId: user?.collegeId || null,
     university: user?.university || '',
     degree: user?.degree || '',
     branch: user?.branch || '',
@@ -34,7 +36,12 @@ const SettingsScreen = ({ navigation }) => {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const data = { ...form, semester: Number(form.semester) };
+      const data = { 
+        ...form, 
+        collegeId: form.collegeId || null,
+        university: (form.university || '').trim(),
+        semester: Number(form.semester) || 1 
+      };
       const res = await apiClient.patch('/auth/profile', data);
       setUser(res.data.user || res.data);
       showSuccess('Profile Saved', 'Your profile details have been updated.');
@@ -111,20 +118,53 @@ const SettingsScreen = ({ navigation }) => {
           </View>
 
           <View style={styles.form}>
-            <Field label="Name">
-              <Input value={form.name} onChangeText={t => setFormValue('name', t)} />
+            <Field label="Full Name">
+              <Input 
+                value={form.name} 
+                onChangeText={t => setFormValue('name', t)} 
+                placeholder="Enter your full name"
+                editable={!isSaving}
+              />
             </Field>
-            <Field label="University">
-              <Input value={form.university} onChangeText={t => setFormValue('university', t)} />
+
+            <Field label="College / University" hint="Search or enter your institution">
+              <CollegePicker
+                collegeId={form.collegeId}
+                collegeName={form.university}
+                placeholder="Search your college or university"
+                onSelect={({ collegeId: selectedId, collegeName: selectedName }) => {
+                  setForm(f => ({ ...f, collegeId: selectedId, university: selectedName }));
+                }}
+                disabled={isSaving}
+              />
             </Field>
-            <Field label="Degree">
-              <Input value={form.degree} onChangeText={t => setFormValue('degree', t)} />
+
+            <Field label="Degree / Program">
+              <Input 
+                value={form.degree} 
+                onChangeText={t => setFormValue('degree', t)} 
+                placeholder="Enter your degree / program"
+                editable={!isSaving}
+              />
             </Field>
-            <Field label="Branch">
-              <Input value={form.branch} onChangeText={t => setFormValue('branch', t)} />
+
+            <Field label="Department / Branch">
+              <Input 
+                value={form.branch} 
+                onChangeText={t => setFormValue('branch', t)} 
+                placeholder="Enter your branch / department"
+                editable={!isSaving}
+              />
             </Field>
-            <Field label="Semester">
-              <Input value={form.semester} onChangeText={t => setFormValue('semester', t)} keyboardType="numeric" />
+
+            <Field label="Current Semester">
+              <Input 
+                value={form.semester} 
+                onChangeText={t => setFormValue('semester', t)} 
+                placeholder="Enter your semester"
+                keyboardType="numeric" 
+                editable={!isSaving}
+              />
             </Field>
 
             <View style={styles.saveAction}>

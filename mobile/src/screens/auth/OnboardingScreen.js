@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Field } from '../../components/ui/Field';
 import { SelectPicker } from '../../components/ui/SelectPicker';
+import { CollegePicker } from '../../components/ui/CollegePicker';
 import { typography, radii, spacing, useAppTheme, useStyles } from '../../theme/theme';
 import { updateProfile } from '../../api/auth';
 
@@ -62,6 +63,7 @@ const OnboardingScreen = ({ navigation }) => {
   const styles = useStyles(createStyles);
   const { user, setUser, setIsNewRegistration } = useContext(AuthContext);
 
+  const [collegeId, setCollegeId] = useState(user?.collegeId || null);
   const [university, setUniversity] = useState(user?.university || '');
   const [degree, setDegree] = useState(user?.degree || 'B.Tech');
   const [branch, setBranch] = useState(user?.branch || 'CSE');
@@ -74,6 +76,7 @@ const OnboardingScreen = ({ navigation }) => {
     setLoading(true);
     try {
       const payload = {
+        collegeId: collegeId || null,
         university: university.trim(),
         degree,
         branch,
@@ -144,12 +147,15 @@ const OnboardingScreen = ({ navigation }) => {
 
           <View style={styles.form}>
             <Field label="College / University" hint="Where are you currently studying?">
-              <Input
-                value={university}
-                onChangeText={setUniversity}
-                placeholder="e.g. Stanford University / IIT Delhi"
-                autoCapitalize="words"
-                editable={!loading}
+              <CollegePicker
+                collegeId={collegeId}
+                collegeName={university}
+                placeholder="Search your college or university"
+                onSelect={({ collegeId: selectedId, collegeName: selectedName }) => {
+                  setCollegeId(selectedId);
+                  setUniversity(selectedName);
+                }}
+                disabled={loading}
               />
             </Field>
 
@@ -181,7 +187,7 @@ const OnboardingScreen = ({ navigation }) => {
                 <Field label="Academic Year">
                   <SelectPicker
                     label="Academic Year"
-                    placeholder="Select year"
+                    placeholder="Select your academic year"
                     value={year}
                     options={YEAR_OPTIONS}
                     onValueChange={setYear}
@@ -194,7 +200,7 @@ const OnboardingScreen = ({ navigation }) => {
                 <Field label="Current Semester">
                   <SelectPicker
                     label="Current Semester"
-                    placeholder="Select sem"
+                    placeholder="Select your semester"
                     value={semester}
                     options={SEMESTER_OPTIONS}
                     onValueChange={setSemester}

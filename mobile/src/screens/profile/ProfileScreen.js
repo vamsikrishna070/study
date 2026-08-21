@@ -45,7 +45,7 @@ const ProfileScreen = ({ navigation }) => {
           </View>
 
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>University</Text>
+            <Text style={styles.detailLabel}>College / University</Text>
             <Text style={styles.detailValue}>{user?.university || 'Not specified'}</Text>
           </View>
           <View style={styles.detailRow}>

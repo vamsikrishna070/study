@@ -7,7 +7,8 @@ const publicUser = (user) => ({
   id: user._id,
   name: user.name,
   email: user.email,
-  university: user.university,
+  collegeId: user.collegeId || null,
+  university: user.university || '',
   degree: user.degree,
   branch: user.branch,
   batch: user.batch,
@@ -21,7 +22,7 @@ const publicUser = (user) => ({
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 
 export async function register(req, res) {
-  let { name, email, password, university, degree, branch, batch, semester } = req.body;
+  let { name, email, password, collegeId, university, degree, branch, batch, semester } = req.body;
   if (!name || !email || !password) return res.status(400).json({ success: false, message: 'Name, email, and password are required' });
   email = email.trim().toLowerCase();
   if (password.length < 6) return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
@@ -36,7 +37,17 @@ export async function register(req, res) {
     }
   }
   
-  const user = new User({ name, email, password, university, degree, branch, batch, semester });
+  const user = new User({ 
+    name, 
+    email, 
+    password, 
+    collegeId: collegeId || null, 
+    university: university || '', 
+    degree, 
+    branch, 
+    batch, 
+    semester 
+  });
   
   const otp = generateOTP();
   user.otp = await bcrypt.hash(otp, 10);
@@ -200,11 +211,14 @@ export async function me(req, res) {
 }
 
 export async function updateProfile(req, res) {
-  const { name, university, degree, branch, batch, semester, profileImageUrl, profileImagePublicId } = req.body;
+  const { name, collegeId, university, degree, branch, batch, semester, profileImageUrl, profileImagePublicId } = req.body;
   const user = await User.findById(req.user._id);
   if (!user) return res.status(404).json({ success: false, message: 'User not found' });
   
   if (name) user.name = name;
+  if (collegeId !== undefined) {
+    user.collegeId = (collegeId && mongoose.Types.ObjectId.isValid(collegeId)) ? collegeId : null;
+  }
   if (university !== undefined) user.university = university;
   if (degree !== undefined) user.degree = degree;
   if (branch !== undefined) user.branch = branch;

@@ -17,6 +17,7 @@ import unitRoutes from './unitRoutes.js';
 import importantPointRoutes from './importantPointRoutes.js';
 import searchRoutes from './searchRoutes.js';
 import uploadRoutes from './uploadRoutes.js';
+import collegeRoutes from './collegeRoutes.js';
 
 import mongoose from 'mongoose';
 
@@ -49,4 +50,5 @@ router.use('/notifications', notificationRoutes);
 router.use('/important-points', importantPointRoutes);
 router.use('/search', searchRoutes);
 router.use('/upload', uploadRoutes);
+router.use('/colleges', collegeRoutes);
 export default router;
