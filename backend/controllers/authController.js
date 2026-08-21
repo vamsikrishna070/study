@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import { generateToken } from '../utils/generateToken.js';
-import { sendEmail } from '../utils/sendEmail.js';
+import { sendVerificationEmail, sendPasswordResetEmail } from '../services/emailService.js';
 
 const publicUser = (user) => ({
   id: user._id,
@@ -46,14 +46,10 @@ export async function register(req, res) {
   await user.save();
 
   try {
-    await sendEmail({
-      to: user.email,
-      subject: 'StudyArena - Email Verification OTP',
-      text: `Your verification code is: ${otp}. It expires in 15 minutes.`,
-    });
+    await sendVerificationEmail(user.email, otp);
   } catch (error) {
     await User.deleteOne({ _id: user._id });
-    return res.status(500).json({ success: false, message: 'Failed to send verification email' });
+    return res.status(500).json({ success: false, message: error.message || 'Failed to send verification email' });
   }
 
   res.status(201).json({ success: true, message: 'Verification email sent' });
@@ -109,13 +105,9 @@ export async function resendOtp(req, res) {
     await user.save();
 
     try {
-      await sendEmail({
-        to: user.email,
-        subject: 'StudyArena - Email Verification OTP',
-        text: `Your verification code is: ${otp}. It expires in 15 minutes.`,
-      });
+      await sendVerificationEmail(user.email, otp);
     } catch (error) {
-      return res.status(500).json({ success: false, message: 'Failed to send verification email' });
+      return res.status(500).json({ success: false, message: error.message || 'Failed to send verification email' });
     }
 
     return res.json({ success: true, message: 'A new verification code has been sent' });
@@ -130,13 +122,9 @@ export async function resendOtp(req, res) {
     await user.save();
 
     try {
-      await sendEmail({
-        to: user.email,
-        subject: 'StudyArena - Password Reset OTP',
-        text: `Your password reset code is: ${otp}. It expires in 15 minutes.`,
-      });
+      await sendPasswordResetEmail(user.email, otp);
     } catch (error) {
-      console.error('Failed to send password reset email:', error.message);
+      console.error('[AuthController] Failed to send password reset email:', error.message);
     }
 
     return res.json({ success: true, message: 'If an account exists, a reset code was sent' });
@@ -175,14 +163,9 @@ export async function forgotPassword(req, res) {
   await user.save();
 
   try {
-    await sendEmail({
-      to: user.email,
-      subject: 'StudyArena - Password Reset OTP',
-      text: `Your password reset code is: ${otp}. It expires in 15 minutes.`,
-    });
+    await sendPasswordResetEmail(user.email, otp);
   } catch (error) {
-    // If it fails, log it, but we already said we return success anyway
-    console.error('Failed to send password reset email:', error.message);
+    console.error('[AuthController] Failed to send password reset email:', error.message);
   }
 
   res.json({ success: true, message: 'If an account exists, a reset code was sent' });

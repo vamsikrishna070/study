@@ -25,6 +25,12 @@ services:
         sync: false
       - key: VAPID_SUBJECT
         sync: false
+      - key: BREVO_API_KEY
+        sync: false
+      - key: BREVO_FROM_EMAIL
+        sync: false
+      - key: BREVO_FROM_NAME
+        sync: false
 
   - type: cron
     name: studyarena-reminders
