@@ -26,20 +26,45 @@ const darkColors = {
   accent: '#df6b47', card: '#1e1e1e', cardBorder: '#333333', muted: '#2c2c2c', mutedForeground: '#888888', destructive: '#ff5252'
 };
 
-const defaultThemeValue = {
-  isDark: false,
-  toggleTheme: () => {},
-  colors: lightColors,
-  typography,
-  spacing,
-  radii,
-  theme: {
-    ...MD3LightTheme,
-    colors: { ...MD3LightTheme.colors, ...lightColors }
-  }
+const defaultFonts = {
+  bodyMedium: { fontFamily: typography.sans.medium },
+  bodyLarge: { fontFamily: typography.sans.regular },
+  labelLarge: { fontFamily: typography.sans.bold },
+  titleLarge: { fontFamily: typography.sans.bold },
+  titleMedium: { fontFamily: typography.sans.semiBold },
+  titleSmall: { fontFamily: typography.sans.medium },
+  headlineMedium: { fontFamily: typography.serif.medium },
+  headlineSmall: { fontFamily: typography.serif.medium },
 };
 
-export const ThemeContext = createContext(defaultThemeValue);
+const paperLightTheme = {
+  ...MD3LightTheme,
+  colors: {
+    ...MD3LightTheme.colors,
+    primary: lightColors.primary, onPrimary: lightColors.primaryForeground, secondary: lightColors.accent,
+    background: lightColors.background, surface: lightColors.card, onSurface: lightColors.foreground,
+    error: lightColors.destructive, outline: lightColors.cardBorder,
+  },
+  fonts: { ...MD3LightTheme.fonts, ...defaultFonts },
+};
+
+const paperDarkTheme = {
+  ...MD3DarkTheme,
+  colors: {
+    ...MD3DarkTheme.colors,
+    primary: darkColors.primary, onPrimary: darkColors.primaryForeground, secondary: darkColors.accent,
+    background: darkColors.background, surface: darkColors.card, onSurface: darkColors.foreground,
+    error: darkColors.destructive, outline: darkColors.cardBorder,
+  },
+  fonts: { ...MD3DarkTheme.fonts, ...defaultFonts },
+};
+
+const lightThemeObj = { isDark: false, toggleTheme: () => {}, colors: lightColors, typography, spacing, radii, theme: paperLightTheme };
+const darkThemeObj = { isDark: true, toggleTheme: () => {}, colors: darkColors, typography, spacing, radii, theme: paperDarkTheme };
+
+let currentGlobalTheme = lightThemeObj;
+
+export const ThemeContext = createContext(lightThemeObj);
 
 export const ThemeProvider = ({ children }) => {
   const [isDark, setIsDark] = useState(false);
@@ -58,42 +83,26 @@ export const ThemeProvider = ({ children }) => {
     AsyncStorage.setItem('theme', nextDark ? 'dark' : 'light');
   };
 
-  const currentColors = isDark ? darkColors : lightColors;
-
-  const paperTheme = {
-    ...(isDark ? MD3DarkTheme : MD3LightTheme),
-    colors: {
-      ...(isDark ? MD3DarkTheme.colors : MD3LightTheme.colors),
-      primary: currentColors.primary, onPrimary: currentColors.primaryForeground, secondary: currentColors.accent,
-      background: currentColors.background, surface: currentColors.card, onSurface: currentColors.foreground,
-      error: currentColors.destructive, outline: currentColors.cardBorder,
-    },
-    fonts: {
-      ...(isDark ? MD3DarkTheme.fonts : MD3LightTheme.fonts),
-      bodyMedium: { fontFamily: typography.sans.medium },
-      bodyLarge: { fontFamily: typography.sans.regular },
-      labelLarge: { fontFamily: typography.sans.bold },
-      titleLarge: { fontFamily: typography.sans.bold },
-      titleMedium: { fontFamily: typography.sans.semiBold },
-      titleSmall: { fontFamily: typography.sans.medium },
-      headlineMedium: { fontFamily: typography.serif.medium },
-      headlineSmall: { fontFamily: typography.serif.medium },
-    },
-  };
+  const currentThemeData = isDark ? darkThemeObj : lightThemeObj;
+  
+  // Update global reference for Proxy access
+  currentGlobalTheme = { ...currentThemeData, toggleTheme };
 
   if (!isLoaded) return null;
 
   return (
-    <ThemeContext.Provider value={{ isDark, toggleTheme, colors: currentColors, typography, spacing, radii, theme: paperTheme }}>
+    <ThemeContext.Provider value={currentGlobalTheme}>
       {children}
     </ThemeContext.Provider>
   );
 };
 
-export const useAppTheme = () => useContext(ThemeContext);
+export const useAppTheme = () => {
+  const context = useContext(ThemeContext);
+  return context || lightThemeObj;
+};
 
-import { useMemo } from 'react';
-export const useStyles = (createStyles) => {
-  const theme = useAppTheme();
-  return useMemo(() => createStyles(theme), [theme]);
+export const useStyles = (styleFactory) => {
+  const themeData = useAppTheme();
+  return React.useMemo(() => styleFactory(themeData), [themeData?.isDark, styleFactory]);
 };

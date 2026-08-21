@@ -1,46 +1,81 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, StyleSheet, ScrollView, RefreshControl, Text, TouchableOpacity, Alert, ActivityIndicator, Modal, FlatList } from 'react-native';
-import { BookOpen, CheckCircle, Circle, Upload, ChevronRight, ChevronDown, X } from 'lucide-react-native';
-import * as DocumentPicker from 'expo-document-picker';
-import { extractSyllabus, confirmSyllabus, updateTopicCompletion, getUnits, getTopics } from '../../api/syllabus';
-import { getSubjects } from '../../api/subjects';
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  RefreshControl,
+  Text,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
+import {
+  BookOpen,
+  CheckCircle2,
+  Circle,
+  Upload,
+  ChevronRight,
+  ChevronDown,
+  Sparkles,
+  Layers,
+  UploadCloud,
+} from 'lucide-react-native';
+import {
+  extractSyllabus,
+  updateTopicCompletion,
+  getUnits,
+  getTopics,
+} from '../../api/syllabus';
+import { getSubjects, updateSubject } from '../../api/subjects';
 import { Header } from '../../components/ui/Header';
 import { PageHeading } from '../../components/ui/PageHeading';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { QueryState } from '../../components/ui/QueryState';
 import { Button } from '../../components/ui/Button';
-import { typography, spacing, radii, useAppTheme, useStyles } from '../../theme/theme';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SelectPicker } from '../../components/ui/SelectPicker';
+import { SyllabusReviewModal } from '../../components/subjects/SyllabusReviewModal';
+import { DocumentPreviewCard } from '../../components/ui/DocumentPreviewCard';
+import { pickAndUploadDocument } from '../../utils/fileUploader';
+import { useAppTheme, useStyles } from '../../theme/theme';
 
 const SyllabusScreen = ({ route, navigation }) => {
-  const { colors } = useAppTheme();
-  const insets = useSafeAreaInsets();
+  const { colors, typography, spacing, radii } = useAppTheme();
+  const styles = useStyles(createStyles);
+
   const passedSubject = route?.params?.subject;
-  const passedSubjectId = route?.params?.subjectId || passedSubject?._id;
-  
-  const [subjectId, setSubjectId] = useState(passedSubjectId);
-  const [subject, setSubject] = useState(passedSubject || null);
+  const passedSubjectId = route?.params?.subjectId || passedSubject?._id || passedSubject?.id;
+
+  const [subjectId, setSubjectId] = useState(passedSubjectId || '');
   const [allSubjects, setAllSubjects] = useState([]);
-  const [subjectPickerVisible, setSubjectPickerVisible] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [units, setUnits] = useState([]);
+  const [topics, setTopics] = useState([]);
   const [error, setError] = useState(null);
   const [expandedUnits, setExpandedUnits] = useState({});
+
+  // Extraction Review Modal state
+  const [reviewVisible, setReviewVisible] = useState(false);
+  const [parsedUnits, setParsedUnits] = useState([]);
+  const [extracting, setExtracting] = useState(false);
+  const [uploadingPdf, setUploadingPdf] = useState(false);
 
   const loadData = async () => {
     try {
       setError(null);
-      let targetId = subjectId;
-      let targetSubject = subject;
 
-      // Load all subjects for the picker if no subjectId is preset
+      // Load all subjects for selector
       const subsRes = await getSubjects();
-      const subsData = subsRes.data || subsRes;
+      const subsData = subsRes.data || subsRes || [];
       setAllSubjects(subsData);
 
+      const targetId = subjectId || (subsData.length > 0 ? (subsData[0]._id || subsData[0].id) : null);
+
+      if (!subjectId && targetId) {
+        setSubjectId(targetId);
+      }
+
       if (!targetId) {
-        // Don't auto-select; let the user choose
         setLoading(false);
         setRefreshing(false);
         return;
@@ -48,21 +83,16 @@ const SyllabusScreen = ({ route, navigation }) => {
 
       const [unitsRes, topicsRes] = await Promise.all([
         getUnits(targetId),
-        getTopics(targetId)
+        getTopics(targetId),
       ]);
 
-      const unitsData = unitsRes.data || unitsRes;
-      const topicsData = topicsRes.data || topicsRes;
+      const unitsData = unitsRes.data || unitsRes || [];
+      const topicsData = topicsRes.data || topicsRes || [];
+      setUnits(unitsData);
+      setTopics(topicsData);
 
-      const unitsWithTopics = unitsData.map(u => ({
-        ...u,
-        topics: topicsData.filter(t => t.unit === u._id)
-      }));
-
-      setUnits(unitsWithTopics);
-      
-      if (unitsWithTopics.length > 0) {
-        setExpandedUnits({ [unitsWithTopics[0]._id]: true });
+      if (unitsData.length > 0) {
+        setExpandedUnits({ [unitsData[0]._id || unitsData[0].id]: true });
       }
     } catch (e) {
       setError('Failed to load syllabus.');
@@ -72,47 +102,149 @@ const SyllabusScreen = ({ route, navigation }) => {
     }
   };
 
-  useEffect(() => { loadData(); }, [subjectId]);
-  const onRefresh = useCallback(() => { setRefreshing(true); loadData(); }, [subjectId]);
+  useEffect(() => {
+    loadData();
+  }, [subjectId]);
 
-  const handleUpload = async () => {
-    if (!subjectId) return Alert.alert('Error', 'Please select a subject first.');
-    
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadData();
+  }, [subjectId]);
+
+  const currentSubject = allSubjects.find((s) => (s._id || s.id) === subjectId);
+  const subjectColor = currentSubject?.color || colors.accent;
+
+  const handleUploadAndExtract = async () => {
+    if (!subjectId) {
+      Alert.alert('Error', 'Please select a subject first.');
+      return;
+    }
+
     try {
-      const result = await DocumentPicker.getDocumentAsync({ type: 'application/pdf' });
-      if (result.canceled) return;
-      
-      setLoading(true);
-      const file = result.assets[0];
-      const res = await extractSyllabus(subjectId, file.uri, file.mimeType, file.name);
-      
-      Alert.alert('Success', 'PDF parsed successfully!');
-      await confirmSyllabus(subjectId, res.data?.units || res.units);
+      setUploadingPdf(true);
+      const uploaded = await pickAndUploadDocument({
+        type: 'application/pdf',
+      });
+
+      if (!uploaded || !uploaded.url) return;
+
+      // Update subject
+      await updateSubject(subjectId, {
+        syllabusFile: {
+          url: uploaded.url,
+          publicId: uploaded.publicId,
+          originalName: uploaded.originalName,
+          mimeType: uploaded.mimeType,
+          size: uploaded.size,
+        },
+      });
+
+      setExtracting(true);
+      const res = await extractSyllabus(
+        subjectId,
+        uploaded.url,
+        uploaded.mimeType,
+        uploaded.originalName
+      );
+      const extracted = res.data?.units || res.units || res.data || [];
+
+      if (extracted.length > 0) {
+        setParsedUnits(extracted);
+        setReviewVisible(true);
+      } else {
+        Alert.alert(
+          'Syllabus Uploaded',
+          'Syllabus PDF was uploaded successfully. Text extraction could not detect units automatically, but the document is saved.'
+        );
+      }
       loadData();
     } catch (e) {
-      Alert.alert('Upload Failed', e.message || 'Failed to extract syllabus.');
-      setLoading(false);
+      Alert.alert('Extraction Failed', e?.response?.data?.message || e.message || 'Failed to extract syllabus.');
+    } finally {
+      setUploadingPdf(false);
+      setExtracting(false);
     }
   };
 
-  const toggleTopic = async (unitId, topicId, completed) => {
+  const handleExtractExisting = async () => {
+    if (!currentSubject?.syllabusFile?.url) return;
+    setExtracting(true);
     try {
-      setUnits(prev => prev.map(u => u._id === unitId ? {
-        ...u, topics: u.topics.map(t => t._id === topicId ? { ...t, completed: !completed } : t)
-      } : u));
-      
-      await updateTopicCompletion(topicId, !completed);
-    } catch(e) {
-      Alert.alert('Error', 'Failed to update topic');
+      const res = await extractSyllabus(
+        subjectId,
+        currentSubject.syllabusFile.url,
+        currentSubject.syllabusFile.mimeType,
+        currentSubject.syllabusFile.originalName
+      );
+      const extracted = res.data?.units || res.units || res.data || [];
+      if (extracted.length > 0) {
+        setParsedUnits(extracted);
+        setReviewVisible(true);
+      } else {
+        Alert.alert('Extraction Notice', 'Could not detect structured units from this PDF.');
+      }
+    } catch (err) {
+      Alert.alert('Extraction Failed', err?.response?.data?.message || 'Failed to extract syllabus.');
+    } finally {
+      setExtracting(false);
+    }
+  };
+
+  const handleRemoveSyllabus = async () => {
+    if (!subjectId) return;
+    try {
+      await updateSubject(subjectId, {
+        syllabusFile: { url: '', publicId: '', originalName: '', mimeType: '', size: 0 },
+      });
+      Alert.alert('Removed', 'Syllabus PDF has been removed.');
       loadData();
+    } catch (err) {
+      Alert.alert('Error', 'Failed to remove syllabus PDF.');
+    }
+  };
+
+  const toggleTopic = async (topic) => {
+    const isCompleted = topic.status === 'completed' || topic.completed;
+    const newStatus = isCompleted ? 'not-started' : 'completed';
+
+    // Optimistic update
+    setTopics((prev) =>
+      prev.map((t) =>
+        (t._id || t.id) === (topic._id || topic.id)
+          ? { ...t, status: newStatus, completed: !isCompleted }
+          : t
+      )
+    );
+
+    try {
+      await updateTopicCompletion(topic._id || topic.id, !isCompleted);
+    } catch (e) {
+      // Revert on error
+      setTopics((prev) =>
+        prev.map((t) =>
+          (t._id || t.id) === (topic._id || topic.id)
+            ? { ...t, status: topic.status, completed: topic.completed }
+            : t
+        )
+      );
+      Alert.alert('Error', 'Failed to update topic status.');
     }
   };
 
   const toggleUnit = (unitId) => {
-    setExpandedUnits(prev => ({ ...prev, [unitId]: !prev[unitId] }));
+    setExpandedUnits((prev) => ({ ...prev, [unitId]: !prev[unitId] }));
   };
 
-  if (loading) {
+  const subjectOptions = allSubjects.map((s) => ({
+    label: `${s.name} (${s.code})`,
+    value: s._id || s.id,
+  }));
+
+  const totalTopics = topics.length;
+  const completedTopics = topics.filter((t) => t.status === 'completed' || t.completed).length;
+  const progressPercent = totalTopics > 0 ? Math.round((completedTopics / totalTopics) * 100) : 0;
+
+  if (loading && !refreshing) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color={colors.primary} />
@@ -123,260 +255,402 @@ const SyllabusScreen = ({ route, navigation }) => {
   return (
     <View style={styles.container}>
       <Header />
-      <ScrollView 
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+      <ScrollView
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+        }
         contentContainerStyle={styles.scroll}
       >
-        <PageHeading 
-          eyebrow="The curriculum" 
-          title="Syllabus" 
-          detail={subject?.name ? `Tracking progress for ${subject.name}` : "Select a subject and upload a PDF syllabus."}
-          action={subjectId ? <Button onPress={handleUpload} variant="outline" size="sm">Upload PDF</Button> : null}
+        <PageHeading
+          eyebrow="The curriculum"
+          title="Syllabus"
+          detail={
+            currentSubject
+              ? `Tracking curriculum & topics for ${currentSubject.name}`
+              : 'Select a subject and upload a PDF syllabus.'
+          }
+          action={
+            subjectId ? (
+              <Button
+                onPress={handleUploadAndExtract}
+                variant="outline"
+                size="sm"
+                loading={extracting || uploadingPdf}
+                disabled={extracting || uploadingPdf}
+              >
+                <Sparkles size={16} color={subjectColor} style={{ marginRight: 6 }} />
+                {extracting ? 'Extracting...' : uploadingPdf ? 'Uploading...' : 'Upload PDF'}
+              </Button>
+            ) : null
+          }
         />
 
-        {/* Subject Selector — shown when no subject is pre-selected */}
-        {!passedSubjectId && (
-          <TouchableOpacity
-            style={styles.subjectPickerBtn}
-            onPress={() => setSubjectPickerVisible(true)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.subjectPickerLabel}>
-              {subject ? subject.name : 'Select Subject'}
-            </Text>
-            <ChevronDown size={18} color={colors.mutedForeground} />
-          </TouchableOpacity>
+        {/* Subject Selector Dropdown */}
+        {allSubjects.length > 0 && (
+          <View style={styles.pickerSection}>
+            <SelectPicker
+              label="Select Subject"
+              value={subjectId}
+              onValueChange={(val) => {
+                setSubjectId(val);
+                setUnits([]);
+                setTopics([]);
+              }}
+              options={subjectOptions}
+              placeholder="Choose a subject"
+            />
+          </View>
         )}
 
         <QueryState error={error} onRetry={loadData} label="Syllabus" />
 
         {!error && !subjectId && (
-          <EmptyState 
+          <EmptyState
             title="Select a Subject"
-            detail={allSubjects.length === 0 ? "Create a subject first, then upload its syllabus." : "Choose a subject above to view or upload its syllabus."}
-            icon={BookOpen}
+            detail={
+              allSubjects.length === 0
+                ? 'Create a subject first, then upload its syllabus.'
+                : 'Choose a subject above to view or upload its syllabus.'
+            }
           />
         )}
 
-        {!error && subjectId && units.length === 0 && (
-          <EmptyState 
-            title="No Syllabus Uploaded"
-            detail="Upload your course syllabus PDF to automatically extract units and topics."
-            icon={Upload}
-            action={<Button onPress={handleUpload}>Upload Syllabus PDF</Button>}
-          />
-        )}
+        {subjectId && !error && (
+          <View style={styles.content}>
+            {/* Attached Syllabus Document Card */}
+            {currentSubject?.syllabusFile?.url ? (
+              <DocumentPreviewCard
+                file={currentSubject.syllabusFile}
+                title="Syllabus PDF"
+                unitCount={units.length}
+                topicCount={totalTopics}
+                isExtracting={extracting}
+                onReplace={handleUploadAndExtract}
+                onRemove={handleRemoveSyllabus}
+                onExtract={units.length === 0 ? handleExtractExisting : null}
+                accentColor={subjectColor}
+              />
+            ) : (
+              <TouchableOpacity
+                style={styles.uploadPromptCard}
+                onPress={handleUploadAndExtract}
+                disabled={uploadingPdf}
+                activeOpacity={0.75}
+              >
+                <UploadCloud size={24} color={subjectColor} style={{ marginBottom: 6 }} />
+                <Text style={styles.uploadPromptTitle}>Attach Syllabus Document</Text>
+                <Text style={styles.uploadPromptSub}>
+                  Upload PDF to automatically extract units and topics
+                </Text>
+              </TouchableOpacity>
+            )}
 
-        {!error && units.length > 0 && (
-          <View style={styles.unitsContainer}>
-            {units.map((u, i) => {
-              const isExpanded = expandedUnits[u._id];
-              const completedCount = u.topics.filter(t => t.completed).length;
-              const totalCount = u.topics.length;
-              const isAllDone = totalCount > 0 && completedCount === totalCount;
+            {/* Overall Syllabus Progress */}
+            {totalTopics > 0 && (
+              <View style={styles.progressCard}>
+                <View style={styles.progressHeader}>
+                  <Text style={styles.progressLabel}>Overall Completion</Text>
+                  <Text style={[styles.progressPercent, { color: subjectColor }]}>
+                    {progressPercent}%
+                  </Text>
+                </View>
+                <View style={styles.progressBarBg}>
+                  <View
+                    style={[
+                      styles.progressBarFill,
+                      { width: `${progressPercent}%`, backgroundColor: subjectColor },
+                    ]}
+                  />
+                </View>
+                <Text style={styles.progressSubtext}>
+                  {completedTopics} of {totalTopics} topics completed
+                </Text>
+              </View>
+            )}
 
-              return (
-                <View key={u._id} style={styles.unitCard}>
-                  <TouchableOpacity 
-                    style={styles.unitHeader} 
-                    onPress={() => toggleUnit(u._id)}
-                    activeOpacity={0.7}
+            {/* Units & Topics List */}
+            {units.length === 0 ? (
+              <View style={styles.emptyUnitsBox}>
+                <Layers size={32} color={colors.mutedForeground} />
+                <Text style={styles.emptyUnitsTitle}>No Units Extracted</Text>
+                <Text style={styles.emptyUnitsDetail}>
+                  {currentSubject?.syllabusFile?.url
+                    ? 'Extract units and topics from your attached syllabus PDF.'
+                    : 'Upload a PDF syllabus to track each unit and topic.'}
+                </Text>
+                {currentSubject?.syllabusFile?.url && (
+                  <Button
+                    onPress={handleExtractExisting}
+                    loading={extracting}
+                    style={{ marginTop: spacing.md }}
                   >
-                    <View style={styles.unitHeaderLeft}>
-                      <ChevronRight 
-                        size={20} 
-                        color={colors.mutedForeground} 
-                        style={{ transform: [{ rotate: isExpanded ? '90deg' : '0deg' }] }}
-                      />
-                      <View>
-                        <Text style={styles.unitTitle}>Unit {i+1}: {u.title}</Text>
-                        <Text style={styles.unitProgress}>{completedCount} of {totalCount} completed</Text>
-                      </View>
-                    </View>
-                    {isAllDone && <CheckCircle size={20} color={colors.accent} />}
-                  </TouchableOpacity>
+                    <Sparkles size={16} color={colors.primaryForeground} style={{ marginRight: 6 }} />
+                    Extract Topics from PDF
+                  </Button>
+                )}
+              </View>
+            ) : (
+              <View style={styles.unitsSection}>
+                {units.map((unit, index) => {
+                  const uId = unit._id || unit.id || String(index);
+                  const isExpanded = !!expandedUnits[uId];
+                  const unitTopics = topics.filter(
+                    (t) => (t.unit?._id || t.unit) === uId || t.unit === unit.title
+                  );
+                  const completedInUnit = unitTopics.filter((t) => t.status === 'completed' || t.completed).length;
 
-                  {isExpanded && (
-                    <View style={styles.topicsContainer}>
-                      {u.topics.map(t => (
-                        <TouchableOpacity 
-                          key={t._id} 
-                          style={styles.topicRow}
-                          onPress={() => toggleTopic(u._id, t._id, t.completed)}
-                          activeOpacity={0.7}
-                        >
-                          {t.completed ? (
-                            <CheckCircle size={20} color={colors.accent} style={styles.topicIcon} />
-                          ) : (
-                            <Circle size={20} color={colors.mutedForeground} style={styles.topicIcon} />
-                          )}
-                          <Text style={[styles.topicTitle, t.completed && styles.topicTitleCompleted]}>
-                            {t.title}
+                  return (
+                    <View key={uId} style={styles.unitCard}>
+                      <TouchableOpacity
+                        style={styles.unitHeader}
+                        onPress={() => toggleUnit(uId)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={[styles.unitBadge, { backgroundColor: `${subjectColor}1A` }]}>
+                          <Text style={[styles.unitBadgeText, { color: subjectColor }]}>
+                            U{index + 1}
                           </Text>
-                        </TouchableOpacity>
-                      ))}
-                      {u.topics.length === 0 && (
-                        <Text style={styles.noTopicsText}>No topics extracted for this unit.</Text>
+                        </View>
+                        <View style={styles.unitHeaderTextContainer}>
+                          <Text style={styles.unitTitle} numberOfLines={1}>
+                            {unit.title || unit.name || `Unit ${index + 1}`}
+                          </Text>
+                          <Text style={styles.unitTopicCount}>
+                            {completedInUnit} / {unitTopics.length} completed
+                          </Text>
+                        </View>
+                        {isExpanded ? (
+                          <ChevronDown size={18} color={colors.mutedForeground} />
+                        ) : (
+                          <ChevronRight size={18} color={colors.mutedForeground} />
+                        )}
+                      </TouchableOpacity>
+
+                      {isExpanded && (
+                        <View style={styles.topicsList}>
+                          {unitTopics.length === 0 ? (
+                            <Text style={styles.noTopicsText}>No topics in this unit.</Text>
+                          ) : (
+                            unitTopics.map((topic, tIdx) => {
+                              const isDone = topic.status === 'completed' || topic.completed;
+
+                              return (
+                                <TouchableOpacity
+                                  key={topic._id || topic.id || tIdx}
+                                  style={styles.topicRow}
+                                  onPress={() => toggleTopic(topic)}
+                                  activeOpacity={0.7}
+                                >
+                                  <View style={styles.checkboxContainer}>
+                                    {isDone ? (
+                                      <CheckCircle2 size={20} color={subjectColor} />
+                                    ) : (
+                                      <Circle size={20} color={colors.mutedForeground} />
+                                    )}
+                                  </View>
+                                  <Text
+                                    style={[
+                                      styles.topicName,
+                                      isDone && styles.topicNameDone,
+                                    ]}
+                                  >
+                                    {topic.title || topic.name}
+                                  </Text>
+                                </TouchableOpacity>
+                              );
+                            })
+                          )}
+                        </View>
                       )}
                     </View>
-                  )}
-                </View>
-              );
-            })}
+                  );
+                })}
+              </View>
+            )}
           </View>
         )}
       </ScrollView>
 
-      {/* Subject Picker Modal */}
-      <Modal visible={subjectPickerVisible} animationType="slide" transparent>
-        <View style={styles.modalContainer}>
-          <View style={styles.modalBackdrop} />
-          <View style={[styles.modalContent, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Subject</Text>
-              <TouchableOpacity onPress={() => setSubjectPickerVisible(false)} style={styles.closeBtn}>
-                <X size={20} color={colors.foreground} />
-              </TouchableOpacity>
-            </View>
-            {allSubjects.length === 0 ? (
-              <View style={styles.modalEmpty}>
-                <Text style={styles.modalEmptyText}>No subjects found. Create a subject first.</Text>
-              </View>
-            ) : (
-              <FlatList
-                data={allSubjects}
-                keyExtractor={item => item._id}
-                contentContainerStyle={{ padding: spacing.md }}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={[styles.subjectItem, subjectId === item._id && styles.subjectItemSelected]}
-                    onPress={() => {
-                      setSubjectId(item._id);
-                      setSubject(item);
-                      setSubjectPickerVisible(false);
-                      setUnits([]);
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.subjectItemText, subjectId === item._id && styles.subjectItemTextSelected]}>
-                      {item.name}
-                    </Text>
-                    <Text style={styles.subjectItemCode}>{item.code}</Text>
-                  </TouchableOpacity>
-                )}
-              />
-            )}
-          </View>
-        </View>
-      </Modal>
+      {/* Review Modal */}
+      <SyllabusReviewModal
+        visible={reviewVisible}
+        subjectId={subjectId}
+        parsedUnits={parsedUnits}
+        onClose={() => setReviewVisible(false)}
+        onSuccess={() => {
+          setReviewVisible(false);
+          loadData();
+        }}
+      />
     </View>
   );
 };
 
-const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background },
-  scroll: { padding: spacing.lg, paddingBottom: spacing.xxl },
-  subjectPickerBtn: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    borderRadius: radii.lg,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    marginBottom: spacing.md,
-  },
-  subjectPickerLabel: {
-    fontFamily: typography.sans.medium,
-    fontSize: 16,
-    color: colors.foreground,
-  },
-  modalContainer: { flex: 1, justifyContent: 'flex-end' },
-  modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(24,32,49,0.48)' },
-  modalContent: { backgroundColor: colors.card, borderTopLeftRadius: radii.xxl, borderTopRightRadius: radii.xxl, maxHeight: '70%' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.cardBorder },
-  modalTitle: { fontFamily: typography.serif.medium, fontSize: 24, color: colors.foreground },
-  closeBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  modalEmpty: { padding: spacing.xl, alignItems: 'center' },
-  modalEmptyText: { fontFamily: typography.sans.regular, fontSize: 14, color: colors.mutedForeground, textAlign: 'center' },
-  subjectItem: {
-    backgroundColor: colors.background,
-    borderRadius: radii.md,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-  },
-  subjectItemSelected: { borderColor: colors.primary, backgroundColor: `${colors.primary}1A` },
-  subjectItemText: { fontFamily: typography.sans.bold, fontSize: 16, color: colors.foreground },
-  subjectItemTextSelected: { color: colors.primary },
-  subjectItemCode: { fontFamily: typography.mono.regular, fontSize: 12, color: colors.mutedForeground, marginTop: 2 },
-  unitsContainer: { gap: spacing.md, marginTop: spacing.md },
-  unitCard: {
-    backgroundColor: colors.card,
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    overflow: 'hidden',
-  },
-  unitHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: spacing.lg,
-    backgroundColor: colors.card,
-  },
-  unitHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  unitTitle: {
-    fontFamily: typography.serif.medium,
-    fontSize: 18,
-    color: colors.foreground,
-  },
-  unitProgress: {
-    fontFamily: typography.sans.regular,
-    fontSize: 12,
-    color: colors.mutedForeground,
-    marginTop: 2,
-  },
-  topicsContainer: {
-    borderTopWidth: 1,
-    borderTopColor: colors.cardBorder,
-    padding: spacing.md,
-    backgroundColor: colors.background, // Slightly different bg to differentiate
-  },
-  topicRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-  },
-  topicIcon: {
-    marginRight: spacing.md,
-  },
-  topicTitle: {
-    fontFamily: typography.sans.medium,
-    fontSize: 15,
-    color: colors.foreground,
-    flex: 1,
-  },
-  topicTitleCompleted: {
-    color: colors.mutedForeground,
-    textDecorationLine: 'line-through',
-  },
-  noTopicsText: {
-    fontFamily: typography.sans.regular,
-    fontSize: 14,
-    color: colors.mutedForeground,
-    fontStyle: 'italic',
-    padding: spacing.sm,
-  }
-}));
+const createStyles = ({ colors, typography, spacing, radii }) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    scroll: { padding: spacing.md, paddingBottom: spacing.xxl },
+    pickerSection: { marginBottom: spacing.md },
+    content: { gap: spacing.md },
+
+    uploadPromptCard: {
+      backgroundColor: colors.card,
+      borderRadius: radii.xl,
+      borderWidth: 1,
+      borderStyle: 'dashed',
+      borderColor: colors.cardBorder,
+      padding: spacing.lg,
+      alignItems: 'center',
+    },
+    uploadPromptTitle: {
+      fontFamily: typography.sans.bold,
+      fontSize: 14,
+      color: colors.foreground,
+    },
+    uploadPromptSub: {
+      fontFamily: typography.sans.regular,
+      fontSize: 12,
+      color: colors.mutedForeground,
+      marginTop: 2,
+    },
+
+    progressCard: {
+      backgroundColor: colors.card,
+      borderRadius: radii.xl,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      padding: spacing.md,
+    },
+    progressHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 6,
+    },
+    progressLabel: {
+      fontFamily: typography.sans.semiBold,
+      fontSize: 13,
+      color: colors.foreground,
+    },
+    progressPercent: {
+      fontFamily: typography.mono.bold,
+      fontSize: 15,
+    },
+    progressBarBg: {
+      height: 6,
+      backgroundColor: colors.cardBorder,
+      borderRadius: radii.pill,
+      overflow: 'hidden',
+    },
+    progressBarFill: {
+      height: '100%',
+      borderRadius: radii.pill,
+    },
+    progressSubtext: {
+      fontFamily: typography.sans.regular,
+      fontSize: 12,
+      color: colors.mutedForeground,
+      marginTop: 4,
+    },
+
+    emptyUnitsBox: {
+      backgroundColor: colors.card,
+      borderRadius: radii.xl,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      padding: spacing.xl,
+      alignItems: 'center',
+      gap: spacing.xs,
+    },
+    emptyUnitsTitle: {
+      fontFamily: typography.sans.bold,
+      fontSize: 16,
+      color: colors.foreground,
+      marginTop: spacing.xs,
+    },
+    emptyUnitsDetail: {
+      fontFamily: typography.sans.regular,
+      fontSize: 13,
+      color: colors.mutedForeground,
+      textAlign: 'center',
+      lineHeight: 18,
+      paddingHorizontal: spacing.md,
+    },
+
+    unitsSection: {
+      gap: spacing.sm,
+    },
+    unitCard: {
+      backgroundColor: colors.card,
+      borderRadius: radii.xl,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      overflow: 'hidden',
+    },
+    unitHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: spacing.md,
+    },
+    unitBadge: {
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: radii.sm,
+      marginRight: spacing.md,
+    },
+    unitBadgeText: {
+      fontFamily: typography.mono.bold,
+      fontSize: 12,
+    },
+    unitHeaderTextContainer: { flex: 1 },
+    unitTitle: {
+      fontFamily: typography.sans.bold,
+      fontSize: 15,
+      color: colors.foreground,
+    },
+    unitTopicCount: {
+      fontFamily: typography.sans.regular,
+      fontSize: 12,
+      color: colors.mutedForeground,
+      marginTop: 2,
+    },
+    topicsList: {
+      borderTopWidth: 1,
+      borderTopColor: colors.cardBorder,
+      backgroundColor: colors.background + '80',
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs,
+    },
+    noTopicsText: {
+      fontFamily: typography.sans.regular,
+      fontSize: 13,
+      color: colors.mutedForeground,
+      fontStyle: 'italic',
+      paddingVertical: spacing.sm,
+    },
+    topicRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: spacing.sm,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.cardBorder + '60',
+    },
+    checkboxContainer: {
+      marginRight: spacing.md,
+    },
+    topicName: {
+      flex: 1,
+      fontFamily: typography.sans.regular,
+      fontSize: 14,
+      color: colors.foreground,
+      lineHeight: 20,
+    },
+    topicNameDone: {
+      textDecorationLine: 'line-through',
+      color: colors.mutedForeground,
+      opacity: 0.7,
+    },
+  });
 
 export default SyllabusScreen;

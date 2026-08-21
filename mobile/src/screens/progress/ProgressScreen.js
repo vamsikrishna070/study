@@ -9,8 +9,9 @@ import { QueryState } from '../../components/ui/QueryState';
 import { typography, spacing, radii, useAppTheme, useStyles } from '../../theme/theme';
 
 const ProgressScreen = ({ navigation }) => {
-  const { colors } = useAppTheme();
-  const { logout } = useContext(AuthContext);
+  const { colors, typography, spacing, radii, theme } = useAppTheme();
+  const styles = useStyles(createStyles);
+  const { logout } = useContext(AuthContext);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -112,7 +113,7 @@ const ProgressScreen = ({ navigation }) => {
   );
 };
 
-const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.create({
+const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background },
   scroll: { padding: spacing.lg, paddingBottom: spacing.xxl },
@@ -195,6 +196,4 @@ const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.
     backgroundColor: colors.primary,
     borderRadius: radii.round,
   }
-}));
-
-export default ProgressScreen;
+});export default ProgressScreen;

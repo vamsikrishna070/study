@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:background="#FAFAFA"
+    android:padding="24dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="StudyArena"
+        android:textSize="20sp"
+        android:textColor="#df6b47"
+        android:textStyle="bold"
+        android:layout_marginBottom="16dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="REMINDER"
+        android:textSize="14sp"
+        android:textColor="#666666"
+        android:letterSpacing="0.1"
+        android:layout_marginBottom="32dp" />
+
+    <TextView
+        android:id="@+id/tvAlarmTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Time to study"
+        android:textSize="28sp"
+        android:textColor="#111111"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:layout_marginBottom="64dp" />
+
+    <Button
+        android:id="@+id/btnDismiss"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:text="DISMISS"
+        android:backgroundTint="#df6b47"
+        android:textColor="#FFFFFF"
+        android:textStyle="bold"
+        android:layout_marginBottom="16dp" />
+
+    <Button
+        android:id="@+id/btnSnooze"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:text="SNOOZE 5 MIN"
+        android:backgroundTint="#EEEEEE"
+        android:textColor="#333333"
+        android:textStyle="bold" />
+
+</LinearLayout>

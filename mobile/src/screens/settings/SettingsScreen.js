@@ -1,6 +1,6 @@
 import React, { useContext, useState } from 'react';
 import { View, StyleSheet, ScrollView, Text, TouchableOpacity, Switch, Alert, Image } from 'react-native';
-import { Camera, Moon, Sun, Trophy, LogOut, ToggleLeft, ToggleRight, Bell } from 'lucide-react-native';
+import { Camera, Moon, Sun, Trophy, ToggleLeft, ToggleRight, Bell } from 'lucide-react-native';
 import { AuthContext } from '../../context/AuthContext';
 import { Header } from '../../components/ui/Header';
 import { PageHeading } from '../../components/ui/PageHeading';
@@ -9,12 +9,13 @@ import { Field } from '../../components/ui/Field';
 import { Input } from '../../components/ui/Input';
 import { typography, spacing, radii, useAppTheme, useStyles } from '../../theme/theme';
 import apiClient from '../../api/client';
-import * as ImagePicker from 'expo-image-picker';
+import { pickAndUploadImage } from '../../utils/fileUploader';
 
 const SettingsScreen = ({ navigation }) => {
+  const { colors, typography, spacing, radii, theme, isDark, toggleTheme } = useAppTheme();
+  const styles = useStyles(createStyles);
+
   const { user, logout, setUser } = useContext(AuthContext);
-  const { isDark, toggleTheme, colors, theme } = useAppTheme();
-  
   const [form, setForm] = useState({
     name: user?.name || '',
     university: user?.university || '',
@@ -27,7 +28,7 @@ const SettingsScreen = ({ navigation }) => {
   const [isSaving, setIsSaving] = useState(false);
 
   const setFormValue = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-
+  
   const handleSave = async () => {
     setIsSaving(true);
     try {
@@ -44,56 +45,21 @@ const SettingsScreen = ({ navigation }) => {
 
   const handleImagePick = async () => {
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
+      setIsSaving(true);
+      const uploaded = await pickAndUploadImage({
         aspect: [1, 1],
-        quality: 0.8,
       });
 
-      if (!result.canceled) {
-        setIsSaving(true);
-        const fileUri = result.assets[0].uri;
-        
-        const formData = new FormData();
-        formData.append('file', {
-          uri: fileUri,
-          type: 'image/jpeg',
-          name: 'profile.jpg',
-        });
-
-        const uploadRes = await apiClient.post('/upload', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
-
-        const fileData = uploadRes.data.data;
-        
-        const updateRes = await apiClient.patch('/auth/profile', { profileImageUrl: fileData.url });
+      if (uploaded && uploaded.url) {
+        const updateRes = await apiClient.patch('/auth/profile', { profileImageUrl: uploaded.url });
         setUser(updateRes.data.user || updateRes.data);
         Alert.alert('Success', 'Profile picture updated.');
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to update profile picture.');
+      Alert.alert('Error', error.message || 'Failed to update profile picture.');
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const ProfileImage = () => {
-    if (user?.profileImageUrl) {
-      return (
-        <View style={styles.imageWrapper}>
-          <Image source={{ uri: user.profileImageUrl }} style={styles.image} />
-        </View>
-      );
-    }
-    return (
-      <View style={[styles.imageWrapper, styles.imagePlaceholder]}>
-        <Text style={styles.imageText}>
-          {user?.name?.split(' ').map(p => p[0]).join('').slice(0, 2) || 'U'}
-        </Text>
-      </View>
-    );
   };
 
   return (
@@ -110,7 +76,17 @@ const SettingsScreen = ({ navigation }) => {
         <View style={styles.section}>
           <View style={styles.profileHeader}>
             <View style={styles.imageContainer}>
-              <ProfileImage />
+              {user?.profileImageUrl ? (
+                <View style={styles.imageWrapper}>
+                  <Image source={{ uri: user.profileImageUrl }} style={styles.image} />
+                </View>
+              ) : (
+                <View style={[styles.imageWrapper, styles.imagePlaceholder]}>
+                  <Text style={styles.imageText}>
+                    {user?.name?.split(' ').map(p => p[0]).join('').slice(0, 2) || 'U'}
+                  </Text>
+                </View>
+              )}
               <TouchableOpacity style={styles.cameraIcon} activeOpacity={0.8} onPress={handleImagePick}>
                 <Camera size={16} color={colors.primaryForeground} />
               </TouchableOpacity>
@@ -128,7 +104,6 @@ const SettingsScreen = ({ navigation }) => {
             <Field label="University">
               <Input value={form.university} onChangeText={t => setFormValue('university', t)} />
             </Field>
-            
             <Field label="Degree">
               <Input value={form.degree} onChangeText={t => setFormValue('degree', t)} />
             </Field>
@@ -208,7 +183,7 @@ const SettingsScreen = ({ navigation }) => {
   );
 };
 
-const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.create({
+const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scroll: { padding: spacing.lg, paddingBottom: spacing.xxl },
   section: {
@@ -370,6 +345,6 @@ const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.
     letterSpacing: 2,
     color: colors.mutedForeground,
   }
-}));
+});
 
 export default SettingsScreen;

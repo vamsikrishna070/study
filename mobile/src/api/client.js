@@ -23,13 +23,17 @@ client.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
     
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type'];
+    }
+    
     // Development Logging
     if (__DEV__) {
       console.log(`\n[API REQUEST]`);
       console.log(`METHOD: ${config.method?.toUpperCase()}`);
       console.log(`URL: ${config.baseURL}${config.url}`);
       console.log(`HAS_AUTH: ${!!token}`);
-      console.log(`CONTENT_TYPE: ${config.headers['Content-Type'] || 'application/json'}`);
+      console.log(`CONTENT_TYPE: ${config.headers['Content-Type'] || 'multipart/form-data (auto)'}`);
     }
     
     return config;

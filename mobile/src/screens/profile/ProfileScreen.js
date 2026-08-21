@@ -1,63 +1,91 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, FlatList } from 'react-native';
-import { Appbar, Text, ActivityIndicator } from 'react-native-paper';
+import React, { useState, useEffect, useContext } from 'react';
+import { View, StyleSheet, ScrollView, Text, Image } from 'react-native';
+import { AuthContext } from '../../context/AuthContext';
+import { Header } from '../../components/ui/Header';
+import { PageHeading } from '../../components/ui/PageHeading';
 import { Button } from '../../components/ui/Button';
-const ProfileScreen = ({ navigation, route }) => {
-  const { colors, theme } = useAppTheme();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [data, setData] = useState([]);
+import { Card } from '../../components/ui/Card';
+import { typography, spacing, radii, useAppTheme, useStyles } from '../../theme/theme';
 
-  useEffect(() => {
-    loadData();
-  }, []);
+const getInitials = (name) => {
+  if (!name || typeof name !== 'string') return 'U';
+  return name.trim().split(/\s+/).slice(0, 2).map(p => p[0].toUpperCase()).join('');
+};
 
-  const loadData = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      // Fetch logic goes here
-      setData([]);
-    } catch (e) {
-      setError('Failed to load data.');
-    } finally {
-      setLoading(false);
-    }
-  };
+const ProfileScreen = ({ navigation }) => {
+  const { colors, typography, spacing, radii } = useAppTheme();
+  const styles = useStyles(createStyles);
+  const { user, logout } = useContext(AuthContext);
 
   return (
     <View style={styles.container}>
-      <Appbar.Header>
-        <Appbar.Action icon="menu" onPress={() => navigation.openDrawer && navigation.openDrawer()} />
-        <Appbar.Content title="Profile" />
-      </Appbar.Header>
+      <Header />
+      <ScrollView contentContainerStyle={styles.scroll}>
+        <PageHeading 
+          eyebrow="Account overview" 
+          title="Profile" 
+          detail="Your personal profile details."
+        />
 
-      {loading && <ActivityIndicator style={{ marginTop: 20 }} />}
-      {error && (
-        <View style={styles.center}>
-          <Text style={{ color: 'red' }}>{error}</Text>
-          <Button onPress={loadData}>Retry</Button>
-        </View>
-      )}
+        <Card style={styles.card}>
+          <View style={styles.profileHeader}>
+            <View style={styles.avatarWrapper}>
+              {user?.profileImageUrl ? (
+                <Image source={{ uri: user.profileImageUrl }} style={styles.avatarImage} />
+              ) : (
+                <View style={styles.avatarPlaceholder}>
+                  <Text style={styles.avatarText}>{getInitials(user?.name)}</Text>
+                </View>
+              )}
+            </View>
+            <View style={styles.infoContainer}>
+              <Text style={styles.name}>{user?.name || 'Student'}</Text>
+              <Text style={styles.email}>{user?.email || 'email@domain.com'}</Text>
+            </View>
+          </View>
 
-      {!loading && !error && data.length === 0 && (
-        <View style={styles.center}>
-          <Text>No data available.</Text>
-        </View>
-      )}
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>University</Text>
+            <Text style={styles.detailValue}>{user?.university || 'Not specified'}</Text>
+          </View>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Degree</Text>
+            <Text style={styles.detailValue}>{user?.degree || 'Not specified'}</Text>
+          </View>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Branch</Text>
+            <Text style={styles.detailValue}>{user?.branch || 'Not specified'}</Text>
+          </View>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Semester</Text>
+            <Text style={styles.detailValue}>{user?.semester ? `Semester ${user.semester}` : 'Not specified'}</Text>
+          </View>
 
-      <FlatList
-        data={data}
-        keyExtractor={(item, index) => index.toString()}
-        renderItem={({ item }) => <Text>{JSON.stringify(item)}</Text>}
-      />
+          <Button style={styles.editBtn} variant="outline" onPress={() => navigation.navigate('Settings')}>
+            Edit Profile in Settings
+          </Button>
+        </Card>
+      </ScrollView>
     </View>
   );
 };
 
-const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
-}));
+const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
+  scroll: { padding: spacing.lg, paddingBottom: spacing.xxl },
+  card: { padding: spacing.xl },
+  profileHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xl },
+  avatarWrapper: { width: 64, height: 64, borderRadius: 32, overflow: 'hidden', marginRight: spacing.lg },
+  avatarImage: { width: '100%', height: '100%' },
+  avatarPlaceholder: { width: '100%', height: '100%', backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontFamily: typography.sans.bold, fontSize: 22, color: colors.primaryForeground },
+  infoContainer: { flex: 1 },
+  name: { fontFamily: typography.serif.medium, fontSize: 24, color: colors.foreground },
+  email: { fontFamily: typography.sans.regular, fontSize: 14, color: colors.mutedForeground, marginTop: 2 },
+  detailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.md, borderTopWidth: 1, borderTopColor: colors.cardBorder },
+  detailLabel: { fontFamily: typography.sans.regular, fontSize: 14, color: colors.mutedForeground },
+  detailValue: { fontFamily: typography.sans.semiBold, fontSize: 14, color: colors.foreground },
+  editBtn: { marginTop: spacing.xl }
+});
 
 export default ProfileScreen;

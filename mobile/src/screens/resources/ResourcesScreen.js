@@ -1,11 +1,36 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, StyleSheet, FlatList, RefreshControl, Text, TouchableOpacity, ActivityIndicator, Modal, KeyboardAvoidingView, Platform, ScrollView, Alert, Linking } from 'react-native';
-import { Library, Plus, FileText, Image as ImageIcon, Video, Music, ExternalLink, X, Download } from 'lucide-react-native';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
-import * as WebBrowser from 'expo-web-browser';
-import { getResources, createResource, deleteResource } from '../../api/resources';
-import client from '../../api/client';
+import React, { useState, useEffect, useCallback, useContext } from 'react';
+import {
+  View,
+  StyleSheet,
+  FlatList,
+  RefreshControl,
+  Text,
+  TouchableOpacity,
+  ActivityIndicator,
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Alert,
+  Image,
+} from 'react-native';
+import {
+  Library,
+  Plus,
+  FileText,
+  Image as ImageIcon,
+  Video,
+  Music,
+  ExternalLink,
+  X,
+  Star,
+  Mic,
+  UploadCloud,
+} from 'lucide-react-native';
+import { viewDocument } from '../../utils/documentViewer';
+import { getResources, createResource, deleteResource, updateResource } from '../../api/resources';
+import { getSubjects } from '../../api/subjects';
+import { AuthContext } from '../../context/AuthContext';
 import { Header } from '../../components/ui/Header';
 import { PageHeading } from '../../components/ui/PageHeading';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -13,86 +38,233 @@ import { QueryState } from '../../components/ui/QueryState';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Field } from '../../components/ui/Field';
+import { SelectPicker } from '../../components/ui/SelectPicker';
+import { RatingInput } from '../../components/ui/RatingInput';
+import { AttachmentCard } from '../../components/ui/AttachmentCard';
+import { VoiceRecorderModal } from '../../components/ui/VoiceRecorderModal';
+import { pickAndUploadDocument, pickAndUploadImage } from '../../utils/fileUploader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { typography, spacing, radii, useAppTheme, useStyles } from '../../theme/theme';
+import { useAppTheme, useStyles } from '../../theme/theme';
 
-const ResourceIcon = ({ type, mimeType }) => {
-  const { colors } = useAppTheme();
-  if (mimeType?.includes('image')) return <ImageIcon size={20} color={colors.secondary} />;
-  if (mimeType?.includes('video')) return <Video size={20} color={colors.secondary} />;
-  if (mimeType?.includes('audio')) return <Music size={20} color={colors.secondary} />;
-  if (type === 'Document' || mimeType?.includes('pdf')) return <FileText size={20} color={colors.secondary} />;
-  if (type === 'YouTube') return <ExternalLink size={20} color={colors.secondary} />;
-  return <Library size={20} color={colors.secondary} />;
+const RESOURCE_TYPES = [
+  { label: 'Web Link', value: 'link' },
+  { label: 'YouTube Video', value: 'youtube' },
+  { label: 'File Upload', value: 'file' },
+  { label: 'Voice Recording', value: 'recording' },
+];
+
+const WATCHED_OPTIONS = [
+  { label: 'To explore', value: 'false' },
+  { label: 'Completed', value: 'true' },
+];
+
+const ResourceIcon = ({ type, mimeType, color }) => {
+  let IconComponent = ExternalLink;
+  let iconColor = color || '#293656';
+
+  if (type === 'youtube' || mimeType?.includes('youtube')) {
+    IconComponent = Video; // Fallback since Youtube icon is not available
+    iconColor = '#ff0000';
+  } else if (type === 'recording' || mimeType?.includes('audio')) {
+    IconComponent = Music;
+    iconColor = '#8d6b8d';
+  } else if (type === 'image' || mimeType?.includes('image')) {
+    IconComponent = ImageIcon;
+    iconColor = '#b58a4a';
+  } else if (type === 'video' || mimeType?.includes('video')) {
+    IconComponent = Video;
+    iconColor = '#4b8f8b';
+  } else if (type === 'file' || mimeType?.includes('pdf') || mimeType?.includes('document')) {
+    IconComponent = FileText;
+    iconColor = color || '#df6b47';
+  }
+
+  // Safety fallback: ensure IconComponent is valid
+  if (!IconComponent) {
+    IconComponent = ExternalLink;
+    iconColor = color || '#293656';
+  }
+
+  return <IconComponent size={20} color={iconColor} />;
 };
 
 const ResourcesScreen = ({ route, navigation }) => {
+  const { colors, typography, spacing, radii } = useAppTheme();
+  const styles = useStyles(createStyles);
   const insets = useSafeAreaInsets();
+  const { logout } = useContext(AuthContext);
 
-  // Subject context from SubjectDetailScreen
   const paramSubjectId = route?.params?.subjectId || null;
   const paramOpenCreate = route?.params?.openCreate || false;
 
   const [data, setData] = useState([]);
+  const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
   // Modal State
-  const [visible, setVisible] = useState(paramOpenCreate);
+  const [modalVisible, setModalVisible] = useState(paramOpenCreate);
+  const [resourceType, setResourceType] = useState('link');
   const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
   const [url, setUrl] = useState('');
   const [subjectId, setSubjectId] = useState(paramSubjectId || '');
+  const [topic, setTopic] = useState('');
+  const [description, setDescription] = useState('');
+  const [rating, setRating] = useState(0);
+  const [watched, setWatched] = useState('false');
+  const [tagsInput, setTagsInput] = useState('');
+  const [fileData, setFileData] = useState(null);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+
+  const [uploadingFile, setUploadingFile] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [downloadingItems, setDownloadingItems] = useState({});
+
+  // Voice recording modal
+  const [voiceModalVisible, setVoiceModalVisible] = useState(false);
 
   const loadData = async () => {
     try {
       setError(null);
-      const res = await getResources(paramSubjectId);
-      setData(res.data || res);
+      const [resRes, subsRes] = await Promise.all([
+        getResources(paramSubjectId),
+        getSubjects(),
+      ]);
+
+      setData(resRes.data || resRes || []);
+      setSubjects(subsRes.data || subsRes || []);
     } catch (e) {
-      setError('Failed to load resources.');
+      if (e.response && e.response.status === 401) {
+        setError('Session expired. Please log in again.');
+        logout();
+      } else {
+        setError('Failed to load resources.');
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  useEffect(() => { loadData(); }, [paramSubjectId]);
+  useEffect(() => {
+    loadData();
+  }, [paramSubjectId]);
 
   useEffect(() => {
-    if (paramOpenCreate) setVisible(true);
+    if (paramOpenCreate) setModalVisible(true);
   }, [paramOpenCreate]);
 
-  const onRefresh = useCallback(() => { setRefreshing(true); loadData(); }, []);
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadData();
+  }, [paramSubjectId]);
+
+  const handlePickDocument = async () => {
+    try {
+      setUploadingFile(true);
+      const uploaded = await pickAndUploadDocument();
+      if (uploaded) {
+        setFileData(uploaded);
+        if (!title.trim()) {
+          setTitle(uploaded.originalName?.replace(/\.[^.]+$/, '') || 'Resource File');
+        }
+      }
+    } catch (err) {
+      Alert.alert('Upload Failed', err.message || 'Could not upload file.');
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
+  const handlePickImage = async () => {
+    try {
+      setUploadingFile(true);
+      const uploaded = await pickAndUploadImage();
+      if (uploaded) {
+        setFileData(uploaded);
+        if (!title.trim()) {
+          setTitle(uploaded.originalName?.replace(/\.[^.]+$/, '') || 'Resource Image');
+        }
+      }
+    } catch (err) {
+      Alert.alert('Upload Failed', err.message || 'Could not upload image.');
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
+  const handleVoiceSave = (recording) => {
+    setFileData(recording);
+    setRecordingDuration(recording.duration || 0);
+    if (!title.trim()) {
+      setTitle(recording.originalName || 'Voice Recording');
+    }
+  };
 
   const handleCreate = async () => {
-    if (!title || !url) {
-      Alert.alert('Error', 'Please enter a title and URL.');
+    if (!title.trim()) {
+      Alert.alert('Validation Error', 'Resource title is required.');
       return;
     }
+
+    const isLinkType = resourceType === 'link' || resourceType === 'youtube';
+    if (isLinkType && !url.trim()) {
+      Alert.alert('Validation Error', 'URL is required for web / video links.');
+      return;
+    }
+    if ((resourceType === 'file' || resourceType === 'recording') && !fileData) {
+      Alert.alert('Validation Error', 'Please upload or record a file for this resource.');
+      return;
+    }
+
     setSubmitting(true);
     try {
-      const res = await createResource({ 
-        title, 
-        description, 
-        url,
-        subjectId: subjectId || undefined,
-        resourceType: url.includes('youtube.com') ? 'YouTube' : 'Website'
-      });
-      setVisible(false);
+      const parsedTags = tagsInput
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean);
+
+      const payload = {
+        title: title.trim(),
+        resourceType,
+        url: isLinkType ? url.trim() : (fileData?.url || ''),
+        subjectId: subjectId || null,
+        topic: topic.trim(),
+        description: description.trim(),
+        rating: Number(rating) || 0,
+        watched: watched === 'true',
+        tags: parsedTags,
+        fileData: fileData
+          ? {
+              url: fileData.url,
+              publicId: fileData.publicId,
+              originalName: fileData.originalName,
+              mimeType: fileData.mimeType,
+              size: fileData.size,
+              duration: fileData.duration || recordingDuration || undefined,
+            }
+          : undefined,
+      };
+
+      const res = await createResource(payload);
+      setModalVisible(false);
       setTitle('');
-      setDescription('');
       setUrl('');
+      setTopic('');
+      setDescription('');
+      setRating(0);
+      setWatched('false');
+      setTagsInput('');
+      setFileData(null);
+      setRecordingDuration(0);
+
       if (res.data) {
-        setData(prev => [res.data, ...prev]);
+        setData((prev) => [res.data, ...prev]);
       } else {
         await loadData();
       }
     } catch (e) {
-      Alert.alert('Error', 'Failed to create resource.');
+      Alert.alert('Error', e?.response?.data?.message || 'Failed to save resource.');
     } finally {
       setSubmitting(false);
     }
@@ -101,147 +273,57 @@ const ResourcesScreen = ({ route, navigation }) => {
   const handleDelete = (id) => {
     Alert.alert('Delete Resource', 'Are you sure you want to remove this resource?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => {
-        try {
-          await deleteResource(id);
-          setData(prev => prev.filter(item => item._id !== id && item.id !== id));
-        } catch (e) {
-          Alert.alert('Error', 'Failed to delete resource.');
-        }
-      }}
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteResource(id);
+            setData((prev) => prev.filter((item) => (item._id || item.id) !== id));
+          } catch (e) {
+            Alert.alert('Error', 'Failed to delete resource.');
+          }
+        },
+      },
     ]);
   };
 
-  const handleOpenResource = async (item) => {
-    let targetUrl = item.url || (item.fileData && item.fileData.url);
-    if (!targetUrl && item.fileData?.publicId) {
-      // If it's a relative path from the backend upload
-      targetUrl = `/${item.fileData.publicId}`; // Adjust if backend gives different format
+  const handleToggleWatched = async (item) => {
+    const itemId = item._id || item.id;
+    const nextWatched = !item.watched;
+
+    setData((prev) =>
+      prev.map((r) => ((r._id || r.id) === itemId ? { ...r, watched: nextWatched } : r))
+    );
+
+    try {
+      await updateResource(itemId, { watched: nextWatched });
+    } catch (err) {
+      loadData();
     }
-    
+  };
+
+  const handleOpenResource = async (item) => {
+    const targetUrl = (item.fileData && item.fileData.url) || item.url;
     if (!targetUrl) {
-      Alert.alert('Error', 'No valid URL found for this resource.');
+      Alert.alert('Error', 'No URL or file available for this resource.');
       return;
     }
 
-    // Fix relative URL by appending backend URL
-    if (targetUrl.startsWith('/')) {
-      const baseUrl = client.defaults.baseURL.replace('/api', '');
-      targetUrl = `${baseUrl}${targetUrl}`;
-    }
-
-    // Ensure http/https
-    if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
-      targetUrl = `https://${targetUrl}`;
-    }
-
-    const isDocument = item.resourceType === 'Document' || item.resourceType === 'file' || targetUrl.toLowerCase().endsWith('.pdf') || item.fileData?.mimeType?.includes('pdf') || item.fileData?.originalName?.toLowerCase()?.endsWith('.pdf');
-
-    if (isDocument) {
-      const itemId = item._id || item.id;
-      if (downloadingItems[itemId]) return; // Prevent double download
-
-      setDownloadingItems(prev => ({ ...prev, [itemId]: true }));
-      try {
-        const filename = item.fileData?.originalName || `resource_${itemId}.pdf`;
-        const fileUri = `${FileSystem.documentDirectory}${filename}`;
-        
-        const downloadResult = await FileSystem.downloadAsync(targetUrl, fileUri);
-        
-        if (downloadResult.status !== 200) {
-          throw new Error(`Failed to download: Status ${downloadResult.status}`);
-        }
-
-        const canShare = await Sharing.isAvailableAsync();
-        if (canShare) {
-          await Sharing.shareAsync(downloadResult.uri, { 
-            mimeType: item.fileData?.mimeType || 'application/pdf',
-            UTI: 'com.adobe.pdf',
-            dialogTitle: `Open ${filename}`
-          });
-        } else {
-          Alert.alert('Sharing Unavailable', 'Cannot open file natively. Opening in browser...');
-          await Linking.openURL(targetUrl);
-        }
-      } catch (e) {
-        console.error('Download error:', e);
-        Alert.alert('Download Failed', 'Could not download or open the file. Opening in browser instead...', [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Open in Browser', onPress: () => Linking.openURL(targetUrl) }
-        ]);
-      } finally {
-        setDownloadingItems(prev => ({ ...prev, [itemId]: false }));
-      }
-    } else {
-      // Normal Web Link
-      try {
-        const supported = await Linking.canOpenURL(targetUrl);
-        if (supported) {
-          await Linking.openURL(targetUrl);
-        } else {
-          Alert.alert('Error', 'Cannot open this URL type.');
-        }
-      } catch (error) {
-        Alert.alert('Error', 'Failed to open link.');
-      }
-    }
+    await viewDocument(targetUrl, item.title || 'Resource');
   };
 
-  const renderItem = ({ item }) => {
-    const isDocument = item.resourceType === 'Document' || item.resourceType === 'file' || item.url?.toLowerCase().endsWith('.pdf') || item.fileData?.mimeType?.includes('pdf') || item.fileData?.originalName?.toLowerCase()?.endsWith('.pdf');
-    const isDownloading = downloadingItems[item._id || item.id];
-    
-    return (
-      <TouchableOpacity 
-        style={styles.card} 
-        activeOpacity={0.7}
-        onLongPress={() => handleDelete(item._id || item.id)}
-        onPress={() => handleOpenResource(item)}
-      >
-        <View style={styles.cardHeader}>
-          <View style={styles.iconBox}>
-            <ResourceIcon type={item.resourceType} mimeType={item.fileData?.mimeType} />
-          </View>
-          <View style={[styles.badge, item.watched ? styles.badgeWatched : null]}>
-            <Text style={[styles.badgeText, item.watched ? styles.badgeTextWatched : null]}>
-              {item.watched ? 'completed' : 'to explore'}
-            </Text>
-          </View>
-        </View>
-        <Text style={styles.cardTitle}>{item.title}</Text>
-        <Text style={styles.cardPreview} numberOfLines={2}>
-          {item.description || 'No description added.'}
-        </Text>
-        
-        <View style={styles.actionButtonContainer}>
-          <View style={[styles.actionButton, isDownloading && styles.actionButtonDisabled]}>
-            {isDownloading ? (
-              <ActivityIndicator size="small" color={colors.primary} />
-            ) : (
-              <>
-                {isDocument ? <FileText size={16} color={colors.primary} /> : <ExternalLink size={16} color={colors.primary} />}
-                <Text style={styles.actionText}>{isDocument ? 'Open PDF / File' : 'Open Link'}</Text>
-              </>
-            )}
-          </View>
-        </View>
+  const subjectOptions = [
+    { label: 'No specific subject', value: '' },
+    ...subjects.map((s) => ({
+      label: `${s.name} (${s.code})`,
+      value: s._id || s.id,
+    })),
+  ];
 
-        <View style={styles.cardFooter}>
-          <Button variant="danger" onPress={() => handleDelete(item._id || item.id)} style={styles.deleteBtn}>
-            Delete
-          </Button>
-        </View>
-      </TouchableOpacity>
-    );
-  };
-
-  if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
+  const isLinkType = resourceType === 'link' || resourceType === 'youtube';
+  const isFileType = resourceType === 'file';
+  const isRecordingType = resourceType === 'recording';
 
   return (
     <View style={styles.container}>
@@ -249,18 +331,19 @@ const ResourcesScreen = ({ route, navigation }) => {
       <FlatList
         data={data}
         keyExtractor={(item, idx) => item._id || item.id || idx.toString()}
-        renderItem={renderItem}
         contentContainerStyle={styles.listContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+        }
         ListHeaderComponent={
           <>
-            <PageHeading 
-              eyebrow="A considered library" 
-              title="Resources" 
+            <PageHeading
+              eyebrow="A considered library"
+              title="Resources"
               detail="Keep the best explanations close, not scattered across twenty tabs."
               action={
-                <Button size="sm" onPress={() => setVisible(true)}>
-                  <Plus size={16} color={colors.primaryForeground} style={{ marginRight: 6 }} /> 
+                <Button size="sm" onPress={() => setModalVisible(true)}>
+                  <Plus size={16} color={colors.primaryForeground} style={{ marginRight: 6 }} />
                   Save resource
                 </Button>
               }
@@ -270,162 +353,494 @@ const ResourcesScreen = ({ route, navigation }) => {
         }
         ListEmptyComponent={
           !error && !loading ? (
-            <EmptyState 
+            <EmptyState
               title="Your library is empty"
               detail="Save videos, articles, docs, and problem sets as you find them."
               icon={Library}
               action={
-                <Button onPress={() => setVisible(true)}>
-                  <Plus size={16} color={colors.primaryForeground} style={{ marginRight: 6 }} /> 
+                <Button onPress={() => setModalVisible(true)}>
+                  <Plus size={16} color={colors.primaryForeground} style={{ marginRight: 6 }} />
                   Save first resource
                 </Button>
               }
             />
           ) : null
         }
+        renderItem={({ item }) => {
+          const resId = item._id || item.id;
+          const isFile = !!item.fileData;
+          const targetUrl = isFile ? item.fileData?.url : item.url;
+          const isImg = item.fileData?.mimeType?.startsWith('image/') || /\.(jpg|jpeg|png|webp)$/i.test(targetUrl || '');
+
+          return (
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <View style={styles.iconBox}>
+                  <ResourceIcon
+                    type={item.resourceType}
+                    mimeType={item.fileData?.mimeType}
+                    color={colors.primary}
+                  />
+                </View>
+                <TouchableOpacity
+                  style={[styles.badge, item.watched ? styles.badgeWatched : null]}
+                  onPress={() => handleToggleWatched(item)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.badgeText, item.watched ? styles.badgeTextWatched : null]}>
+                    {item.watched ? 'completed' : 'to explore'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.cardTitle}>{item.title}</Text>
+
+              {/* Subject chip & Rating */}
+              <View style={styles.metaRow}>
+                {!!(item.subject?.name || item.subject) && (
+                  <Text style={styles.subjectChip}>
+                    {item.subject?.name || item.subject}
+                  </Text>
+                )}
+                {item.rating > 0 && (
+                  <View style={styles.ratingBox}>
+                    <Star size={13} color="#eab308" fill="#eab308" />
+                    <Text style={styles.ratingText}>{item.rating}/5</Text>
+                  </View>
+                )}
+              </View>
+
+              {!!item.description && (
+                <Text style={styles.cardPreview} numberOfLines={2}>
+                  {item.description}
+                </Text>
+              )}
+
+              {/* Image thumbnail preview if image */}
+              {isImg && targetUrl && (
+                <Image
+                  source={{ uri: targetUrl }}
+                  style={styles.cardImagePreview}
+                  resizeMode="cover"
+                />
+              )}
+
+              {/* Tags */}
+              {item.tags?.length > 0 && (
+                <View style={styles.tagsRow}>
+                  {item.tags.map((tag, i) => (
+                    <Text key={i} style={styles.tagText}>
+                      #{tag}
+                    </Text>
+                  ))}
+                </View>
+              )}
+
+              <View style={styles.cardFooter}>
+                <TouchableOpacity
+                  style={styles.openBtn}
+                  onPress={() => handleOpenResource(item)}
+                  activeOpacity={0.7}
+                >
+                  <ExternalLink size={14} color={colors.accent} />
+                  <Text style={styles.openBtnText}>
+                    {isFile ? 'View File' : 'Open Resource'}
+                  </Text>
+                </TouchableOpacity>
+                <Button
+                  variant="danger"
+                  onPress={() => handleDelete(resId)}
+                  style={styles.deleteBtn}
+                >
+                  Delete
+                </Button>
+              </View>
+            </View>
+          );
+        }}
       />
 
-      <Modal visible={visible} animationType="slide" transparent>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalContainer}>
+      {/* Save Resource Modal */}
+      <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={() => setModalVisible(false)}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalContainer}
+        >
           <View style={styles.modalBackdrop} />
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Save Resource</Text>
-              <Button variant="quiet" style={styles.closeBtn} onPress={() => setVisible(false)}>
+              <Text style={styles.modalTitle}>Save a Resource</Text>
+              <Button variant="quiet" style={styles.closeBtn} onPress={() => setModalVisible(false)}>
                 <X size={20} color={colors.foreground} />
               </Button>
             </View>
-            <ScrollView style={styles.modalScroll}>
+
+            <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled">
+              <View style={styles.gridRow}>
+                <Field label="Resource Type" style={{ flex: 1 }}>
+                  <SelectPicker
+                    value={resourceType}
+                    onValueChange={(val) => {
+                      setResourceType(val);
+                      setFileData(null);
+                    }}
+                    options={RESOURCE_TYPES}
+                  />
+                </Field>
+                <Field label="Subject" style={{ flex: 1.2 }}>
+                  <SelectPicker
+                    value={subjectId}
+                    onValueChange={setSubjectId}
+                    options={subjectOptions}
+                    placeholder="No subject"
+                  />
+                </Field>
+              </View>
+
               <Field label="Title">
-                <Input value={title} onChangeText={setTitle} placeholder="Enter resource title" />
+                <Input value={title} onChangeText={setTitle} placeholder="e.g. Dynamic Programming Guide" />
               </Field>
-              <Field label="URL">
-                <Input value={url} onChangeText={setUrl} placeholder="Paste resource link" keyboardType="url" autoCapitalize="none" />
+
+              {/* Conditional Input based on Resource Type */}
+              {isLinkType && (
+                <Field label={resourceType === 'youtube' ? 'YouTube URL' : 'Web Link URL'}>
+                  <Input
+                    value={url}
+                    onChangeText={setUrl}
+                    placeholder={resourceType === 'youtube' ? 'https://youtube.com/watch?v=...' : 'https://...'}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </Field>
+              )}
+
+              {isFileType && (
+                <Field label="Upload File">
+                  {fileData ? (
+                    <AttachmentCard
+                      attachment={fileData}
+                      onRemove={() => setFileData(null)}
+                    />
+                  ) : (
+                    <View style={styles.uploadRow}>
+                      <TouchableOpacity
+                        style={[styles.uploadBox, uploadingFile && styles.disabled]}
+                        onPress={handlePickDocument}
+                        disabled={uploadingFile}
+                        activeOpacity={0.7}
+                      >
+                        <UploadCloud size={20} color={colors.accent} />
+                        <Text style={styles.uploadBoxText}>Pick Document (PDF/DOCX)</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.uploadBox, uploadingFile && styles.disabled]}
+                        onPress={handlePickImage}
+                        disabled={uploadingFile}
+                        activeOpacity={0.7}
+                      >
+                        <ImageIcon size={20} color={colors.accent} />
+                        <Text style={styles.uploadBoxText}>Pick Image</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </Field>
+              )}
+
+              {isRecordingType && (
+                <Field label="Voice Recording">
+                  {fileData ? (
+                    <AttachmentCard
+                      attachment={{
+                        type: 'recording',
+                        originalName: fileData.originalName || 'Voice Recording',
+                        mimeType: 'audio/m4a',
+                        duration: recordingDuration,
+                        url: fileData.url,
+                      }}
+                      onRemove={() => {
+                        setFileData(null);
+                        setRecordingDuration(0);
+                      }}
+                    />
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.recordAudioBox}
+                      onPress={() => setVoiceModalVisible(true)}
+                      activeOpacity={0.7}
+                    >
+                      <Mic size={22} color={colors.accent} />
+                      <Text style={styles.recordAudioText}>Tap to Record Audio</Text>
+                    </TouchableOpacity>
+                  )}
+                </Field>
+              )}
+
+              <View style={styles.gridRow}>
+                <Field label="Rating" style={{ flex: 1.2 }}>
+                  <RatingInput value={rating} onValueChange={setRating} showLabel={false} />
+                </Field>
+                <Field label="Status" style={{ flex: 1 }}>
+                  <SelectPicker
+                    value={watched}
+                    onValueChange={setWatched}
+                    options={WATCHED_OPTIONS}
+                  />
+                </Field>
+              </View>
+
+              <Field label="Topic / Concept (Optional)">
+                <Input value={topic} onChangeText={setTopic} placeholder="e.g. Unit 3: Graph Algorithms" />
               </Field>
+
+              <Field label="Tags (Comma separated)">
+                <Input value={tagsInput} onChangeText={setTagsInput} placeholder="algorithms, dp, cheat-sheet" />
+              </Field>
+
               <Field label="Description (Optional)">
-                <Input 
-                  value={description} 
-                  onChangeText={setDescription} 
-                  placeholder="Add resource description" 
+                <Input
+                  value={description}
+                  onChangeText={setDescription}
+                  placeholder="Key takeaways or summary..."
                   multiline
                   style={{ minHeight: 80, alignItems: 'flex-start' }}
                   textAlignVertical="top"
                 />
               </Field>
-              {!paramSubjectId && (
-                <Field label="Subject ID (Optional)">
-                  <Input value={subjectId} onChangeText={setSubjectId} placeholder="Select subject" />
-                </Field>
-              )}
             </ScrollView>
-            <View style={[styles.modalFooter, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
-              <Button variant="quiet" style={styles.modalBtn} onPress={() => setVisible(false)}>Cancel</Button>
-              <Button style={styles.modalBtn} onPress={handleCreate} loading={submitting}>Save</Button>
+
+            <View
+              style={[
+                styles.modalFooter,
+                { paddingBottom: Math.max(insets.bottom, spacing.md) },
+              ]}
+            >
+              <Button variant="quiet" style={styles.modalBtn} onPress={() => setModalVisible(false)}>
+                Cancel
+              </Button>
+              <Button
+                style={styles.modalBtn}
+                onPress={handleCreate}
+                loading={submitting}
+                disabled={!title.trim() || submitting || uploadingFile}
+              >
+                Save Resource
+              </Button>
             </View>
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Voice Recorder Modal */}
+      <VoiceRecorderModal
+        visible={voiceModalVisible}
+        onClose={() => setVoiceModalVisible(false)}
+        onSave={handleVoiceSave}
+      />
     </View>
   );
 };
 
-const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background },
-  listContent: { padding: spacing.lg, paddingBottom: spacing.xxl },
-  card: {
-    backgroundColor: colors.card,
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: spacing.md,
-  },
-  iconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.md,
-    backgroundColor: colors.accent + '20',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  badge: {
-    backgroundColor: colors.muted,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: radii.round,
-  },
-  badgeWatched: {
-    backgroundColor: colors.accent + '20',
-  },
-  badgeText: {
-    fontFamily: typography.mono.regular,
-    fontSize: 9,
-    textTransform: 'uppercase',
-    color: colors.mutedForeground,
-  },
-  badgeTextWatched: {
-    color: colors.accent,
-  },
-  cardTitle: {
-    fontFamily: typography.serif.medium,
-    fontSize: 20,
-    color: colors.foreground,
-    marginBottom: spacing.xs,
-  },
-  cardPreview: {
-    fontFamily: typography.sans.regular,
-    fontSize: 14,
-    color: colors.mutedForeground,
-    lineHeight: 20,
-    marginBottom: spacing.md,
-  },
-  actionButtonContainer: {
-    marginBottom: spacing.sm,
-    alignItems: 'flex-start',
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: `${colors.primary}1A`,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.md,
-  },
-  actionButtonDisabled: {
-    opacity: 0.7,
-  },
-  actionText: {
-    fontFamily: typography.sans.medium,
-    fontSize: 14,
-    color: colors.primary,
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    marginTop: spacing.sm,
-    paddingTop: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.cardBorder,
-  },
-  deleteBtn: { minHeight: 32, paddingVertical: 4, paddingHorizontal: 12 },
-  modalContainer: { flex: 1, justifyContent: 'flex-end' },
-  modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(24,32,49,0.48)' },
-  modalContent: { backgroundColor: colors.card, borderTopLeftRadius: radii.xxl, borderTopRightRadius: radii.xxl, maxHeight: '90%' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.cardBorder },
-  modalTitle: { fontFamily: typography.serif.medium, fontSize: 24, color: colors.foreground },
-  closeBtn: { minHeight: 40, paddingHorizontal: 10, paddingVertical: 8 },
-  modalScroll: { padding: spacing.lg },
-  modalFooter: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.md, padding: spacing.lg, borderTopWidth: 1, borderTopColor: colors.cardBorder, backgroundColor: `${colors.muted}33` },
-  modalBtn: { minWidth: 100 }
-}));
+const createStyles = ({ colors, typography, spacing, radii }) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    listContent: { padding: spacing.lg, paddingBottom: spacing.xxl },
+    card: {
+      backgroundColor: colors.card,
+      borderRadius: radii.xl,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      padding: spacing.lg,
+      marginBottom: spacing.md,
+    },
+    cardHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: spacing.xs,
+    },
+    iconBox: {
+      width: 38,
+      height: 38,
+      borderRadius: radii.md,
+      backgroundColor: colors.muted + '80',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    badge: {
+      backgroundColor: colors.muted,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: radii.round,
+    },
+    badgeWatched: {
+      backgroundColor: colors.accent + '20',
+    },
+    badgeText: {
+      fontFamily: typography.mono.regular,
+      fontSize: 10,
+      textTransform: 'uppercase',
+      color: colors.mutedForeground,
+    },
+    badgeTextWatched: {
+      color: colors.accent,
+      fontFamily: typography.mono.bold,
+    },
+    cardTitle: {
+      fontFamily: typography.serif.medium,
+      fontSize: 20,
+      color: colors.foreground,
+      marginTop: spacing.xs,
+      marginBottom: 2,
+    },
+    metaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      marginVertical: 4,
+    },
+    subjectChip: {
+      fontFamily: typography.sans.medium,
+      fontSize: 11,
+      color: colors.primary,
+      backgroundColor: `${colors.primary}1A`,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: radii.sm,
+    },
+    ratingBox: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 3,
+    },
+    ratingText: {
+      fontFamily: typography.mono.medium,
+      fontSize: 11,
+      color: colors.foreground,
+    },
+    cardPreview: {
+      fontFamily: typography.sans.regular,
+      fontSize: 13,
+      color: colors.mutedForeground,
+      lineHeight: 18,
+      marginTop: spacing.xs,
+      marginBottom: spacing.sm,
+    },
+    cardImagePreview: {
+      height: 120,
+      width: '100%',
+      borderRadius: radii.lg,
+      marginVertical: spacing.xs,
+    },
+    tagsRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 6,
+      marginVertical: spacing.xs,
+    },
+    tagText: {
+      fontFamily: typography.mono.regular,
+      fontSize: 11,
+      color: colors.accent,
+    },
+    cardFooter: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginTop: spacing.sm,
+      paddingTop: spacing.sm,
+      borderTopWidth: 1,
+      borderTopColor: colors.cardBorder,
+    },
+    openBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingVertical: 4,
+    },
+    openBtnText: {
+      fontFamily: typography.sans.semiBold,
+      fontSize: 13,
+      color: colors.accent,
+    },
+    deleteBtn: { minHeight: 30, paddingVertical: 2, paddingHorizontal: 10 },
+    modalContainer: { flex: 1, justifyContent: 'flex-end' },
+    modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(24,32,49,0.48)' },
+    modalContent: {
+      backgroundColor: colors.card,
+      borderTopLeftRadius: radii.xxl,
+      borderTopRightRadius: radii.xxl,
+      maxHeight: '92%',
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: spacing.lg,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.cardBorder,
+    },
+    modalTitle: {
+      fontFamily: typography.serif.medium,
+      fontSize: 22,
+      color: colors.foreground,
+    },
+    closeBtn: { minHeight: 36, paddingHorizontal: 8, paddingVertical: 6 },
+    modalScroll: { padding: spacing.lg },
+    gridRow: {
+      flexDirection: 'row',
+      gap: spacing.md,
+    },
+    uploadRow: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+    },
+    uploadBox: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      borderWidth: 1.5,
+      borderStyle: 'dashed',
+      borderColor: colors.cardBorder,
+      borderRadius: radii.lg,
+      backgroundColor: colors.background,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.sm,
+    },
+    disabled: { opacity: 0.5 },
+    uploadBoxText: {
+      fontFamily: typography.sans.medium,
+      fontSize: 12,
+      color: colors.foreground,
+    },
+    recordAudioBox: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      borderWidth: 1.5,
+      borderStyle: 'dashed',
+      borderColor: colors.accent + '60',
+      backgroundColor: colors.accent + '10',
+      borderRadius: radii.lg,
+      paddingVertical: spacing.md,
+    },
+    recordAudioText: {
+      fontFamily: typography.sans.semiBold,
+      fontSize: 13,
+      color: colors.accent,
+    },
+    modalFooter: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      gap: spacing.md,
+      padding: spacing.lg,
+      borderTopWidth: 1,
+      borderTopColor: colors.cardBorder,
+      backgroundColor: `${colors.muted}33`,
+    },
+    modalBtn: { minWidth: 100 },
+  });
 
 export default ResourcesScreen;

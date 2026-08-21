@@ -5,6 +5,9 @@ import { Button } from './Button';
 import { typography, radii, spacing, useAppTheme, useStyles } from '../../theme/theme';
 
 export function QueryState({ error, onRetry, label = 'This section' }) {
+  const { colors, typography, spacing, radii, theme } = useAppTheme();
+  const styles = useStyles(createStyles);
+
   if (!error) return null;
   return (
     <View style={styles.container}>
@@ -20,7 +23,7 @@ export function QueryState({ error, onRetry, label = 'This section' }) {
   );
 }
 
-const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.create({
+const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.create({
   container: {
     backgroundColor: `${colors.destructive}0D`, // 5% opacity
     borderRadius: radii.xxl,
@@ -57,4 +60,4 @@ const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.
     minHeight: 40,
     paddingVertical: 8,
   }
-}));
+});

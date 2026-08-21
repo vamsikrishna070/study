@@ -28,7 +28,7 @@ const Stack = createStackNavigator();
 const { width } = Dimensions.get('window');
 
 const TabNavigator = () => {
-  const { colors, theme } = useAppTheme();
+  const { colors, theme, typography } = useAppTheme();
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -70,6 +70,7 @@ const TabNavigator = () => {
 const DrawerNavigator = () => {
   return (
     <Drawer.Navigator 
+      id="AppDrawer"
       drawerContent={(props) => <Sidebar {...props} />}
       screenOptions={{ 
         headerShown: false,
@@ -83,6 +84,7 @@ const DrawerNavigator = () => {
       <Drawer.Screen name="HomeDrawer" component={TabNavigator} />
       
       <Drawer.Screen name="Syllabus" component={SyllabusScreen} />
+      <Drawer.Screen name="Notes" component={NotesScreen} />
       <Drawer.Screen name="Resources" component={ResourcesScreen} />
       <Drawer.Screen name="Reminders" component={RemindersScreen} />
       <Drawer.Screen name="Progress" component={ProgressScreen} />

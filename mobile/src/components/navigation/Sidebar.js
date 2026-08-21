@@ -33,54 +33,34 @@ const navItems = [
 ];
 
 const Sidebar = (props) => {
-  const { colors } = useAppTheme();
+  const { colors, typography, spacing, radii, theme } = useAppTheme();
+  const styles = useStyles(createStyles);
   const { state, navigation } = props;
   const { user, logout } = useContext(AuthContext);
 
-  // Tab screens live inside the 'HomeDrawer' screen
   const tabScreens = ['OverviewTab', 'SubjectsTab', 'TasksTab', 'ExamsTab'];
 
   const handleNavigation = (routeName) => {
-    // 1. First explicitly dispatch the close drawer action
     if (typeof navigation.closeDrawer === 'function') {
       navigation.closeDrawer();
     } else {
       navigation.dispatch(DrawerActions.closeDrawer());
     }
 
-    // 2. Then navigate
     if (tabScreens.includes(routeName)) {
-      navigation.navigate('DrawerRoot', {
-        screen: 'HomeDrawer',
-        params: { screen: routeName },
+      navigation.navigate('HomeDrawer', {
+        screen: routeName,
       });
     } else {
-      navigation.navigate('DrawerRoot', {
-        screen: routeName
-      });
+      navigation.navigate(routeName);
     }
   };
 
   const handleLogout = async () => {
-    navigation.closeDrawer();
-    await logout();
-  };
-
-  const ProfileAvatar = () => {
-    if (user?.profileImageUrl) {
-      return (
-        <View style={styles.avatarContainer}>
-          <Image source={{ uri: user.profileImageUrl }} style={styles.avatarImage} />
-        </View>
-      );
+    if (typeof navigation.closeDrawer === 'function') {
+      navigation.closeDrawer();
     }
-    return (
-      <View style={[styles.avatarContainer, styles.avatarPlaceholder]}>
-        <Text style={styles.avatarText}>
-          {user?.name?.split(' ').map(p => p[0]).join('').slice(0, 2) || 'U'}
-        </Text>
-      </View>
-    );
+    await logout();
   };
 
   return (
@@ -106,7 +86,7 @@ const Sidebar = (props) => {
 
         <View style={styles.navSection}>
           {navItems.map((item) => {
-            const isActive = false; // TODO: Calculate active state properly if needed
+            const isActive = false;
 
             return (
               <TouchableOpacity
@@ -132,7 +112,17 @@ const Sidebar = (props) => {
           onPress={() => handleNavigation('Settings')}
           accessibilityLabel="Settings"
         >
-          <ProfileAvatar />
+          {user?.profileImageUrl ? (
+            <View style={styles.avatarContainer}>
+              <Image source={{ uri: user.profileImageUrl }} style={styles.avatarImage} />
+            </View>
+          ) : (
+            <View style={[styles.avatarContainer, styles.avatarPlaceholder]}>
+              <Text style={styles.avatarText}>
+                {user?.name?.split(' ').map(p => p[0]).join('').slice(0, 2) || 'U'}
+              </Text>
+            </View>
+          )}
           <View style={styles.profileInfo}>
             <Text style={styles.profileName} numberOfLines={1}>{user?.name || 'Student'}</Text>
             <Text style={styles.profileDegree} numberOfLines={1}>
@@ -155,7 +145,7 @@ const Sidebar = (props) => {
   );
 };
 
-const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.create({
+const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.card,
@@ -216,7 +206,7 @@ const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.
     marginBottom: 4,
   },
   navItemActive: {
-    backgroundColor: colors.accent + '33', // approx bg-sidebar-accent
+    backgroundColor: colors.accent + '33',
   },
   navLabel: {
     fontFamily: typography.sans.semiBold,
@@ -293,6 +283,6 @@ const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.
     marginLeft: spacing.sm,
     opacity: 0.7,
   }
-}));
+});
 
 export default Sidebar;

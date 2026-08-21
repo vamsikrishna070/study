@@ -9,6 +9,9 @@ export function Input({
   error,
   ...props 
 }) {
+  const { colors, typography, spacing, radii, theme } = useAppTheme();
+  const styles = useStyles(createStyles);
+
   const [isFocused, setIsFocused] = useState(false);
   const [isSecure, setIsSecure] = useState(secureTextEntry);
 
@@ -44,7 +47,7 @@ export function Input({
   );
 }
 
-const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.create({
+const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -74,4 +77,4 @@ const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.
     height: '100%',
     justifyContent: 'center',
   }
-}));
+});

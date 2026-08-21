@@ -1,7 +1,29 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, StyleSheet, FlatList, RefreshControl, Text, TouchableOpacity, ActivityIndicator, Modal, KeyboardAvoidingView, Platform, ScrollView, Alert } from 'react-native';
-import { FileText, Plus, X } from 'lucide-react-native';
+import React, { useState, useEffect, useCallback, useContext } from 'react';
+import {
+  View,
+  StyleSheet,
+  FlatList,
+  RefreshControl,
+  Text,
+  TouchableOpacity,
+  ActivityIndicator,
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Alert,
+} from 'react-native';
+import {
+  FileText,
+  Plus,
+  X,
+  Search,
+  SlidersHorizontal,
+  Mic,
+} from 'lucide-react-native';
 import { getNotes, createNote, deleteNote } from '../../api/notes';
+import { getSubjects } from '../../api/subjects';
+import { AuthContext } from '../../context/AuthContext';
 import { Header } from '../../components/ui/Header';
 import { PageHeading } from '../../components/ui/PageHeading';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -9,305 +31,715 @@ import { QueryState } from '../../components/ui/QueryState';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Field } from '../../components/ui/Field';
+import { SelectPicker } from '../../components/ui/SelectPicker';
+import { AttachmentUploader } from '../../components/ui/AttachmentUploader';
+import { AttachmentCard } from '../../components/ui/AttachmentCard';
+import { VoiceRecorderModal } from '../../components/ui/VoiceRecorderModal';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { typography, spacing, radii, useAppTheme, useStyles } from '../../theme/theme';
+import { useAppTheme, useStyles } from '../../theme/theme';
+
+const PRIORITY_OPTIONS = [
+  { label: 'Low', value: 'low' },
+  { label: 'Medium', value: 'medium' },
+  { label: 'High', value: 'high' },
+  { label: 'Exam essential', value: 'exam' },
+];
+
+const FILTER_PRIORITY_OPTIONS = [
+  { label: 'All priorities', value: '' },
+  ...PRIORITY_OPTIONS,
+];
 
 const NotesScreen = ({ route, navigation }) => {
-  const { colors } = useAppTheme();
+  const { colors, typography, spacing, radii } = useAppTheme();
+  const styles = useStyles(createStyles);
   const insets = useSafeAreaInsets();
+  const { logout } = useContext(AuthContext);
 
-  // Subject context passed from SubjectDetailScreen
   const paramSubjectId = route?.params?.subjectId || null;
   const paramOpenCreate = route?.params?.openCreate || false;
 
   const [data, setData] = useState([]);
+  const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
-  // Modal State
-  const [visible, setVisible] = useState(paramOpenCreate);
+  // Search & Filter
+  const [search, setSearch] = useState('');
+  const [filterSubjectId, setFilterSubjectId] = useState(paramSubjectId || '');
+  const [filterPriority, setFilterPriority] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Note Modal State
+  const [modalVisible, setModalVisible] = useState(paramOpenCreate);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [subjectId, setSubjectId] = useState(paramSubjectId || '');
+  const [topic, setTopic] = useState('');
+  const [priority, setPriority] = useState('medium');
+  const [tagsInput, setTagsInput] = useState('');
+  const [attachments, setAttachments] = useState([]);
   const [submitting, setSubmitting] = useState(false);
+
+  // Voice recording modal
+  const [voiceModalVisible, setVoiceModalVisible] = useState(false);
 
   const loadData = async () => {
     try {
       setError(null);
-      const res = await getNotes(paramSubjectId);
-      setData(res.data || res);
+      const [notesRes, subsRes] = await Promise.all([
+        getNotes(filterSubjectId || paramSubjectId),
+        getSubjects(),
+      ]);
+
+      const notesList = notesRes.data || notesRes || [];
+      const subsList = subsRes.data || subsRes || [];
+      setData(notesList);
+      setSubjects(subsList);
+
+      if (!subjectId && subsList.length > 0) {
+        setSubjectId(subsList[0]._id || subsList[0].id);
+      }
     } catch (e) {
-      setError('Failed to load notes.');
+      if (e.response && e.response.status === 401) {
+        setError('Session expired. Please log in again.');
+        logout();
+      } else {
+        setError('Failed to load notes.');
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  useEffect(() => { loadData(); }, [paramSubjectId]);
+  useEffect(() => {
+    loadData();
+  }, [paramSubjectId, filterSubjectId]);
 
   useEffect(() => {
-    if (paramOpenCreate) setVisible(true);
+    if (paramOpenCreate) setModalVisible(true);
   }, [paramOpenCreate]);
 
-  const onRefresh = useCallback(() => { setRefreshing(true); loadData(); }, []);
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadData();
+  }, [filterSubjectId]);
 
   const handleCreate = async () => {
-    if (!title || !content) {
-      Alert.alert('Error', 'Please enter both title and content.');
+    if (!title.trim() || !content.trim()) {
+      Alert.alert('Validation Error', 'Please enter both title and note content.');
       return;
     }
     if (!subjectId) {
-      Alert.alert('Error', 'A subject is required. Please provide a subject ID.');
+      Alert.alert('Validation Error', 'Please select a subject.');
       return;
     }
+
     setSubmitting(true);
     try {
-      const res = await createNote({ title, content, subjectId });
-      setVisible(false);
+      const parsedTags = tagsInput
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean);
+
+      const payload = {
+        title: title.trim(),
+        content: content.trim(),
+        subjectId,
+        topic: topic.trim(),
+        priority,
+        tags: parsedTags,
+        attachments,
+      };
+
+      const res = await createNote(payload);
+      setModalVisible(false);
       setTitle('');
       setContent('');
+      setTopic('');
+      setPriority('medium');
+      setTagsInput('');
+      setAttachments([]);
+
       if (res.data) {
-        setData(prev => [res.data, ...prev]);
+        setData((prev) => [res.data, ...prev]);
       } else {
         await loadData();
       }
     } catch (e) {
-      Alert.alert('Error', e?.response?.data?.message || 'Failed to create note.');
+      Alert.alert('Error', e?.response?.data?.message || 'Failed to save note.');
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleDelete = (id) => {
-    Alert.alert('Delete Note', 'Are you sure you want to remove this note?', [
+    Alert.alert('Delete Note', 'Are you sure you want to remove this note? This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => {
-        try {
-          await deleteNote(id);
-          setData(prev => prev.filter(item => item._id !== id && item.id !== id));
-        } catch (e) {
-          Alert.alert('Error', 'Failed to delete note.');
-        }
-      }}
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteNote(id);
+            setData((prev) => prev.filter((item) => (item._id || item.id) !== id));
+          } catch (e) {
+            Alert.alert('Error', 'Failed to delete note.');
+          }
+        },
+      },
     ]);
   };
 
-  const renderItem = ({ item }) => (
-    <TouchableOpacity 
-      style={styles.card} 
-      activeOpacity={0.7}
-      onLongPress={() => handleDelete(item._id || item.id)}
-    >
-      <View style={styles.cardHeader}>
-        <View style={styles.iconBox}>
-          <FileText size={20} color={colors.secondary} />
-        </View>
-        {item.priority && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{item.priority}</Text>
-          </View>
-        )}
-      </View>
-      <Text style={styles.cardTitle}>{item.title}</Text>
-      {!!item.subject?.name && <Text style={styles.subjectChip}>{item.subject.name}</Text>}
-      <Text style={styles.cardPreview} numberOfLines={2}>
-        {item.content || 'No content preview available.'}
-      </Text>
-      <View style={styles.cardFooter}>
-        <Text style={styles.cardDate}>
-          {new Date(item.createdAt || item.date || Date.now()).toLocaleDateString()}
-        </Text>
-        <Button variant="danger" onPress={() => handleDelete(item._id || item.id)} style={styles.deleteBtn}>
-          Delete
-        </Button>
-      </View>
-    </TouchableOpacity>
-  );
+  const handleVoiceSave = (recording) => {
+    setAttachments((prev) => [...prev, { type: 'recording', ...recording }]);
+  };
 
-  if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
+  // Filter notes locally for search and priority
+  const filteredNotes = data.filter((item) => {
+    const matchesSearch =
+      !search ||
+      `${item.title} ${item.content} ${item.subject?.name || item.subject || ''} ${item.topic || ''} ${(item.tags || []).join(' ')}`
+        .toLowerCase()
+        .includes(search.toLowerCase());
+
+    const matchesPriority = !filterPriority || item.priority === filterPriority;
+
+    return matchesSearch && matchesPriority;
+  });
+
+  const subjectOptions = subjects.map((s) => ({
+    label: `${s.name} (${s.code})`,
+    value: s._id || s.id,
+  }));
+
+  const filterSubjectOptions = [
+    { label: 'All subjects', value: '' },
+    ...subjectOptions,
+  ];
+
+  const getPriorityBadgeColor = (p) => {
+    switch (p) {
+      case 'exam':
+        return colors.destructive;
+      case 'high':
+        return colors.accent;
+      case 'medium':
+        return '#b58a4a';
+      case 'low':
+      default:
+        return colors.mutedForeground;
+    }
+  };
 
   return (
     <View style={styles.container}>
       <Header />
       <FlatList
-        data={data}
+        data={filteredNotes}
         keyExtractor={(item, idx) => item._id || item.id || idx.toString()}
-        renderItem={renderItem}
         contentContainerStyle={styles.listContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+        }
         ListHeaderComponent={
           <>
-            <PageHeading 
-              eyebrow={paramSubjectId ? "Subject Notes" : "Your knowledge base"} 
-              title="Notes" 
+            <PageHeading
+              eyebrow={paramSubjectId ? 'Subject Notes' : 'Your knowledge base'}
+              title="Notes"
               detail="Capture ideas, explanations, formulas, and key concepts."
               action={
-                <Button size="sm" onPress={() => setVisible(true)}>
-                  <Plus size={16} color={colors.primaryForeground} style={{ marginRight: 6 }} /> 
+                <Button size="sm" onPress={() => setModalVisible(true)}>
+                  <Plus size={16} color={colors.primaryForeground} style={{ marginRight: 6 }} />
                   New note
                 </Button>
               }
             />
+
+            {/* Search & Filter Header */}
+            <View style={styles.searchRow}>
+              <View style={styles.searchInputContainer}>
+                <Search size={16} color={colors.mutedForeground} style={{ marginRight: 8 }} />
+                <Input
+                  value={search}
+                  onChangeText={setSearch}
+                  placeholder="Search notes..."
+                  style={styles.searchField}
+                />
+                {search.length > 0 && (
+                  <TouchableOpacity onPress={() => setSearch('')}>
+                    <X size={16} color={colors.mutedForeground} />
+                  </TouchableOpacity>
+                )}
+              </View>
+              <TouchableOpacity
+                style={[
+                  styles.filterToggleBtn,
+                  (filterPriority || filterSubjectId) && styles.filterToggleActive,
+                ]}
+                onPress={() => setShowFilters(!showFilters)}
+                activeOpacity={0.7}
+              >
+                <SlidersHorizontal
+                  size={18}
+                  color={
+                    filterPriority || filterSubjectId
+                      ? colors.accent
+                      : colors.mutedForeground
+                  }
+                />
+              </TouchableOpacity>
+            </View>
+
+            {/* Expandable Filter Box */}
+            {showFilters && (
+              <View style={styles.filterBox}>
+                <Field label="Filter by Subject">
+                  <SelectPicker
+                    value={filterSubjectId}
+                    onValueChange={setFilterSubjectId}
+                    options={filterSubjectOptions}
+                    placeholder="All subjects"
+                  />
+                </Field>
+                <Field label="Filter by Priority">
+                  <SelectPicker
+                    value={filterPriority}
+                    onValueChange={setFilterPriority}
+                    options={FILTER_PRIORITY_OPTIONS}
+                    placeholder="All priorities"
+                  />
+                </Field>
+              </View>
+            )}
+
             <QueryState error={error} onRetry={loadData} label="Notes" />
           </>
         }
         ListEmptyComponent={
           !error && !loading ? (
-            <EmptyState 
-              title="No notes yet"
-              detail="Start building your knowledge base by creating your first note."
+            <EmptyState
+              title={search || filterPriority ? 'No notes match filters' : 'No notes yet'}
+              detail={
+                search || filterPriority
+                  ? 'Try adjusting your search query or priority filters.'
+                  : 'Start building your knowledge base by creating your first note.'
+              }
               icon={FileText}
               action={
-                <Button onPress={() => setVisible(true)}>
-                  <Plus size={16} color={colors.primaryForeground} style={{ marginRight: 6 }} /> 
+                <Button onPress={() => setModalVisible(true)}>
+                  <Plus size={16} color={colors.primaryForeground} style={{ marginRight: 6 }} />
                   Create note
                 </Button>
               }
             />
           ) : null
         }
+        renderItem={({ item }) => {
+          const noteId = item._id || item.id;
+          const priorityColor = getPriorityBadgeColor(item.priority);
+          const atts = item.attachments || [];
+
+          return (
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <View style={styles.iconBox}>
+                  <FileText size={20} color={colors.accent} />
+                </View>
+                {item.priority && (
+                  <View
+                    style={[
+                      styles.badge,
+                      { backgroundColor: priorityColor + '20', borderColor: priorityColor },
+                    ]}
+                  >
+                    <Text style={[styles.badgeText, { color: priorityColor }]}>
+                      {item.priority}
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              <Text style={styles.cardTitle}>{item.title}</Text>
+
+              {/* Subject and Topic Chips */}
+              <View style={styles.chipRow}>
+                {!!(item.subject?.name || item.subject) && (
+                  <Text style={styles.subjectChip}>
+                    {item.subject?.name || item.subject}
+                  </Text>
+                )}
+                {!!item.topic && (
+                  <Text style={styles.topicChip}>{item.topic}</Text>
+                )}
+              </View>
+
+              <Text style={styles.cardPreview} numberOfLines={3}>
+                {item.content}
+              </Text>
+
+              {/* Tags */}
+              {item.tags?.length > 0 && (
+                <View style={styles.tagsRow}>
+                  {item.tags.map((tag, i) => (
+                    <Text key={i} style={styles.tagText}>
+                      #{tag}
+                    </Text>
+                  ))}
+                </View>
+              )}
+
+              {/* Attachments Preview */}
+              {atts.length > 0 && (
+                <View style={styles.attachmentsContainer}>
+                  {atts.map((att, i) => (
+                    <AttachmentCard key={i} attachment={att} readonly />
+                  ))}
+                </View>
+              )}
+
+              <View style={styles.cardFooter}>
+                <Text style={styles.cardDate}>
+                  {new Date(item.createdAt || item.updatedAt || Date.now()).toLocaleDateString()}
+                </Text>
+                <Button
+                  variant="danger"
+                  onPress={() => handleDelete(noteId)}
+                  style={styles.deleteBtn}
+                >
+                  Delete
+                </Button>
+              </View>
+            </View>
+          );
+        }}
       />
 
-      <Modal visible={visible} animationType="slide" transparent>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalContainer}>
+      {/* New Note Modal */}
+      <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={() => setModalVisible(false)}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalContainer}
+        >
           <View style={styles.modalBackdrop} />
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>New Note</Text>
-              <Button variant="quiet" style={styles.closeBtn} onPress={() => setVisible(false)}>
+              <Button variant="quiet" style={styles.closeBtn} onPress={() => setModalVisible(false)}>
                 <X size={20} color={colors.foreground} />
               </Button>
             </View>
-            <ScrollView style={styles.modalScroll}>
+
+            <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled">
               <Field label="Note Title">
-                <Input value={title} onChangeText={setTitle} placeholder="Enter note title" />
+                <Input value={title} onChangeText={setTitle} placeholder="e.g. Quicksort Algorithm" />
               </Field>
+
+              <View style={styles.gridRow}>
+                <Field label="Subject" style={{ flex: 1 }}>
+                  <SelectPicker
+                    value={subjectId}
+                    onValueChange={setSubjectId}
+                    options={subjectOptions}
+                    placeholder="Select a subject"
+                  />
+                </Field>
+                <Field label="Priority" style={{ width: 140 }}>
+                  <SelectPicker
+                    value={priority}
+                    onValueChange={setPriority}
+                    options={PRIORITY_OPTIONS}
+                  />
+                </Field>
+              </View>
+
+              <Field label="Topic / Unit (Optional)">
+                <Input
+                  value={topic}
+                  onChangeText={setTopic}
+                  placeholder="e.g. Unit 2: Sorting"
+                />
+              </Field>
+
+              <Field label="Tags (Comma separated)">
+                <Input
+                  value={tagsInput}
+                  onChangeText={setTagsInput}
+                  placeholder="algorithms, exams, formulas"
+                />
+              </Field>
+
               <Field label="Content">
-                <Input 
-                  value={content} 
-                  onChangeText={setContent} 
-                  placeholder="Write your notes here..." 
+                <Input
+                  value={content}
+                  onChangeText={setContent}
+                  placeholder="Write your note content here..."
                   multiline
-                  style={{ minHeight: 120, alignItems: 'flex-start' }}
+                  style={{ minHeight: 140, alignItems: 'flex-start' }}
                   textAlignVertical="top"
                 />
               </Field>
-              {!paramSubjectId && (
-                <Field label="Subject ID">
-                  <Input 
-                    value={subjectId} 
-                    onChangeText={setSubjectId} 
-                    placeholder="Select subject" 
-                  />
-                </Field>
-              )}
+
+              {/* Attachments Section */}
+              <Field label="Attachments & Media">
+                <View style={styles.voiceBtnContainer}>
+                  <TouchableOpacity
+                    style={styles.recordVoiceBtn}
+                    onPress={() => setVoiceModalVisible(true)}
+                    activeOpacity={0.7}
+                  >
+                    <Mic size={16} color={colors.accent} />
+                    <Text style={styles.recordVoiceText}>Record Voice Note</Text>
+                  </TouchableOpacity>
+                </View>
+                <AttachmentUploader
+                  attachments={attachments}
+                  onAttachmentsChange={setAttachments}
+                />
+              </Field>
             </ScrollView>
-            <View style={[styles.modalFooter, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
-              <Button variant="quiet" style={styles.modalBtn} onPress={() => setVisible(false)}>Cancel</Button>
-              <Button style={styles.modalBtn} onPress={handleCreate} loading={submitting}>Save</Button>
+
+            <View
+              style={[
+                styles.modalFooter,
+                { paddingBottom: Math.max(insets.bottom, spacing.md) },
+              ]}
+            >
+              <Button variant="quiet" style={styles.modalBtn} onPress={() => setModalVisible(false)}>
+                Cancel
+              </Button>
+              <Button
+                style={styles.modalBtn}
+                onPress={handleCreate}
+                loading={submitting}
+                disabled={!title.trim() || !content.trim() || !subjectId || submitting}
+              >
+                Save Note
+              </Button>
             </View>
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Voice Recording Modal */}
+      <VoiceRecorderModal
+        visible={voiceModalVisible}
+        onClose={() => setVoiceModalVisible(false)}
+        onSave={handleVoiceSave}
+      />
     </View>
   );
 };
 
-const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background },
-  listContent: { padding: spacing.lg, paddingBottom: spacing.xxl },
-  card: {
-    backgroundColor: colors.card,
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: spacing.md,
-  },
-  iconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.md,
-    backgroundColor: colors.accent + '20',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  badge: {
-    backgroundColor: colors.muted,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: radii.round,
-  },
-  badgeText: {
-    fontFamily: typography.mono.regular,
-    fontSize: 9,
-    textTransform: 'uppercase',
-    color: colors.mutedForeground,
-  },
-  cardTitle: {
-    fontFamily: typography.serif.medium,
-    fontSize: 20,
-    color: colors.foreground,
-    marginBottom: spacing.xs,
-  },
-  subjectChip: {
-    fontFamily: typography.sans.medium,
-    fontSize: 11,
-    color: colors.primary,
-    backgroundColor: `${colors.primary}1A`,
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: radii.sm,
-    marginBottom: spacing.xs,
-  },
-  cardPreview: {
-    fontFamily: typography.sans.regular,
-    fontSize: 14,
-    color: colors.mutedForeground,
-    lineHeight: 20,
-    marginBottom: spacing.md,
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: spacing.sm,
-    paddingTop: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.cardBorder,
-  },
-  cardDate: {
-    fontFamily: typography.mono.regular,
-    fontSize: 10,
-    color: colors.mutedForeground,
-    textTransform: 'uppercase',
-  },
-  deleteBtn: { minHeight: 32, paddingVertical: 4, paddingHorizontal: 12 },
-  modalContainer: { flex: 1, justifyContent: 'flex-end' },
-  modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(24,32,49,0.48)' },
-  modalContent: { backgroundColor: colors.card, borderTopLeftRadius: radii.xxl, borderTopRightRadius: radii.xxl, maxHeight: '90%' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.cardBorder },
-  modalTitle: { fontFamily: typography.serif.medium, fontSize: 24, color: colors.foreground },
-  closeBtn: { minHeight: 40, paddingHorizontal: 10, paddingVertical: 8 },
-  modalScroll: { padding: spacing.lg },
-  modalFooter: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.md, padding: spacing.lg, borderTopWidth: 1, borderTopColor: colors.cardBorder, backgroundColor: `${colors.muted}33` },
-  modalBtn: { minWidth: 100 }
-}));
+const createStyles = ({ colors, typography, spacing, radii }) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    listContent: { padding: spacing.lg, paddingBottom: spacing.xxl },
+    searchRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      marginBottom: spacing.md,
+    },
+    searchInputContainer: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      borderRadius: radii.xl,
+      paddingHorizontal: spacing.md,
+      minHeight: 44,
+    },
+    searchField: {
+      flex: 1,
+      borderWidth: 0,
+      minHeight: 40,
+      paddingHorizontal: 0,
+      backgroundColor: 'transparent',
+    },
+    filterToggleBtn: {
+      width: 44,
+      height: 44,
+      borderRadius: radii.xl,
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    filterToggleActive: {
+      borderColor: colors.accent,
+      backgroundColor: colors.accent + '15',
+    },
+    filterBox: {
+      backgroundColor: colors.card,
+      borderRadius: radii.xl,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      padding: spacing.md,
+      marginBottom: spacing.md,
+    },
+    card: {
+      backgroundColor: colors.card,
+      borderRadius: radii.xl,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      padding: spacing.lg,
+      marginBottom: spacing.md,
+    },
+    cardHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      marginBottom: spacing.sm,
+    },
+    iconBox: {
+      width: 38,
+      height: 38,
+      borderRadius: radii.md,
+      backgroundColor: colors.accent + '20',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    badge: {
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 3,
+      borderRadius: radii.round,
+      borderWidth: 1,
+    },
+    badgeText: {
+      fontFamily: typography.mono.bold,
+      fontSize: 10,
+      textTransform: 'uppercase',
+    },
+    cardTitle: {
+      fontFamily: typography.serif.medium,
+      fontSize: 20,
+      color: colors.foreground,
+      marginBottom: spacing.xs,
+    },
+    chipRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 6,
+      marginBottom: spacing.sm,
+    },
+    subjectChip: {
+      fontFamily: typography.sans.medium,
+      fontSize: 11,
+      color: colors.primary,
+      backgroundColor: `${colors.primary}1A`,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: radii.sm,
+    },
+    topicChip: {
+      fontFamily: typography.sans.regular,
+      fontSize: 11,
+      color: colors.mutedForeground,
+      backgroundColor: colors.muted,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: radii.sm,
+    },
+    cardPreview: {
+      fontFamily: typography.sans.regular,
+      fontSize: 14,
+      color: colors.mutedForeground,
+      lineHeight: 20,
+      marginBottom: spacing.sm,
+    },
+    tagsRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 6,
+      marginBottom: spacing.sm,
+    },
+    tagText: {
+      fontFamily: typography.mono.regular,
+      fontSize: 11,
+      color: colors.accent,
+    },
+    attachmentsContainer: {
+      marginVertical: spacing.xs,
+    },
+    cardFooter: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginTop: spacing.xs,
+      paddingTop: spacing.sm,
+      borderTopWidth: 1,
+      borderTopColor: colors.cardBorder,
+    },
+    cardDate: {
+      fontFamily: typography.mono.regular,
+      fontSize: 10,
+      color: colors.mutedForeground,
+      textTransform: 'uppercase',
+    },
+    deleteBtn: { minHeight: 32, paddingVertical: 4, paddingHorizontal: 12 },
+    modalContainer: { flex: 1, justifyContent: 'flex-end' },
+    modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(24,32,49,0.48)' },
+    modalContent: {
+      backgroundColor: colors.card,
+      borderTopLeftRadius: radii.xxl,
+      borderTopRightRadius: radii.xxl,
+      maxHeight: '92%',
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: spacing.lg,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.cardBorder,
+    },
+    modalTitle: {
+      fontFamily: typography.serif.medium,
+      fontSize: 22,
+      color: colors.foreground,
+    },
+    closeBtn: { minHeight: 36, paddingHorizontal: 8, paddingVertical: 6 },
+    modalScroll: { padding: spacing.lg },
+    gridRow: {
+      flexDirection: 'row',
+      gap: spacing.md,
+    },
+    voiceBtnContainer: {
+      marginBottom: spacing.sm,
+    },
+    recordVoiceBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      alignSelf: 'flex-start',
+      backgroundColor: colors.accent + '15',
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      borderRadius: radii.lg,
+      borderWidth: 1,
+      borderColor: colors.accent + '40',
+    },
+    recordVoiceText: {
+      fontFamily: typography.sans.semiBold,
+      fontSize: 12,
+      color: colors.accent,
+    },
+    modalFooter: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      gap: spacing.md,
+      padding: spacing.lg,
+      borderTopWidth: 1,
+      borderTopColor: colors.cardBorder,
+      backgroundColor: `${colors.muted}33`,
+    },
+    modalBtn: { minWidth: 100 },
+  });
 
 export default NotesScreen;

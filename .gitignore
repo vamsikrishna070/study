@@ -1,10 +1,119 @@
-frontend/dist
-backend/node_modules
-frontend/node_modules
-frontend/.vite
-frontend/.env
-backend/.env
-backend/credentials.json
-backend/tokens.json
+# ==============================================================================
+# StudyArena Monorepo .gitignore
+# Covers: Root, backend, frontend, mobile (Expo & Android native)
+# ==============================================================================
+
+# ─── Dependencies ─────────────────────────────────────────────────────────────
+node_modules/
+*/node_modules/
+**/node_modules/
+
+# ─── Environment & Secrets ────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.env.local
+*.env.production.local
+*.env.development.local
 credentials.json
 tokens.json
+*/credentials.json
+*/tokens.json
+google-services.json
+GoogleService-Info.plist
+
+# ─── Logs & Diagnostics ───────────────────────────────────────────────────────
+*.log
+logs/
+*/logs/
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+pnpm-debug.*
+
+# ─── Build Outputs & Caches ───────────────────────────────────────────────────
+dist/
+*/dist/
+build/
+*/build/
+out/
+*/out/
+.vite/
+*/.vite/
+.cache/
+*/.cache/
+.parcel-cache/
+.next/
+
+# ─── Expo & React Native ──────────────────────────────────────────────────────
+.expo/
+*/.expo/
+.expo-shared/
+*/.expo-shared/
+web-build/
+*/web-build/
+expo-env.d.ts
+*/expo-env.d.ts
+.metro-health-check*
+*.tgz
+*.tsbuildinfo
+
+# ─── Android Native & Gradle Caches ───────────────────────────────────────────
+.gradle/
+**/.gradle/
+**/build/
+.cxx/
+**/.cxx/
+local.properties
+**/local.properties
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+*.hprof
+
+# ─── Keystores & Signing Keys ─────────────────────────────────────────────────
+*.jks
+*.keystore
+*.p8
+*.p12
+*.key
+*.pem
+*.mobileprovision
+*.orig.*
+
+# ─── iOS Native (if generated) ────────────────────────────────────────────────
+Pods/
+**/Pods/
+ios/build/
+*.xcworkspace/xcuserdata/
+*.xcuserstate
+
+# ─── IDE & Editors ────────────────────────────────────────────────────────────
+.idea/
+**/.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.iml
+*.sublime-project
+*.sublime-workspace
+
+# ─── OS-Specific ──────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# ─── Temporary & Scratch ──────────────────────────────────────────────────────
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+scratch/

@@ -1,8 +1,10 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { typography, spacing, useAppTheme, useStyles } from '../../theme/theme';
+import { useStyles } from '../../theme/theme';
 
 export function Field({ label, hint, children, style }) {
+  const styles = useStyles(createStyles);
+
   return (
     <View style={[styles.container, style]}>
       {label && <Text style={styles.label}>{label}</Text>}
@@ -12,12 +14,12 @@ export function Field({ label, hint, children, style }) {
   );
 }
 
-const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.create({
+const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.create({
   container: {
     marginBottom: spacing.md,
   },
   label: {
-    fontFamily: typography.mono.bold || typography.mono.medium, // fallback if bold isn't loaded
+    fontFamily: typography.mono.medium,
     fontSize: 10,
     textTransform: 'uppercase',
     letterSpacing: 1.2,
@@ -30,4 +32,4 @@ const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.
     color: colors.mutedForeground,
     marginTop: spacing.xs,
   }
-}));
+});

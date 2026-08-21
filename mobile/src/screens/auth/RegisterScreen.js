@@ -8,8 +8,9 @@ import { Field } from '../../components/ui/Field';
 import { typography, radii, spacing, useAppTheme, useStyles } from '../../theme/theme';
 
 const RegisterScreen = ({ navigation }) => {
-  const { colors } = useAppTheme();
-  const { register } = useContext(AuthContext);
+  const { colors, typography, spacing, radii, theme } = useAppTheme();
+  const styles = useStyles(createStyles);
+  const { register } = useContext(AuthContext);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -116,7 +117,7 @@ const RegisterScreen = ({ navigation }) => {
   );
 };
 
-const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.create({
+const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -195,6 +196,4 @@ const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.
     fontSize: 14,
     color: colors.accent,
   }
-}));
-
-export default RegisterScreen;
+});export default RegisterScreen;

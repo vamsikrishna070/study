@@ -4,6 +4,7 @@ import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
 import VerifyOtpScreen from '../screens/auth/VerifyOtpScreen';
 import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
+import { useAppTheme } from '../theme/theme';
 
 const Stack = createNativeStackNavigator();
 

@@ -8,8 +8,9 @@ import { Field } from '../../components/ui/Field';
 import { typography, radii, spacing, useAppTheme, useStyles } from '../../theme/theme';
 
 const LoginScreen = ({ navigation }) => {
-  const { colors } = useAppTheme();
-  const { login } = useContext(AuthContext);
+  const { colors, typography, spacing, radii, theme } = useAppTheme();
+  const styles = useStyles(createStyles);
+  const { login } = useContext(AuthContext);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -119,7 +120,7 @@ const LoginScreen = ({ navigation }) => {
   );
 };
 
-const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.create({
+const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -207,6 +208,4 @@ const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.
     fontSize: 14,
     color: colors.accent,
   }
-}));
-
-export default LoginScreen;
+});export default LoginScreen;

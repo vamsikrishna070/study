@@ -11,6 +11,9 @@ export function Button({
   style, 
   textStyle 
 }) {
+  const { colors, typography, spacing, radii, theme } = useAppTheme();
+  const styles = useStyles(createStyles);
+
   const getVariantStyles = () => {
     switch (variant) {
       case 'quiet':
@@ -67,7 +70,7 @@ export function Button({
   );
 }
 
-const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.create({
+const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.create({
   baseButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -90,4 +93,4 @@ const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.
   disabled: {
     opacity: 0.5,
   }
-}));
+});

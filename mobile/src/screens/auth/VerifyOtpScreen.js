@@ -9,8 +9,9 @@ import { typography, radii, spacing, useAppTheme, useStyles } from '../../theme/
 import { forgotPassword, resendOtp, resetPassword } from '../../api/auth';
 
 const VerifyOtpScreen = ({ route, navigation }) => {
-  const { colors } = useAppTheme();
-  const email = route.params?.email || '';
+  const { colors, typography, spacing, radii, theme } = useAppTheme();
+  const styles = useStyles(createStyles);
+  const email = route.params?.email || '';
   const mode = route.params?.mode || 'email-verification'; // 'email-verification' | 'password-reset'
   
   const { verify } = useContext(AuthContext);
@@ -199,7 +200,7 @@ const VerifyOtpScreen = ({ route, navigation }) => {
   );
 };
 
-const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.create({
+const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scrollContent: { flexGrow: 1, justifyContent: 'center', padding: spacing.md },
   card: {
@@ -229,6 +230,4 @@ const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.
   footerText: { fontFamily: typography.sans.regular, fontSize: 14, color: colors.mutedForeground },
   footerLink: { fontFamily: typography.sans.bold, fontSize: 14, color: colors.accent },
   footerLinkDisabled: { color: colors.mutedForeground, opacity: 0.7 }
-}));
-
-export default VerifyOtpScreen;
+});export default VerifyOtpScreen;

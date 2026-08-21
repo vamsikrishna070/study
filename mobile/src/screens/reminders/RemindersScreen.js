@@ -8,12 +8,14 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import * as DocumentPicker from 'expo-document-picker';
 import { Bell, Plus, CalendarDays, Clock, Trash2, BellOff, ChevronRight, X, Repeat, Music } from 'lucide-react-native';
 import { getReminders, createReminder, updateReminder, deleteReminder } from '../../api/reminders';
+import { getSubjects } from '../../api/subjects';
 import { DrawerActions } from '@react-navigation/native';
 import {
   scheduleAlarm,
   cancelAlarm,
 } from '../../services/AlarmModule';
 import { setupNotifications } from '../../services/NotificationService';
+import { getNextTriggerTimestamp } from '../../utils/reminderHelper';
 import {
   getNotifId,
   setNotifId,
@@ -23,8 +25,23 @@ import {
 import { Header } from '../../components/ui/Header';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Button } from '../../components/ui/Button';
+import { SelectPicker } from '../../components/ui/SelectPicker';
+import { WeekdaySelector } from '../../components/ui/WeekdaySelector';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '../../theme/theme';
+
+const CATEGORY_OPTIONS = [
+  { label: 'General', value: 'general' },
+  { label: 'Study', value: 'study' },
+  { label: 'Exam', value: 'exam' },
+  { label: 'Assignment', value: 'assignment' },
+];
+
+const PRIORITY_OPTIONS = [
+  { label: 'Low', value: 'low' },
+  { label: 'Medium', value: 'medium' },
+  { label: 'High', value: 'high' },
+];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -53,6 +70,7 @@ const RemindersScreen = ({ navigation }) => {
 
   // List state
   const [reminders, setReminders] = useState([]);
+  const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
@@ -67,6 +85,9 @@ const RemindersScreen = ({ navigation }) => {
   const [editingNotifId, setEditingNotifId] = useState(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [category, setCategory] = useState('general');
+  const [priority, setPriority] = useState('medium');
+  const [subjectId, setSubjectId] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedTime, setSelectedTime] = useState(new Date());
   const [notificationEnabled, setNotificationEnabled] = useState(true);
@@ -87,11 +108,13 @@ const RemindersScreen = ({ navigation }) => {
   const loadReminders = useCallback(async (isRefresh = false) => {
     try {
       setError(null);
-      const res = await getReminders();
-      const data = (res.data || res || []);
+      const [remRes, subsRes] = await Promise.all([getReminders(), getSubjects()]);
+      const data = (remRes.data || remRes || []);
+      const subsData = (subsRes.data || subsRes || []);
       // Sort by remindAt ascending
       const sorted = [...data].sort((a, b) => new Date(a.remindAt) - new Date(b.remindAt));
       setReminders(sorted);
+      setSubjects(subsData);
     } catch (e) {
       const msg = e?.response?.status === 401
         ? 'Session expired. Please log in again.'
@@ -103,35 +126,12 @@ const RemindersScreen = ({ navigation }) => {
     }
   }, []);
 
-  const reconcileNotifications = useCallback(async (data) => {
-    // Relying on native persistence for exact alarms (handled on BOOT_COMPLETED natively)
-    // We can just iterate and ensure our DB has them scheduled
-    for (const reminder of data) {
-      if (!reminder.notificationEnabled) continue;
-      const isRecurring = reminder.scheduleType && reminder.scheduleType !== 'one-time';
-      if (!isRecurring && !isUpcoming(reminder.remindAt)) continue;
-
-      // Note: We don't query native state here to avoid async overhead.
-      // AlarmManager handles duplicates safely (same ID updates the alarm).
-      try {
-        const timestamp = new Date(reminder.remindAt).getTime();
-        await scheduleAlarm(reminder._id, timestamp, reminder.title, reminder.soundId || 'default');
-      } catch (_) {}
-    }
-  }, []);
-
   useEffect(() => {
     setupNotifications().then(hasPerm => {
       setNotificationPermission(hasPerm);
     });
     loadReminders();
   }, []);
-
-  useEffect(() => {
-    if (reminders.length > 0) {
-      reconcileNotifications(reminders);
-    }
-  }, [reminders]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -144,8 +144,11 @@ const RemindersScreen = ({ navigation }) => {
     try {
       if (typeof navigation.closeDrawer === 'function') {
         navigation.closeDrawer();
-      } else {
-        navigation.dispatch(DrawerActions.closeDrawer());
+      } else if (typeof navigation.getParent === 'function') {
+        const parent = navigation.getParent('AppDrawer') || navigation.getParent();
+        if (parent && typeof parent.closeDrawer === 'function') {
+          parent.closeDrawer();
+        }
       }
     } catch (e) {
       // Ignore if not rendered inside a drawer
@@ -157,6 +160,9 @@ const RemindersScreen = ({ navigation }) => {
       setEditingNotifId(storedNotifId);
       setTitle(reminder.title || '');
       setDescription(reminder.description || '');
+      setCategory(reminder.category || 'general');
+      setPriority(reminder.priority || 'medium');
+      setSubjectId(reminder.subject?._id || reminder.subject || '');
       const remindDate = new Date(reminder.remindAt);
       setSelectedDate(remindDate);
       setSelectedTime(remindDate);
@@ -169,6 +175,9 @@ const RemindersScreen = ({ navigation }) => {
       setEditingNotifId(null);
       setTitle('');
       setDescription('');
+      setCategory('general');
+      setPriority('medium');
+      setSubjectId('');
       setSelectedDate(now);
       setSelectedTime(now);
       setNotificationEnabled(true);
@@ -250,6 +259,9 @@ const RemindersScreen = ({ navigation }) => {
     const payload = {
       title: title.trim(),
       description: description.trim(),
+      category,
+      priority,
+      subject: subjectId || undefined,
       remindAt: remindAt.toISOString(),
       notificationEnabled,
       scheduleType,
@@ -267,13 +279,14 @@ const RemindersScreen = ({ navigation }) => {
         // Cancel old native alarm
         await cancelAlarm(editingId);
 
-        // Schedule new native alarm
+        // Schedule new native alarm only if enabled and next trigger is strictly in future
         if (notificationEnabled) {
-          const timestamp = new Date(updated.remindAt).getTime();
-          await scheduleAlarm(editingId, timestamp, updated.title, updated.soundId || 'default');
+          const nextTimestamp = getNextTriggerTimestamp(updated);
+          if (nextTimestamp) {
+            console.log(`[REMINDER] Scheduling edited reminder: "${updated.title}" at ${new Date(nextTimestamp).toISOString()}`);
+            await scheduleAlarm(editingId, nextTimestamp, updated.title, updated.soundId || 'default');
+          }
         }
-
-
 
         setReminders(prev => {
           const next = prev.map(r =>
@@ -287,10 +300,13 @@ const RemindersScreen = ({ navigation }) => {
         const res = await createReminder(payload);
         const created = res.data || res;
 
-        // Schedule notification only after successful backend creation
+        // Schedule notification only after successful backend creation and strictly in future
         if (notificationEnabled) {
-          const timestamp = new Date(created.remindAt).getTime();
-          await scheduleAlarm(created._id, timestamp, created.title, created.soundId || 'default');
+          const nextTimestamp = getNextTriggerTimestamp(created);
+          if (nextTimestamp) {
+            console.log(`[REMINDER] Scheduling new reminder: "${created.title}" at ${new Date(nextTimestamp).toISOString()}`);
+            await scheduleAlarm(created._id, nextTimestamp, created.title, created.soundId || 'default');
+          }
         }
 
         setReminders(prev => {
@@ -369,7 +385,10 @@ const RemindersScreen = ({ navigation }) => {
     return { label: 'Upcoming', color: colors.primary };
   };
 
-  const styles = makeStyles(colors, typography, spacing, radii, insets, isDark);
+  const styles = React.useMemo(
+    () => makeStyles(colors, typography, spacing, radii, insets, isDark),
+    [colors, typography, spacing, radii, insets, isDark]
+  );
 
   // ─── Render: Reminder Card ────────────────────────────────────────────────────
 
@@ -599,8 +618,43 @@ const RemindersScreen = ({ navigation }) => {
                 textAlignVertical="top"
               />
 
+              {/* Subject (Optional) */}
+              <Text style={[styles.fieldLabel, { marginTop: 8 }]}>Link to Subject (optional)</Text>
+              <SelectPicker
+                value={subjectId}
+                onValueChange={setSubjectId}
+                options={[
+                  { label: 'No specific subject', value: '' },
+                  ...subjects.map((s) => ({
+                    label: `${s.name} (${s.code})`,
+                    value: s._id || s.id,
+                  })),
+                ]}
+                placeholder="None"
+              />
+
+              {/* Category & Priority Row */}
+              <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.fieldLabel}>Category</Text>
+                  <SelectPicker
+                    value={category}
+                    onValueChange={setCategory}
+                    options={CATEGORY_OPTIONS}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.fieldLabel}>Priority</Text>
+                  <SelectPicker
+                    value={priority}
+                    onValueChange={setPriority}
+                    options={PRIORITY_OPTIONS}
+                  />
+                </View>
+              </View>
+
               {/* When Section */}
-              <Text style={[styles.fieldLabel, { marginTop: 4 }]}>When</Text>
+              <Text style={[styles.fieldLabel, { marginTop: 8 }]}>When</Text>
 
               {/* Date Picker Trigger */}
               <TouchableOpacity

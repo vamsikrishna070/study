@@ -9,6 +9,9 @@ export function Card({
   style, 
   onPress 
 }) {
+  const { colors, typography, spacing, radii, theme } = useAppTheme();
+  const styles = useStyles(createStyles);
+
   const Container = onPress ? TouchableOpacity : View;
   
   return (
@@ -30,7 +33,7 @@ export function Card({
   );
 }
 
-const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.create({
+const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.create({
   card: {
     backgroundColor: colors.card,
     borderRadius: radii.xxl,
@@ -58,4 +61,4 @@ const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.
   content: {
     // Content takes the rest
   }
-}));
+});

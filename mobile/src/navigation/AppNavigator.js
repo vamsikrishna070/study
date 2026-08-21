@@ -7,7 +7,7 @@ import MainNavigator from './MainNavigator';
 import { useAppTheme } from '../theme/theme';
 
 const AppNavigator = () => {
-  const { colors, theme } = useAppTheme();
+  const { colors, theme, typography } = useAppTheme();
   const { user, loading } = useContext(AuthContext);
 
   if (loading) {
@@ -27,6 +27,12 @@ const AppNavigator = () => {
       text: colors.foreground,
       border: colors.cardBorder,
       notification: colors.accent,
+    },
+    fonts: {
+      regular: { fontFamily: typography.sans.regular, fontWeight: 'normal' },
+      medium: { fontFamily: typography.sans.medium, fontWeight: '500' },
+      bold: { fontFamily: typography.sans.bold, fontWeight: 'bold' },
+      heavy: { fontFamily: typography.sans.extraBold, fontWeight: '900' },
     },
   };
 

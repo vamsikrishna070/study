@@ -3,6 +3,9 @@ import { View, Text, StyleSheet } from 'react-native';
 import { typography, radii, spacing, useAppTheme, useStyles } from '../../theme/theme';
 
 export function EmptyState({ icon: Icon, title, detail, action, style }) {
+  const { colors, typography, spacing, radii, theme } = useAppTheme();
+  const styles = useStyles(createStyles);
+
   return (
     <View style={[styles.container, style]}>
       <View style={styles.iconWrapper}>
@@ -15,7 +18,7 @@ export function EmptyState({ icon: Icon, title, detail, action, style }) {
   );
 }
 
-const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.create({
+const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.create({
   container: {
     backgroundColor: `${colors.card}80`, // 50% opacity hex
     borderRadius: radii.xxl,
@@ -53,4 +56,4 @@ const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.
   actionWrapper: {
     marginTop: spacing.lg,
   }
-}));
+});

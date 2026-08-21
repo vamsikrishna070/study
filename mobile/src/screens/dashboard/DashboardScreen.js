@@ -15,8 +15,9 @@ import { Button } from '../../components/ui/Button';
 import { typography, spacing, radii, useAppTheme, useStyles } from '../../theme/theme';
 
 const DashboardScreen = ({ navigation }) => {
-  const { colors } = useAppTheme();
-  const { user, logout } = useContext(AuthContext);
+  const { colors, typography, spacing, radii, theme } = useAppTheme();
+  const styles = useStyles(createStyles);
+  const { user, logout } = useContext(AuthContext);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
@@ -157,7 +158,7 @@ const DashboardScreen = ({ navigation }) => {
   );
 };
 
-const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.create({
+const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.create({
   container: { 
     flex: 1, 
     backgroundColor: colors.background 
@@ -207,6 +208,4 @@ const styles = useStyles(({ colors, typography, spacing, radii }) => StyleSheet.
     color: colors.mutedForeground,
     marginTop: 4,
   }
-}));
-
-export default DashboardScreen;
+});export default DashboardScreen;
