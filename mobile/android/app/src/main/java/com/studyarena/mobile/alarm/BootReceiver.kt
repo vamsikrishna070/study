@@ -27,7 +27,8 @@ class BootReceiver : BroadcastReceiver() {
                         val data = JSONObject(value)
                         val timestamp = data.getDouble("timestamp").toLong()
                         val title = data.getString("title")
-                        val soundId = data.getString("soundId")
+                        val soundId = data.optString("soundId", "default_alarm")
+                        val soundUri = data.optString("soundUri", null)
 
                         // If alarm is in the past, don't schedule one-time alarms
                         // Since JS handles recurrence calculations, if it's past, we wait for JS sync on app open.
@@ -36,6 +37,9 @@ class BootReceiver : BroadcastReceiver() {
                                 putExtra("id", id)
                                 putExtra("title", title)
                                 putExtra("soundId", soundId)
+                                if (!soundUri.isNullOrBlank()) {
+                                    putExtra("soundUri", soundUri)
+                                }
                             }
                             
                             val pendingIntent = PendingIntent.getBroadcast(
@@ -47,7 +51,7 @@ class BootReceiver : BroadcastReceiver() {
 
                             alarmManager.setAlarmClock(AlarmManager.AlarmClockInfo(timestamp, pendingIntent), pendingIntent)
                         } else {
-                            // Optionally remove expired alarms
+                            // Clean up expired alarm entry
                             prefs.edit().remove(id).apply()
                         }
                     } catch (e: Exception) {

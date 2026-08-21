@@ -14,8 +14,10 @@ import android.net.Uri
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.studyarena.mobile.R
+import java.io.File
 
 class AlarmService : Service() {
 
@@ -27,6 +29,7 @@ class AlarmService : Service() {
         const val ACTION_SNOOZE = "com.studyarena.mobile.alarm.SNOOZE"
         const val NOTIFICATION_ID = 4242
         const val CHANNEL_ID = "study_arena_alarm_service_channel"
+        private const val TAG = "AlarmService"
     }
 
     override fun onCreate() {
@@ -37,44 +40,63 @@ class AlarmService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_DISMISS) {
+        // Defensive check: Do not execute or ring on null intents (e.g. system restarts)
+        if (intent == null) {
+            Log.d(TAG, "onStartCommand received null intent. Stopping service.")
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
+        if (intent.action == ACTION_DISMISS) {
             val id = intent.getStringExtra("id")
-            // Mark as handled and stop
+            Log.d(TAG, "Dismiss action received for reminder: $id")
             stopAlarm()
             return START_NOT_STICKY
         }
-        
-        if (intent?.action == ACTION_SNOOZE) {
+
+        if (intent.action == ACTION_SNOOZE) {
             val id = intent.getStringExtra("id") ?: ""
-            val title = intent.getStringExtra("title") ?: ""
-            val soundId = intent.getStringExtra("soundId") ?: ""
-            
+            val title = intent.getStringExtra("title") ?: "Study Reminder"
+            val soundId = intent.getStringExtra("soundId") ?: "default_alarm"
+            val soundUri = intent.getStringExtra("soundUri")
+
             // Re-schedule for 5 mins
             val newTime = System.currentTimeMillis() + (5 * 60 * 1000)
-            
+            Log.d(TAG, "Snooze action received for reminder $id. Rescheduling at $newTime")
+
             val alarmIntent = Intent(this, AlarmReceiver::class.java).apply {
                 putExtra("id", id)
                 putExtra("title", title)
                 putExtra("soundId", soundId)
+                if (!soundUri.isNullOrBlank()) {
+                    putExtra("soundUri", soundUri)
+                }
             }
-            
+
             val pendingIntent = PendingIntent.getBroadcast(
                 this,
                 id.hashCode(),
                 alarmIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
-            
+
             val alarmManager = getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
             alarmManager.setAlarmClock(android.app.AlarmManager.AlarmClockInfo(newTime, pendingIntent), pendingIntent)
-            
+
             stopAlarm()
             return START_NOT_STICKY
         }
 
-        val id = intent?.getStringExtra("id") ?: ""
-        val title = intent?.getStringExtra("title") ?: "Reminder"
-        val soundId = intent?.getStringExtra("soundId") ?: "default_alarm"
+        val id = intent.getStringExtra("id")
+        if (id.isNullOrBlank()) {
+            Log.w(TAG, "onStartCommand received intent with blank id. Stopping service.")
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
+        val title = intent.getStringExtra("title") ?: "Study Reminder"
+        val soundId = intent.getStringExtra("soundId") ?: "default_alarm"
+        val soundUri = intent.getStringExtra("soundUri")
 
         createNotificationChannel()
 
@@ -83,17 +105,30 @@ class AlarmService : Service() {
             putExtra("id", id)
             putExtra("title", title)
             putExtra("soundId", soundId)
+            if (!soundUri.isNullOrBlank()) {
+                putExtra("soundUri", soundUri)
+            }
         }
-        val fullScreenPendingIntent = PendingIntent.getActivity(this, 0, fullScreenIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val fullScreenPendingIntent = PendingIntent.getActivity(
+            this,
+            id.hashCode(),
+            fullScreenIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
 
         val dismissIntent = Intent(this, AlarmService::class.java).apply {
             action = ACTION_DISMISS
             putExtra("id", id)
         }
-        val dismissPendingIntent = PendingIntent.getService(this, 1, dismissIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val dismissPendingIntent = PendingIntent.getService(
+            this,
+            (id + "_dismiss").hashCode(),
+            dismissIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
 
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("StudyArena Reminder")
             .setContentText(title)
             .setPriority(NotificationCompat.PRIORITY_MAX)
@@ -105,55 +140,104 @@ class AlarmService : Service() {
 
         startForeground(NOTIFICATION_ID, notification)
 
-        playAlarmSound(soundId)
-        
-        // Launch activity explicitly to bring to front if unlocked
+        playAlarmSound(soundId, soundUri)
+
+        // Launch activity explicitly to bring to front
         startActivity(fullScreenIntent)
 
-        return START_STICKY
+        return START_NOT_STICKY
     }
 
-    private fun playAlarmSound(soundId: String) {
+    private fun playAlarmSound(soundId: String, soundUri: String?) {
         if (mediaPlayer != null) return
 
         try {
-            val resId = resources.getIdentifier(soundId, "raw", packageName)
-            val uri = if (resId != 0) {
-                Uri.parse("android.resource://$packageName/$resId")
-            } else {
-                Uri.parse("android.resource://$packageName/raw/default_alarm")
+            var player: MediaPlayer? = null
+
+            // 1. Try custom soundUri if provided
+            if (!soundUri.isNullOrBlank()) {
+                try {
+                    val uri = if (soundUri.startsWith("content://") || soundUri.startsWith("file://")) {
+                        Uri.parse(soundUri)
+                    } else {
+                        Uri.fromFile(File(soundUri))
+                    }
+                    val mp = MediaPlayer().apply {
+                        setDataSource(this@AlarmService, uri)
+                        setAudioAttributes(
+                            AudioAttributes.Builder()
+                                .setUsage(AudioAttributes.USAGE_ALARM)
+                                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                                .build()
+                        )
+                        isLooping = true
+                        prepare()
+                        start()
+                    }
+                    player = mp
+                    Log.d(TAG, "Playing custom audio from $soundUri")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to play custom soundUri: $soundUri", e)
+                }
             }
 
-            mediaPlayer = MediaPlayer().apply {
-                setDataSource(this@AlarmService, uri)
-                setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_ALARM)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .build()
-                )
-                isLooping = true
-                prepare()
-                start()
+            // 2. If no custom player, load built-in raw resources
+            if (player == null) {
+                val cleanSoundId = when {
+                    soundId.isBlank() || soundId == "default" || soundId == "custom" -> "default_alarm"
+                    else -> soundId
+                }
+
+                val resId = resources.getIdentifier(cleanSoundId, "raw", packageName)
+                val fallbackUri = if (resId != 0) {
+                    Uri.parse("android.resource://$packageName/$resId")
+                } else {
+                    Uri.parse("android.resource://$packageName/raw/default_alarm")
+                }
+
+                player = MediaPlayer().apply {
+                    setDataSource(this@AlarmService, fallbackUri)
+                    setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_ALARM)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .build()
+                    )
+                    isLooping = true
+                    prepare()
+                    start()
+                }
+                Log.d(TAG, "Playing built-in raw sound $cleanSoundId (resId=$resId)")
             }
+
+            mediaPlayer = player
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e(TAG, "Failed to initialize MediaPlayer for alarm", e)
         }
     }
 
     private fun stopAlarm() {
-        mediaPlayer?.stop()
-        mediaPlayer?.release()
-        mediaPlayer = null
-        stopForeground(true)
-        stopSelf()
+        try {
+            mediaPlayer?.stop()
+            mediaPlayer?.release()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error stopping mediaPlayer", e)
+        } finally {
+            mediaPlayer = null
+            stopForeground(true)
+            stopSelf()
+        }
     }
 
     override fun onDestroy() {
         super.onDestroy()
         stopAlarm()
         if (wakeLock?.isHeld == true) {
-            wakeLock?.release()
+            try {
+                wakeLock?.release()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error releasing wakeLock", e)
+            }
         }
     }
 

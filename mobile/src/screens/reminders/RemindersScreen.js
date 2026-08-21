@@ -6,16 +6,22 @@ import {
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as DocumentPicker from 'expo-document-picker';
-import { Bell, Plus, CalendarDays, Clock, Trash2, BellOff, ChevronRight, X, Repeat, Music } from 'lucide-react-native';
+import * as FileSystem from 'expo-file-system';
+import { 
+  Bell, Plus, CalendarDays, Clock, Trash2, BellOff, ChevronRight, X, 
+  Repeat, Music, Volume2, VolumeX, FolderMusic, Check, AlertCircle 
+} from 'lucide-react-native';
 import { getReminders, createReminder, updateReminder, deleteReminder } from '../../api/reminders';
 import { getSubjects } from '../../api/subjects';
 import { DrawerActions } from '@react-navigation/native';
 import {
   scheduleAlarm,
   cancelAlarm,
+  playAudioPreview,
+  stopAudioPreview,
 } from '../../services/AlarmModule';
 import { setupNotifications } from '../../services/NotificationService';
-import { getNextTriggerTimestamp } from '../../utils/reminderHelper';
+import { getNextTriggerTimestamp, validateReminderDateTime } from '../../utils/reminderHelper';
 import {
   getNotifId,
   setNotifId,
@@ -98,6 +104,9 @@ const RemindersScreen = ({ navigation }) => {
   const [scheduleType, setScheduleType] = useState('one-time');
   const [weekdays, setWeekdays] = useState([]);
   const [soundId, setSoundId] = useState('default');
+  const [soundUri, setSoundUri] = useState(null);
+  const [soundName, setSoundName] = useState('');
+  const [previewingSound, setPreviewingSound] = useState(null);
 
   // Date/time picker visibility (Android shows inline picker on press)
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -131,6 +140,9 @@ const RemindersScreen = ({ navigation }) => {
       setNotificationPermission(hasPerm);
     });
     loadReminders();
+    return () => {
+      stopAudioPreview();
+    };
   }, []);
 
   const onRefresh = useCallback(() => {
@@ -138,7 +150,7 @@ const RemindersScreen = ({ navigation }) => {
     loadReminders(true);
   }, [loadReminders]);
 
-  // ─── Bottom Sheet ─────────────────────────────────────────────────────────────
+  // ─── Bottom Sheet ─────────────────────────────────────────────────────
 
   const openSheet = async (reminder = null) => {
     try {
@@ -153,6 +165,9 @@ const RemindersScreen = ({ navigation }) => {
     } catch (e) {
       // Ignore if not rendered inside a drawer
     }
+    await stopAudioPreview();
+    setPreviewingSound(null);
+
     const now = new Date();
     if (reminder) {
       const storedNotifId = await getNotifId(reminder._id);
@@ -169,8 +184,12 @@ const RemindersScreen = ({ navigation }) => {
       setNotificationEnabled(reminder.notificationEnabled !== false);
       setScheduleType(reminder.scheduleType || 'one-time');
       setWeekdays(reminder.weekdays || []);
-      setSoundId(reminder.soundId || 'default');
+      setSoundId(reminder.soundId || (reminder.soundPreference === 'local' ? 'custom' : 'default'));
+      setSoundUri(reminder.soundUri || null);
+      setSoundName(reminder.soundName || '');
     } else {
+      // Default new reminder time: 15 minutes in the future
+      const futureDefault = new Date(now.getTime() + 15 * 60 * 1000);
       setEditingId(null);
       setEditingNotifId(null);
       setTitle('');
@@ -178,12 +197,14 @@ const RemindersScreen = ({ navigation }) => {
       setCategory('general');
       setPriority('medium');
       setSubjectId('');
-      setSelectedDate(now);
-      setSelectedTime(now);
+      setSelectedDate(futureDefault);
+      setSelectedTime(futureDefault);
       setNotificationEnabled(true);
       setScheduleType('one-time');
       setWeekdays([]);
       setSoundId('default');
+      setSoundUri(null);
+      setSoundName('');
     }
     setFormError(null);
     setShowDatePicker(false);
@@ -192,12 +213,61 @@ const RemindersScreen = ({ navigation }) => {
     Animated.spring(sheetAnim, { toValue: 1, useNativeDriver: true, tension: 65, friction: 11 }).start();
   };
 
-  const closeSheet = () => {
+  const closeSheet = async () => {
     Keyboard.dismiss();
+    await stopAudioPreview();
+    setPreviewingSound(null);
     Animated.timing(sheetAnim, { toValue: 0, duration: 220, useNativeDriver: true }).start(() => {
       setSheetVisible(false);
       setSubmitting(false);
     });
+  };
+
+  // ─── Custom Audio Pick & Preview ──────────────────────────────────────────────
+
+  const handlePickCustomAudio = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['audio/*', 'application/ogg', 'audio/mpeg', 'audio/wav', 'audio/x-wav', 'audio/mp4'],
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled || !result.assets || result.assets.length === 0) return;
+      const asset = result.assets[0];
+
+      // Copy permanently to internal app storage
+      const soundsDir = `${FileSystem.documentDirectory}custom_sounds/`;
+      const dirInfo = await FileSystem.getInfoAsync(soundsDir);
+      if (!dirInfo.exists) {
+        await FileSystem.makeDirectoryAsync(soundsDir, { intermediates: true });
+      }
+
+      const safeName = `${Date.now()}_${(asset.name || 'custom_sound.mp3').replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      const destinationUri = `${soundsDir}${safeName}`;
+
+      await FileSystem.copyAsync({
+        from: asset.uri,
+        to: destinationUri,
+      });
+
+      setSoundId('custom');
+      setSoundName(asset.name || 'Custom Audio');
+      setSoundUri(destinationUri);
+    } catch (e) {
+      console.warn('Error selecting audio file:', e);
+      Alert.alert('Audio Picker', 'Could not access the selected audio file. Please try another file.');
+    }
+  };
+
+  const handleTogglePreview = async (optValue, customUri = null) => {
+    if (previewingSound === optValue) {
+      await stopAudioPreview();
+      setPreviewingSound(null);
+    } else {
+      await stopAudioPreview();
+      setPreviewingSound(optValue);
+      const targetUri = customUri || (optValue === 'custom' ? soundUri : null);
+      await playAudioPreview(optValue, targetUri);
+    }
   };
 
   // ─── Validation ───────────────────────────────────────────────────────────────
@@ -220,18 +290,10 @@ const RemindersScreen = ({ navigation }) => {
       setFormError('Please enter a reminder title.');
       return false;
     }
-    const remindAt = buildRemindAt();
-    if (scheduleType === 'one-time' && remindAt <= new Date()) {
-      setFormError('Please choose a future date and time.');
-      return false;
-    }
-    if (scheduleType === 'weekly' && weekdays.length === 0) {
-      setFormError('Please select at least one weekday for weekly reminders.');
-      return false;
-    }
-    const validTypes = ['one-time', 'daily', 'weekly', 'monthly', 'yearly'];
-    if (!validTypes.includes(scheduleType)) {
-      setFormError('Invalid recurrence type selected.');
+    // Perform robust live date/time validation using real-time moment
+    const valResult = validateReminderDateTime(selectedDate, selectedTime, scheduleType, weekdays);
+    if (!valResult.isValid) {
+      setFormError(valResult.error);
       return false;
     }
     setFormError(null);
@@ -254,6 +316,8 @@ const RemindersScreen = ({ navigation }) => {
 
     setSubmitting(true);
     setFormError(null);
+    await stopAudioPreview();
+    setPreviewingSound(null);
 
     const remindAt = buildRemindAt();
     const payload = {
@@ -268,6 +332,9 @@ const RemindersScreen = ({ navigation }) => {
       weekdays,
       repeatDayOfMonth: remindAt.getDate(),
       soundId,
+      soundName: soundId === 'custom' ? soundName : undefined,
+      soundUri: soundId === 'custom' ? soundUri : undefined,
+      soundPreference: soundId === 'custom' ? 'local' : 'default',
     };
 
     try {
@@ -282,15 +349,21 @@ const RemindersScreen = ({ navigation }) => {
         // Schedule new native alarm only if enabled and next trigger is strictly in future
         if (notificationEnabled) {
           const nextTimestamp = getNextTriggerTimestamp(updated);
-          if (nextTimestamp) {
+          if (nextTimestamp && nextTimestamp > Date.now()) {
             console.log(`[REMINDER] Scheduling edited reminder: "${updated.title}" at ${new Date(nextTimestamp).toISOString()}`);
-            await scheduleAlarm(editingId, nextTimestamp, updated.title, updated.soundId || 'default');
+            await scheduleAlarm(
+              editingId,
+              nextTimestamp,
+              updated.title,
+              updated.soundId || 'default',
+              updated.soundUri || soundUri || null
+            );
           }
         }
 
         setReminders(prev => {
           const next = prev.map(r =>
-            r._id === editingId ? { ...r, ...updated } : r
+            r._id === editingId ? { ...r, ...updated, soundName: payload.soundName, soundUri: payload.soundUri } : r
           );
           return [...next].sort((a, b) => new Date(a.remindAt) - new Date(b.remindAt));
         });
@@ -303,14 +376,20 @@ const RemindersScreen = ({ navigation }) => {
         // Schedule notification only after successful backend creation and strictly in future
         if (notificationEnabled) {
           const nextTimestamp = getNextTriggerTimestamp(created);
-          if (nextTimestamp) {
+          if (nextTimestamp && nextTimestamp > Date.now()) {
             console.log(`[REMINDER] Scheduling new reminder: "${created.title}" at ${new Date(nextTimestamp).toISOString()}`);
-            await scheduleAlarm(created._id, nextTimestamp, created.title, created.soundId || 'default');
+            await scheduleAlarm(
+              created._id,
+              nextTimestamp,
+              created.title,
+              created.soundId || 'default',
+              created.soundUri || soundUri || null
+            );
           }
         }
 
         setReminders(prev => {
-          const next = [{ ...created }, ...prev];
+          const next = [{ ...created, soundName: payload.soundName, soundUri: payload.soundUri }, ...prev];
           return next.sort((a, b) => new Date(a.remindAt) - new Date(b.remindAt));
         });
       }
@@ -361,6 +440,10 @@ const RemindersScreen = ({ navigation }) => {
     setShowDatePicker(false);
     if (event.type === 'set' && date) {
       setSelectedDate(date);
+      const val = validateReminderDateTime(date, selectedTime, scheduleType, weekdays);
+      if (val.isValid) {
+        setFormError(null);
+      }
     }
   };
 
@@ -368,6 +451,10 @@ const RemindersScreen = ({ navigation }) => {
     setShowTimePicker(false);
     if (event.type === 'set' && time) {
       setSelectedTime(time);
+      const val = validateReminderDateTime(selectedDate, time, scheduleType, weekdays);
+      if (val.isValid) {
+        setFormError(null);
+      }
     }
   };
 
@@ -458,7 +545,8 @@ const RemindersScreen = ({ navigation }) => {
             <View style={styles.metaChip}>
               <Music size={12} color={colors.mutedForeground} />
               <Text style={styles.metaText} numberOfLines={1}>
-                {item.soundId === 'default_alarm' ? 'Default Alarm' : 
+                {item.soundId === 'custom' ? (item.soundName || 'Custom Audio') :
+                 item.soundId === 'default_alarm' ? 'Default Alarm' : 
                  item.soundId === 'gentle_alarm' ? 'Gentle Alarm' : 
                  item.soundId === 'study_bell' ? 'Study Bell' : 'Alarm'}
               </Text>
@@ -679,7 +767,7 @@ const RemindersScreen = ({ navigation }) => {
 
               {/* Time Picker Trigger */}
               <TouchableOpacity
-                style={styles.pickerRow}
+                style={[styles.pickerRow, !!formError && styles.inputError]}
                 onPress={() => setShowTimePicker(true)}
                 activeOpacity={0.7}
               >
@@ -695,6 +783,14 @@ const RemindersScreen = ({ navigation }) => {
                   onChange={onTimeChange}
                   themeVariant={isDark ? 'dark' : 'light'}
                 />
+              )}
+
+              {/* Inline Date/Time Error Box */}
+              {!!formError && (
+                <View style={styles.inlineErrorBox}>
+                  <AlertCircle size={14} color={colors.destructive} style={{ marginRight: 6 }} />
+                  <Text style={styles.inlineErrorText}>{formError}</Text>
+                </View>
               )}
 
               {/* ── Repeat / Recurrence ──────────────────────────────────────── */}
@@ -768,6 +864,7 @@ const RemindersScreen = ({ navigation }) => {
                   { value: 'default_alarm', label: 'Default Alarm' },
                   { value: 'gentle_alarm', label: 'Gentle Alarm' },
                   { value: 'study_bell', label: 'Study Bell' },
+                  { value: 'custom', label: 'Custom' },
                 ].map((opt) => (
                   <TouchableOpacity
                     key={opt.value}
@@ -775,7 +872,13 @@ const RemindersScreen = ({ navigation }) => {
                       styles.recurrenceChip,
                       soundId === opt.value && styles.recurrenceChipActive,
                     ]}
-                    onPress={() => handleAudioSelect(opt.value)}
+                    onPress={() => {
+                      handleAudioSelect(opt.value);
+                      if (previewingSound) {
+                        stopAudioPreview();
+                        setPreviewingSound(null);
+                      }
+                    }}
                     activeOpacity={0.7}
                   >
                     <Text
@@ -789,8 +892,57 @@ const RemindersScreen = ({ navigation }) => {
                   </TouchableOpacity>
                 ))}
               </View>
+
+              {/* Custom Audio Pick & Preview Area */}
+              {soundId === 'custom' && (
+                <View style={styles.customAudioCard}>
+                  <View style={styles.customAudioHeader}>
+                    <Music size={18} color={colors.primary} />
+                    <Text style={styles.customAudioTitle} numberOfLines={1}>
+                      {soundName || 'No audio file selected'}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.pickAudioBtn}
+                    onPress={handlePickCustomAudio}
+                    activeOpacity={0.7}
+                  >
+                    <FolderMusic size={16} color={colors.primary} />
+                    <Text style={styles.pickAudioBtnText}>
+                      {soundUri ? 'Change Audio File' : 'Pick Audio File (MP3, WAV)'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* Audio Preview Bar */}
+              <View style={styles.previewContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.previewBtn,
+                    previewingSound === soundId && styles.previewBtnActive,
+                  ]}
+                  onPress={() => handleTogglePreview(soundId)}
+                  activeOpacity={0.7}
+                >
+                  {previewingSound === soundId ? (
+                    <VolumeX size={16} color={colors.primaryForeground} />
+                  ) : (
+                    <Volume2 size={16} color={colors.primary} />
+                  )}
+                  <Text
+                    style={[
+                      styles.previewBtnText,
+                      previewingSound === soundId && styles.previewBtnTextActive,
+                    ]}
+                  >
+                    {previewingSound === soundId ? 'Stop Sound Preview' : 'Preview Selected Sound'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
               <Text style={styles.audioDisclaimer}>
-                Select an alarm sound. When triggered, your device will ring at high priority.
+                When triggered, your device will ring at high priority with full alarm controls.
               </Text>
 
               {/* Notification Toggle */}
@@ -1080,6 +1232,21 @@ const makeStyles = (colors, typography, spacing, radii, insets, isDark) => Style
     fontSize: 13,
     color: colors.destructive,
   },
+  inlineErrorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.destructive + '18',
+    borderRadius: radii.md,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 10,
+  },
+  inlineErrorText: {
+    flex: 1,
+    fontFamily: typography.sans.medium,
+    fontSize: 12,
+    color: colors.destructive,
+  },
   sheetFooter: {
     paddingHorizontal: spacing.md,
     paddingTop: spacing.sm,
@@ -1150,6 +1317,66 @@ const makeStyles = (colors, typography, spacing, radii, insets, isDark) => Style
     color: colors.mutedForeground,
   },
   weekdayTextActive: {
+    color: colors.primaryForeground,
+  },
+  // Custom audio card & preview
+  customAudioCard: {
+    backgroundColor: colors.background,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    padding: 12,
+    marginBottom: 8,
+  },
+  customAudioHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  customAudioTitle: {
+    flex: 1,
+    fontFamily: typography.sans.bold,
+    fontSize: 13,
+    color: colors.foreground,
+  },
+  pickAudioBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.primary + '14',
+    paddingVertical: 10,
+    borderRadius: radii.md,
+  },
+  pickAudioBtnText: {
+    fontFamily: typography.sans.bold,
+    fontSize: 13,
+    color: colors.primary,
+  },
+  previewContainer: {
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  previewBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: radii.round,
+    backgroundColor: colors.primary + '18',
+  },
+  previewBtnActive: {
+    backgroundColor: colors.primary,
+  },
+  previewBtnText: {
+    fontFamily: typography.sans.bold,
+    fontSize: 12,
+    color: colors.primary,
+  },
+  previewBtnTextActive: {
     color: colors.primaryForeground,
   },
   // Audio disclaimer

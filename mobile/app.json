@@ -3,66 +3,9 @@
     "name": "StudyArena",
     "slug": "study-arena",
     "version": "1.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.studyarena.mobile"
-    },
-    "android": {
-      "package": "com.studyarena.mobile",
-      "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
-      },
-      "permissions": [
-        "android.permission.NOTIFICATIONS",
-        "android.permission.VIBRATE",
-        "android.permission.RECORD_AUDIO",
-        "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.WRITE_EXTERNAL_STORAGE",
-        "android.permission.SCHEDULE_EXACT_ALARM",
-        "android.permission.RECORD_AUDIO",
-        "android.permission.MODIFY_AUDIO_SETTINGS",
-        "android.permission.FOREGROUND_SERVICE",
-        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
-      ]
-    },
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": [
-      "expo-secure-store",
-      [
-        "expo-notifications",
-        {
-          "sounds": [
-            "./assets/sounds/default_alarm.wav",
-            "./assets/sounds/gentle_alarm.wav",
-            "./assets/sounds/study_bell.wav"
-          ]
-        }
-      ],
-      [
-        "expo-audio",
-        {
-          "microphonePermission": "Allow StudyArena to access your microphone for voice recordings."
-        }
-      ],
-      [
-        "expo-image-picker",
-        {
-          "photosPermission": "Allow StudyArena to access your photos for profile pictures and attachments."
-        }
-      ],
-      "expo-asset",
-      "@react-native-community/datetimepicker",
-      "expo-sharing",
-      "expo-web-browser"
-    ],
     "extra": {
       "eas": {
         "projectId": "decf8b1a-27c1-4ad3-bea5-fe2d49828a06"

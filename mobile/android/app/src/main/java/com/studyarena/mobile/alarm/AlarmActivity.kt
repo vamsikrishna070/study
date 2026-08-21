@@ -32,6 +32,7 @@ class AlarmActivity : Activity() {
         val id = intent.getStringExtra("id")
         val title = intent.getStringExtra("title")
         val soundId = intent.getStringExtra("soundId")
+        val soundUri = intent.getStringExtra("soundUri")
 
         findViewById<TextView>(R.id.tvAlarmTitle).text = title ?: "Time to study"
 
@@ -50,6 +51,9 @@ class AlarmActivity : Activity() {
                 putExtra("id", id)
                 putExtra("title", title)
                 putExtra("soundId", soundId)
+                if (!soundUri.isNullOrBlank()) {
+                    putExtra("soundUri", soundUri)
+                }
             }
             startService(serviceIntent)
             finish()
