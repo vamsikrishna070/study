@@ -1,5 +1,7 @@
 import bcrypt from 'bcryptjs';
+import mongoose from 'mongoose';
 import User from '../models/User.js';
+import College from '../models/College.js';
 import { generateToken } from '../utils/generateToken.js';
 import { sendVerificationEmail, sendPasswordResetEmail } from '../services/emailService.js';
 
@@ -9,14 +11,14 @@ const publicUser = (user) => ({
   email: user.email,
   collegeId: user.collegeId || null,
   university: user.university || '',
-  degree: user.degree,
-  branch: user.branch,
-  batch: user.batch,
-  semester: user.semester,
-  profileImageUrl: user.profileImageUrl,
-  profileImagePublicId: user.profileImagePublicId,
-  notificationPreferences: user.notificationPreferences,
-  isVerified: user.isVerified,
+  degree: user.degree || '',
+  branch: user.branch || '',
+  batch: user.batch || '',
+  semester: user.semester || 1,
+  profileImageUrl: user.profileImageUrl || '',
+  profileImagePublicId: user.profileImagePublicId || '',
+  notificationPreferences: user.notificationPreferences || { email: true, push: true },
+  isVerified: user.isVerified || false,
 });
 
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
@@ -37,16 +39,24 @@ export async function register(req, res) {
     }
   }
   
+  let validCollegeId = null;
+  if (collegeId && typeof collegeId === 'string' && mongoose.Types.ObjectId.isValid(collegeId.trim())) {
+    const collegeExists = await College.findOne({ _id: collegeId.trim(), isActive: true });
+    if (collegeExists) {
+      validCollegeId = collegeExists._id;
+    }
+  }
+
   const user = new User({ 
-    name, 
+    name: name.trim(), 
     email, 
     password, 
-    collegeId: collegeId || null, 
-    university: university || '', 
-    degree, 
-    branch, 
-    batch, 
-    semester 
+    collegeId: validCollegeId, 
+    university: university ? university.trim() : '', 
+    degree: degree ? degree.trim() : '', 
+    branch: branch ? branch.trim() : '', 
+    batch: batch ? batch.trim() : '', 
+    semester: Number(semester) || 1 
   });
   
   const otp = generateOTP();
@@ -211,21 +221,79 @@ export async function me(req, res) {
 }
 
 export async function updateProfile(req, res) {
-  const { name, collegeId, university, degree, branch, batch, semester, profileImageUrl, profileImagePublicId } = req.body;
+  const { 
+    name, 
+    collegeId, 
+    university, 
+    degree, 
+    branch, 
+    batch, 
+    semester, 
+    profileImageUrl, 
+    profileImagePublicId 
+  } = req.body;
+
   const user = await User.findById(req.user._id);
   if (!user) return res.status(404).json({ success: false, message: 'User not found' });
   
-  if (name) user.name = name;
-  if (collegeId !== undefined) {
-    user.collegeId = (collegeId && mongoose.Types.ObjectId.isValid(collegeId)) ? collegeId : null;
+  if (name !== undefined) {
+    if (typeof name === 'string' && name.trim()) {
+      user.name = name.trim();
+    } else {
+      return res.status(400).json({ success: false, message: 'Name cannot be empty' });
+    }
   }
-  if (university !== undefined) user.university = university;
-  if (degree !== undefined) user.degree = degree;
-  if (branch !== undefined) user.branch = branch;
-  if (batch !== undefined) user.batch = batch;
-  if (semester !== undefined) user.semester = semester;
-  if (profileImageUrl !== undefined) user.profileImageUrl = profileImageUrl;
-  if (profileImagePublicId !== undefined) user.profileImagePublicId = profileImagePublicId;
+
+  if (collegeId !== undefined) {
+    if (collegeId === null || (typeof collegeId === 'string' && collegeId.trim() === '')) {
+      user.collegeId = null;
+    } else if (typeof collegeId === 'string' && collegeId.trim()) {
+      const trimmedId = collegeId.trim();
+      if (!mongoose.Types.ObjectId.isValid(trimmedId)) {
+        return res.status(400).json({ success: false, message: 'Invalid college selection.' });
+      }
+      const collegeExists = await College.findOne({ _id: trimmedId, isActive: true });
+      if (!collegeExists) {
+        return res.status(400).json({ success: false, message: 'Selected college was not found.' });
+      }
+      user.collegeId = collegeExists._id;
+    } else {
+      return res.status(400).json({ success: false, message: 'Invalid college selection.' });
+    }
+  }
+
+  if (university !== undefined) {
+    user.university = typeof university === 'string' ? university.trim() : '';
+  }
+
+  if (degree !== undefined) {
+    user.degree = typeof degree === 'string' ? degree.trim() : '';
+  }
+
+  if (branch !== undefined) {
+    user.branch = typeof branch === 'string' ? branch.trim() : '';
+  }
+
+  if (batch !== undefined) {
+    user.batch = typeof batch === 'string' ? batch.trim() : '';
+  }
+
+  if (semester !== undefined) {
+    const sem = Number(semester);
+    if (!isNaN(sem) && sem >= 1 && sem <= 12) {
+      user.semester = sem;
+    } else {
+      return res.status(400).json({ success: false, message: 'Semester must be between 1 and 12' });
+    }
+  }
+
+  if (profileImageUrl !== undefined) {
+    user.profileImageUrl = typeof profileImageUrl === 'string' ? profileImageUrl.trim() : '';
+  }
+
+  if (profileImagePublicId !== undefined) {
+    user.profileImagePublicId = typeof profileImagePublicId === 'string' ? profileImagePublicId.trim() : '';
+  }
 
   await user.save();
   res.json({ success: true, data: publicUser(user) });

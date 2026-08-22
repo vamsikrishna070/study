@@ -43,7 +43,7 @@ const SettingsScreen = ({ navigation }) => {
         semester: Number(form.semester) || 1 
       };
       const res = await apiClient.patch('/auth/profile', data);
-      setUser(res.data.user || res.data);
+      setUser(res.data.data || res.data.user || res.data);
       showSuccess('Profile Saved', 'Your profile details have been updated.');
     } catch (error) {
       showError('Update Failed', 'Failed to update profile settings. Please try again.');
@@ -61,7 +61,7 @@ const SettingsScreen = ({ navigation }) => {
 
       if (uploaded && uploaded.url) {
         const updateRes = await apiClient.patch('/auth/profile', { profileImageUrl: uploaded.url });
-        setUser(updateRes.data.user || updateRes.data);
+        setUser(updateRes.data.data || updateRes.data.user || updateRes.data);
         showSuccess('Profile Picture Updated', 'Your new profile picture has been saved.');
       }
     } catch (error) {
