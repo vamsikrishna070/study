@@ -70,7 +70,7 @@ export function romanToArabic(roman) {
  */
 export function parseUnitNumber(str, defaultNum = 1) {
   if (!str) return defaultNum;
-  const clean = str.replace(/^unit\s*/i, '').trim();
+  const clean = str.replace(/^(?:unit|module|chapter|section|part|block)\s*[:.\-–—]?\s*/i, '').trim();
   const num = parseInt(clean, 10);
   if (!isNaN(num) && num > 0) return num;
   const roman = romanToArabic(clean);
@@ -110,21 +110,115 @@ export function isReferenceOrJunk(line) {
   if (trimmed.length < 2) return true;
 
   if (/https?:\/\//i.test(trimmed)) return true;
-  if (/^--\s*\d+\s*of\s*\d+\s*--$/i.test(trimmed)) return true;
-  if (/^(?:Course\s+Unitization\s+Plan\s*\(Lab\)|Course\s+Utilization\s+Plan\s*[–-]\s*Lab)/i.test(trimmed)) return true;
-  if (/^(?:Unit\s*No\.?|Unit\s*Name|Required|Contact\s*Hours?|CLOs?|Addressed|References?|Used|Referen\s*cesUsed|Experiment\s*Name|Exp\.?\s*No\.?|sl\.?\s*no\.?|s\.?\s*no\.?)$/i.test(trimmed)) return true;
-  if (/^(?:Learning\s+Assessment|Recommended\s+Resources|Other\s+Resources|Bloom’s\s+Level|Course\s+Designers|Internal\s+Continuous|External\s+Evaluation|CLA-I|Mid-I|Lab\s+Performance|Cognitive\s+Task)/i.test(trimmed)) return true;
-  if (/^(?:Level-\d|Remember|Understand|Apply|Analyse|Evaluate)\s+/i.test(trimmed)) return true;
+  if (/^--\s*\d+\s*(?:of\s*\d+)?\s*--$/i.test(trimmed)) return true;
+  if (/^Page\s+\d+(?:\s+of\s+\d+)?$/i.test(trimmed)) return true;
+  if (/^\d+\s*\/\s*\d+$/i.test(trimmed)) return true;
+
+  // Lab and non-theory sections
+  if (/^(?:Course\s+Unitization\s+Plan\s*\(Lab\)|Course\s+Utilization\s+Plan\s*[–-]\s*Lab|PART\s*\d*:\s*ASM|LIST\s+OF\s+EXPERIMENTS|LABORATORY\s+EXPERIMENTS)/i.test(trimmed)) return true;
+
+  // Table header artifacts
+  if (/^(?:Unit\s*No\.?|Unit\s*Name|Required|Contact\s*Hours?|CLOs?|Addressed|References?|Used|Referen\s*cesUsed|Experiment\s*Name|Exp\.?\s*No\.?|sl\.?\s*no\.?|s\.?\s*no\.?|S\.No\.?|Hours?|Lecture\s*Hours?|Period|Marks?|Credits?|L\s*T\s*P\s*C)$/i.test(trimmed)) return true;
+
+  // Evaluation, Bloom's, Course Outcomes, Designers
+  if (/^(?:Learning\s+Assessment|Recommended\s+Resources|Other\s+Resources|Bloom’s\s+Level|Course\s+Designers|Internal\s+Continuous|External\s+Evaluation|CLA-I|Mid-I|Lab\s+Performance|Cognitive\s+Task|Course\s+Objectives?|Course\s+Outcomes?|Program\s+Outcomes?|CO-PO\s+Mapping|Assessment\s+Pattern)/i.test(trimmed)) return true;
+  if (/^(?:Level-\d|Remember|Understand|Apply|Analyse|Evaluate|Create)\s+/i.test(trimmed)) return true;
+  if (/^(?:CO\d|PO\d|PSO\d)\s*[:-]/i.test(trimmed)) return true;
   if (/^(?:Theory\s*\(\d+%\)|Practical\s*\(\d+%\)|External\s*Theory|External\s*Lab)/i.test(trimmed)) return true;
-  if (/\b(?:edition|McGraw\s*Hill|Pearson|OReilly|Prentice\s*Hall|Cengage|Nerd\s*Ranch|Oracle\s*Press)\b/i.test(trimmed)) return true;
+
+  // Textbooks, Publishers, Authors
+  if (/^(?:Text\s*Books?|Reference\s*Books?|Suggested\s*Readings?|References?|Prescribed\s*Books?|Web\s*Resources?|Online\s*Resources?)\s*[:-]?/i.test(trimmed)) return true;
+  if (/\b(?:edition|McGraw\s*Hill|Pearson|OReilly|Prentice\s*Hall|Cengage|Nerd\s*Ranch|Oracle\s*Press|Wiley|Oxford\s*University\s*Press|Springer|PHI\s*Learning)\b/i.test(trimmed)) return true;
   if (/^(?:\d+\.\s+)?(?:Mr\.|Ms\.|Dr\.|Prof\.)\s+[A-Z]/i.test(trimmed)) return true;
   if (/^\d+\.\s+[A-Z][a-z]+.*(?:\(\d{4}\)|\d{4})/i.test(trimmed)) return true;
   if (/^Total\s+(?:Theory\s+|Lab\s+)?Contact\s+Hours?/i.test(trimmed)) return true;
+
+  // Standalone numbers or dates or isolated punctuation
+  if (/^[\d.,\s;:/\-_()]+$/.test(trimmed) && !/[a-zA-Z]/.test(trimmed)) return true;
+
   return false;
 }
 
 /**
- * Structure-aware syllabus extractor
+ * Checks if a section header indicates the end of theory syllabus
+ */
+export function isNonTheorySectionHeader(line) {
+  if (!line || typeof line !== 'string') return false;
+  const trimmed = line.trim();
+  return (
+    /^(?:Text\s*Books?|Reference\s*Books?|References|Suggested\s*Readings?|Prescribed\s*Books?|Web\s*Resources?|Online\s*Resources?)\s*[:-]?$/i.test(trimmed) ||
+    /^(?:Course\s+Unitization\s+Plan\s*\(Lab\)|Course\s+Utilization\s+Plan\s*[–-]\s*Lab|PART\s*\d*:\s*ASM|LIST\s+OF\s+EXPERIMENTS|LABORATORY\s+EXPERIMENTS)/i.test(trimmed) ||
+    /^(?:Course\s+Outcomes?|Program\s+Outcomes?|CO-PO\s+Mapping|Bloom’s\s+Level\s+of\s+Cognitive\s+Task|Assessment\s+Pattern|Evaluation\s+Scheme)/i.test(trimmed)
+  );
+}
+
+/**
+ * Splits a composite topic text (delimited by semicolons, commas, dashes) into atomic topic items
+ */
+export function splitCompositeTopic(text) {
+  if (!text || typeof text !== 'string') return [];
+
+  let cleaned = text
+    .replace(/\s+(?:CLO|CO)\s*\d+(?:\s*,\s*\d+)*$/i, '')
+    .replace(/\s+\d{1,2}(?:\.\d+)?(?:\s+\d+(?:\s*,\s*\d+)*)*$/, '')
+    .replace(/^\d+[.)\]:-]?\s+/, '')
+    .replace(/^[-*•o]\s*/, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
+  cleaned = cleanOcrTypo(cleaned);
+
+  if (cleaned.length < 3 || isReferenceOrJunk(cleaned)) return [];
+
+  // Check if text has multiple topics separated by semicolons (e.g. "Topic 1; Topic 2; Topic 3")
+  if (cleaned.includes(';')) {
+    const parts = cleaned
+      .split(';')
+      .map((p) => p.trim())
+      .filter((p) => p.length > 2 && !isReferenceOrJunk(p));
+    if (parts.length > 1) {
+      return parts.map(cleanOcrTypo);
+    }
+  }
+
+  // Check if text is a colon-led category with comma-separated topics
+  // e.g. "Process Management: Process Concepts, CPU Scheduling, Operations on Processes"
+  const colonMatch = cleaned.match(/^([^:]+):\s*(.+)$/);
+  if (colonMatch) {
+    const category = colonMatch[1].trim();
+    const rest = colonMatch[2].trim();
+    if (rest.includes(',') && !rest.toLowerCase().includes('etc.')) {
+      const subItems = rest
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 2 && !isReferenceOrJunk(s));
+      if (subItems.length > 1) {
+        return [
+          cleanOcrTypo(`${category} - ${subItems[0]}`),
+          ...subItems.slice(1).map(cleanOcrTypo),
+        ];
+      }
+    }
+  }
+
+  // Check if text is a comma-separated paragraph with 3+ distinct topics
+  // e.g. "Main Memory Management, Contiguous Memory Allocation, Segmentation, Virtual Memory, Paging"
+  const commaCount = (cleaned.match(/,/g) || []).length;
+  if (commaCount >= 2 && cleaned.length > 40) {
+    const parts = cleaned
+      .split(',')
+      .map((p) => p.trim())
+      .filter((p) => p.length > 2 && !isReferenceOrJunk(p));
+    if (parts.length >= 2) {
+      return parts.map(cleanOcrTypo);
+    }
+  }
+
+  return [cleaned];
+}
+
+/**
+ * Structure-aware syllabus extractor supporting OBE tables, standard paragraphs, and bulleted syllabi
  * @param {string} rawText Raw extracted text from PDF
  * @returns {{ courseName: string, courseCode: string, units: Array<{ unitNumber: number, unitName: string, topics: Array<{ title: string, confidence: number }> }> }}
  */
@@ -139,126 +233,163 @@ export function extractSyllabusStructure(rawText) {
     .map((l) => l.trim())
     .filter(Boolean);
 
-  // 1. Extract Course Name and Course Code from content (never from filename)
+  // 1. Extract Course Name and Course Code
   let courseName = '';
   let courseCode = '';
 
-  for (let i = 0; i < Math.min(lines.length, 35); i++) {
+  for (let i = 0; i < Math.min(lines.length, 45); i++) {
     const line = lines[i];
-    const codeMatch = line.match(/Course\s+Code\s*:?\s*([A-Z]{2,5}\s*\d{2,4}[A-Z]?)/i);
+
+    // Pattern 1: Inline Code and Title on same line, e.g. "CS401PC: DATABASE MANAGEMENT SYSTEMS"
+    const inlineMatch = line.match(/^([A-Z]{2,6}\s*[-]?\s*\d{2,5}[A-Z]{0,3})\s*[:.\-–—]\s*(.+)$/i);
+    if (inlineMatch && !courseCode && !courseName) {
+      courseCode = inlineMatch[1].replace(/\s+/g, ' ').trim();
+      courseName = inlineMatch[2]
+        .replace(/^(?:Course\s+Title|Subject\s+Name|Title\s+of\s+(?:the\s+)?Course|Course|Subject)\s*[:.\-–—]\s*/i, '')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+      continue;
+    }
+
+    // Pattern 2: Explicit "Course Code" / "Subject Code" matching
+    const codeMatch = line.match(/(?:Course|Subject)?\s*Code\s*[:.\-]?\s*([A-Z]{2,6}\s*[-]?\s*\d{2,4}[A-Z]?)/i);
     if (codeMatch && !courseCode) {
       courseCode = codeMatch[1].replace(/\s+/g, ' ').trim();
       for (let j = i - 1; j >= 0; j--) {
         const prev = lines[j];
         if (
-          !/SRM|University|Neerukonda|Mandal|District|Andhra|522240|Department|Category|Semester|Credit/i.test(
+          !/SRM|University|Neerukonda|Mandal|District|Andhra|522240|Department|Category|Semester|Credit|Regulation|B\.?\s*Tech|M\.?\s*Tech/i.test(
             prev
           ) &&
-          prev.length > 3
+          prev.length > 3 &&
+          !isReferenceOrJunk(prev)
         ) {
-          courseName = prev.replace(/\s{2,}/g, ' ').trim();
+          courseName = prev
+            .replace(/^(?:Course\s+Title|Subject\s+Name|Title\s+of\s+(?:the\s+)?Course|Course|Subject)\s*[:.\-–—]\s*/i, '')
+            .replace(/\s{2,}/g, ' ')
+            .trim();
           break;
         }
       }
     }
+
+    // Pattern 3: Direct "Course Title" / "Subject Name" matching
+    const nameMatch = line.match(/(?:Course\s+Title|Subject\s+Name|Title\s+of\s+(?:the\s+)?Course)\s*[:.\-–—]?\s*(.+)$/i);
+    if (nameMatch && !courseName) {
+      courseName = nameMatch[1].replace(/\s{2,}/g, ' ').trim();
+    }
   }
 
-  // 2. Structural Parsing
-  const UNIT_HEADER_REGEX = /^(?:UNIT|Unit|MODULE|Module|CHAPTER|Chapter)\s*([0-9IVXLCDM]+)\s*[:-]?\s*(.*)$/i;
+  // Matches: UNIT 1, UNIT I, UNIT - 1, UNIT - I, UNIT: 1, UNIT: I, MODULE 1, MODULE I, CHAPTER 1, SECTION 1, etc.
+  const UNIT_HEADER_REGEX = /^(?:UNIT|Unit|MODULE|Module|CHAPTER|Chapter|SECTION|Section|PART|Part|BLOCK|Block)\s*[:.\-–—]?\s*([0-9IVXLCDM]+)(?:[\s:.\-–—]+(.*))?$/i;
   const TABLE_HEADER_REGEX = /^(?:Unit\s*No\.?|Unit\s*Name|Required|Contact\s*Hours?|CLOs?|Addressed|References?|Used|Referen\s*cesUsed|Experiment\s*Name|Exp\.?\s*No\.?|sl\.?\s*no\.?|s\.?\s*no\.?)$/i;
-  const PAGE_NUMBER_REGEX = /^--\s*\d+\s*of\s*\d+\s*--$/i;
-  const LAB_START_REGEX = /Course\s+Unitization\s+Plan\s*\(?(?:Lab|Laboratory)\)?|Course\s+Utilization\s+Plan\s*[–-]?\s*Lab|PART\s*\d+:\s*ASM/i;
+  const PAGE_NUMBER_REGEX = /^--\s*\d+\s*(?:of\s*\d+)?\s*--$|^Page\s+\d+(?:\s+of\s+\d+)?$/i;
 
   let inTheory = false;
   const units = [];
   let currentUnit = null;
   let pendingLines = [];
 
+  const addTopicToCurrentUnit = (title) => {
+    if (!currentUnit || !title) return;
+    const cleanTitle = cleanOcrTypo(title);
+    if (cleanTitle.length < 2 || isReferenceOrJunk(cleanTitle) || TABLE_HEADER_REGEX.test(cleanTitle)) {
+      return;
+    }
+    const alreadyExists = currentUnit.topics.some(
+      (t) => t.title.toLowerCase().trim() === cleanTitle.toLowerCase().trim()
+    );
+    if (!alreadyExists) {
+      currentUnit.topics.push({
+        title: cleanTitle,
+        confidence: 0.95,
+      });
+    }
+  };
+
   const processPendingLines = () => {
-    if (!currentUnit || pendingLines.length === 0) return;
+    if (!currentUnit || pendingLines.length === 0) {
+      pendingLines = [];
+      return;
+    }
 
-    let buffer = '';
-    for (const rawLine of pendingLines) {
-      if (isReferenceOrJunk(rawLine) || TABLE_HEADER_REGEX.test(rawLine) || PAGE_NUMBER_REGEX.test(rawLine)) {
-        continue;
-      }
+    // Check if the lines in this unit represent an OBE table (ending with column numbers)
+    const hasTableColumns = pendingLines.some((l) =>
+      /\s+\d{1,2}(?:\.\d+)?(?:\s+\d+(?:\s*,\s*\d+)*)+$/.test(l)
+    );
 
-      // Check if line ends with table metadata columns (e.g. 1 1 1,2 or 2 4 3 or 1 4 1,3)
-      const hasTableCols = /\s+\d{1,2}(?:\.\d+)?(?:\s+\d+(?:\s*,\s*\d+)*)+$/.test(rawLine);
-      const isStandaloneTableCell = /^\d{1,2}(?:\.\d+)?(?:\s+\d+(?:\s*,\s*\d+)*)*$/.test(rawLine);
+    if (hasTableColumns) {
+      // Table row extraction
+      let buffer = '';
+      for (const rawLine of pendingLines) {
+        if (isReferenceOrJunk(rawLine) || TABLE_HEADER_REGEX.test(rawLine) || PAGE_NUMBER_REGEX.test(rawLine)) {
+          continue;
+        }
 
-      if (isStandaloneTableCell) {
-        if (buffer) {
-          let cleaned = buffer
-            .replace(/\s+(?:CLO|CO)\s*\d+(?:\s*,\s*\d+)*$/i, '')
-            .replace(/\s+\d{1,2}(?:\.\d+)?(?:\s+\d+(?:\s*,\s*\d+)*)*$/, '')
-            .replace(/^\d+[.)\]:-]?\s+/, '')
-            .replace(/^[-*•o]\s*/, '')
-            .replace(/\s{2,}/g, ' ')
-            .trim();
+        const isRowEnd = /\s+\d{1,2}(?:\.\d+)?(?:\s+\d+(?:\s*,\s*\d+)*)+$/.test(rawLine);
+        const isStandaloneTableCell = /^\d{1,2}(?:\.\d+)?(?:\s+\d+(?:\s*,\s*\d+)*)*$/.test(rawLine);
 
-          cleaned = cleanOcrTypo(cleaned);
-
-          if (cleaned.length > 2 && !TABLE_HEADER_REGEX.test(cleaned) && !isReferenceOrJunk(cleaned)) {
-            if (!currentUnit.topics.some((t) => t.title.toLowerCase() === cleaned.toLowerCase())) {
-              currentUnit.topics.push({
-                title: cleaned,
-                confidence: 0.95,
-              });
-            }
+        if (isStandaloneTableCell) {
+          if (buffer) {
+            const extracted = splitCompositeTopic(buffer);
+            extracted.forEach(addTopicToCurrentUnit);
+            buffer = '';
           }
+          continue;
+        }
+
+        if (buffer) {
+          buffer += ' ' + rawLine;
+        } else {
+          buffer = rawLine;
+        }
+
+        if (isRowEnd) {
+          const extracted = splitCompositeTopic(buffer);
+          extracted.forEach(addTopicToCurrentUnit);
           buffer = '';
         }
-        continue;
       }
 
       if (buffer) {
-        buffer += ' ' + rawLine;
-      } else {
-        buffer = rawLine;
+        const extracted = splitCompositeTopic(buffer);
+        extracted.forEach(addTopicToCurrentUnit);
       }
+    } else {
+      // Standard syllabus (paragraph, bulleted, or line-by-line)
+      let buffer = '';
+      for (const rawLine of pendingLines) {
+        if (isReferenceOrJunk(rawLine) || TABLE_HEADER_REGEX.test(rawLine) || PAGE_NUMBER_REGEX.test(rawLine)) {
+          continue;
+        }
 
-      if (hasTableCols) {
-        let cleaned = buffer
-          .replace(/\s+(?:CLO|CO)\s*\d+(?:\s*,\s*\d+)*$/i, '')
-          .replace(/\s+\d{1,2}(?:\.\d+)?(?:\s+\d+(?:\s*,\s*\d+)*)*$/, '')
-          .replace(/^\d+[.)\]:-]?\s+/, '')
-          .replace(/^[-*•o]\s*/, '')
-          .replace(/\s{2,}/g, ' ')
-          .trim();
+        // Bullet point or numbered topic start
+        const isBulletOrNum = /^[-*•o]\s+|^\d+[.)\]]\s+|^[a-zA-Z][.)]\s+/.test(rawLine);
 
-        cleaned = cleanOcrTypo(cleaned);
-
-        if (cleaned.length > 2 && !TABLE_HEADER_REGEX.test(cleaned) && !isReferenceOrJunk(cleaned)) {
-          if (!currentUnit.topics.some((t) => t.title.toLowerCase() === cleaned.toLowerCase())) {
-            currentUnit.topics.push({
-              title: cleaned,
-              confidence: 0.95,
-            });
+        if (isBulletOrNum) {
+          if (buffer) {
+            const extracted = splitCompositeTopic(buffer);
+            extracted.forEach(addTopicToCurrentUnit);
+            buffer = '';
+          }
+          buffer = rawLine;
+        } else {
+          // Check if previous line ended with complete sentence or semicolon
+          if (buffer && /[.;:]$/.test(buffer)) {
+            const extracted = splitCompositeTopic(buffer);
+            extracted.forEach(addTopicToCurrentUnit);
+            buffer = rawLine;
+          } else if (buffer) {
+            buffer += ' ' + rawLine;
+          } else {
+            buffer = rawLine;
           }
         }
-        buffer = '';
       }
-    }
 
-    if (buffer) {
-      let cleaned = buffer
-        .replace(/\s+(?:CLO|CO)\s*\d+(?:\s*,\s*\d+)*$/i, '')
-        .replace(/\s+\d{1,2}(?:\.\d+)?(?:\s+\d+(?:\s*,\s*\d+)*)*$/, '')
-        .replace(/^\d+[.)\]:-]?\s+/, '')
-        .replace(/^[-*•o]\s*/, '')
-        .replace(/\s{2,}/g, ' ')
-        .trim();
-
-      cleaned = cleanOcrTypo(cleaned);
-
-      if (cleaned.length > 2 && !TABLE_HEADER_REGEX.test(cleaned) && !isReferenceOrJunk(cleaned)) {
-        if (!currentUnit.topics.some((t) => t.title.toLowerCase() === cleaned.toLowerCase())) {
-          currentUnit.topics.push({
-            title: cleaned,
-            confidence: 0.95,
-          });
-        }
+      if (buffer) {
+        const extracted = splitCompositeTopic(buffer);
+        extracted.forEach(addTopicToCurrentUnit);
       }
     }
 
@@ -270,10 +401,13 @@ export function extractSyllabusStructure(rawText) {
 
     if (PAGE_NUMBER_REGEX.test(line)) continue;
 
-    if (LAB_START_REGEX.test(line)) {
-      // Exclude laboratory & practical experiments from theory syllabus
-      inTheory = false;
-      break;
+    // Check for section ending (e.g. Text Books, References, Lab section)
+    if (isNonTheorySectionHeader(line)) {
+      if (inTheory) {
+        processPendingLines();
+        inTheory = false;
+      }
+      continue;
     }
 
     if (/Course\s+Unitization\s+Plan\s*\(?Theory\)?/i.test(line)) {
@@ -288,8 +422,27 @@ export function extractSyllabusStructure(rawText) {
       const rawNum = unitMatch[1];
       const unitNumber = parseUnitNumber(rawNum, units.length + 1);
       let rawTitle = (unitMatch[2] || '').trim();
-      // Remove trailing contact hours or numbers from unit title
-      rawTitle = rawTitle.replace(/\s+\d+(?:\s+\d+)*\s*$/, '').trim();
+
+      // If unit title is empty on the header line, inspect next line
+      if (!rawTitle && i + 1 < lines.length) {
+        const nextLine = lines[i + 1];
+        if (
+          !UNIT_HEADER_REGEX.test(nextLine) &&
+          !isNonTheorySectionHeader(nextLine) &&
+          !TABLE_HEADER_REGEX.test(nextLine) &&
+          nextLine.length < 80 &&
+          !/^\d+/.test(nextLine)
+        ) {
+          rawTitle = nextLine;
+          i++; // Consume next line as unit name
+        }
+      }
+
+      // Remove trailing contact hours or numbers from unit title (e.g. "Process Management 9" or "(10 Hours)")
+      rawTitle = rawTitle
+        .replace(/\s*\(\s*\d+\s*(?:hours?|hrs?|lectures?|periods?)?\s*\)/i, '')
+        .replace(/\s+\d+(?:\s+\d+)*\s*$/, '')
+        .trim();
       rawTitle = cleanOcrTypo(rawTitle);
 
       currentUnit = {
@@ -314,3 +467,4 @@ export function extractSyllabusStructure(rawText) {
     units: units.filter((u) => u.topics.length > 0),
   };
 }
+

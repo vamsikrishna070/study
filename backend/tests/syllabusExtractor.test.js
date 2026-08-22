@@ -214,7 +214,142 @@ Bloom’s Level of Cognitive Task
     `Unit 3 OCR Typo fixed in Unit Name: "${javaResult.units[2].unitName}"`
   );
 
-  // 6. Check Local PDFs if present in local developer environment
+  // 6. Structural Text Extraction Regression: Standard University Paragraph & Semicolon Syllabus (JNTU / Anna University / VTU style)
+  const standardJntuSyllabus = `
+JAWAHARLAL NEHRU TECHNOLOGICAL UNIVERSITY HYDERABAD
+B.Tech. in COMPUTER SCIENCE AND ENGINEERING
+CS401PC: DATABASE MANAGEMENT SYSTEMS
+Course Objectives:
+- To understand the basic concepts and the applications of database systems.
+- To master the basics of SQL and construct queries using SQL.
+
+UNIT - I
+Database System Applications: Purpose of Database Systems, View of Data, Database Languages - DDL, DML.
+Relational Databases: Database design, ER Diagrams, Relational Model, Keys, Integrity Constraints.
+Storage Management: Storage structure, File Organization, Indexing and Hashing.
+
+UNIT - II
+Relational Query Languages: Relational Algebra, Relational Calculus, Tuple Relational Calculus, Domain Relational Calculus.
+SQL: Data Definition, Basic Query Structure, Set Operations, Aggregate Functions, Null Values, Nested Subqueries, Complex Queries, Views.
+
+UNIT - III
+Schema Refinement: Problems Caused by Redundancy, Decompositions, Problem Related to Decomposition, Functional Dependencies, Reasoning about FDs.
+Normal Forms: FIRST, SECOND, THIRD Normal forms, BCNF, Lossless join Decomposition, Dependency Preserving Decomposition, Multi-valued Dependencies, FOURTH Normal Form.
+
+UNIT - IV
+Transaction Management: Transaction Concept, Transaction State, Implementation of Atomicity and Durability, Concurrent Executions, Serializability, Recoverability.
+Concurrency Control: Lock-Based Protocols, Timestamp-Based Protocols, Validation-Based Protocols, Multiple Granularity, Deadlock Handling.
+
+UNIT - V
+Recovery System: Failure Classification, Storage Structure, Recovery and Atomicity, Log-Based Recovery, Recovery with Concurrent Transactions, Buffer Management.
+
+TEXT BOOKS:
+1. Database System Concepts, Silberschatz, Korth, Sudarshan, 6th Edition, McGraw Hill.
+2. Database Management Systems, Raghu Ramakrishnan, Johannes Gehrke, 3rd Edition, McGraw Hill.
+
+REFERENCES:
+1. Database Systems, 6th edition, R. Elmasri and S. B. Navathe, Pearson Education.
+`;
+  const jntuResult = extractSyllabusStructure(standardJntuSyllabus);
+  assert(jntuResult.courseCode === 'CS401PC', `JNTU Course Code extracted: "${jntuResult.courseCode}"`);
+  assert(jntuResult.courseName === 'DATABASE MANAGEMENT SYSTEMS', `JNTU Course Name extracted: "${jntuResult.courseName}"`);
+  assert(jntuResult.units.length === 5, `JNTU Units detected: ${jntuResult.units.length} (Expected: 5)`);
+  assert(
+    jntuResult.units[0].topics.some((t) => t.title.includes('ER Diagrams')),
+    'JNTU Unit 1 extracted atomic comma-delimited topic "ER Diagrams"'
+  );
+  assert(
+    jntuResult.units[1].topics.some((t) => t.title.includes('Nested Subqueries')),
+    'JNTU Unit 2 extracted atomic comma-delimited topic "Nested Subqueries"'
+  );
+  assert(
+    !jntuResult.units.some((u) => u.topics.some((t) => t.title.toLowerCase().includes('silberschatz'))),
+    'JNTU Textbooks excluded from topics'
+  );
+
+  // 7. Structural Text Extraction Regression: Bulleted & Numbered Module Syllabus with Multi-line Headers
+  const bulletedSyllabus = `
+NATIONAL INSTITUTE OF TECHNOLOGY
+DEPARTMENT OF COMPUTER SCIENCE
+Course Title: Computer Networks
+Subject Code: CS-301
+
+MODULE 1
+Introduction to Data Communications
+- Physical Layer: Overview of data communication and networking
+- Network Topologies: Star, Ring, Mesh, Tree, Bus
+- Transmission Media: Guided media (Twisted pair, Coaxial cable, Fiber optics)
+- Wireless Transmission: Radio waves, Microwaves, Infrared
+
+MODULE 2: Data Link Layer
+1. Error Detection and Correction: Parity, Checksum, CRC, Hamming codes
+2. Data Link Protocols: Stop and Wait, Go-Back-N ARQ, Selective Repeat ARQ
+3. Medium Access Control: ALOHA, CSMA, CSMA/CD, CSMA/CA
+
+MODULE 3: Network Layer
+- IP Addressing: IPv4 addressing, Subnetting, Supernetting, CIDR, IPv6 addressing
+- Routing Protocols: Distance Vector Routing, Link State Routing, OSPF, BGP
+- Congestion Control Algorithms: Leaky Bucket, Token Bucket
+
+MODULE 4: Transport and Application Layer
+- Transport Layer: Process-to-process delivery, UDP, TCP, Congestion Control
+- Application Layer Protocols: DNS, HTTP, HTTPS, FTP, SMTP, DHCP
+
+Course Outcomes:
+CO1: Understand physical and data link layers.
+CO2: Design subnets and analyze routing.
+`;
+  const bulletResult = extractSyllabusStructure(bulletedSyllabus);
+  assert(bulletResult.courseName === 'Computer Networks', `Bulleted Course Name: "${bulletResult.courseName}"`);
+  assert(bulletResult.courseCode === 'CS-301', `Bulleted Course Code: "${bulletResult.courseCode}"`);
+  assert(bulletResult.units.length === 4, `Bulleted Modules detected: ${bulletResult.units.length} (Expected: 4)`);
+  assert(
+    bulletResult.units[0].unitName === 'Introduction to Data Communications',
+    `Multi-line Module 1 Name captured: "${bulletResult.units[0].unitName}"`
+  );
+  assert(
+    bulletResult.units[0].topics.some((t) => t.title.includes('Twisted pair')),
+    'Bulleted Module 1 extracted bulleted topics'
+  );
+  assert(
+    bulletResult.units[1].topics.some((t) => t.title.includes('Selective Repeat ARQ')),
+    'Numbered Module 2 extracted numbered topics'
+  );
+  assert(
+    !bulletResult.units.some((u) => u.topics.some((t) => t.title.startsWith('CO1'))),
+    'Course outcomes excluded from topics'
+  );
+
+  // 8. Unit-Topic Association & Strict Isolation Test
+  const isolationTestText = `
+UNIT I: Foundations
+Topic A1
+Topic A2
+
+UNIT II: Intermediate Concepts
+Topic B1
+Topic B2
+
+UNIT III: Advanced Topics
+Topic C1
+Topic C2
+`;
+  const isoResult = extractSyllabusStructure(isolationTestText);
+  assert(isoResult.units.length === 3, 'Isolation Test: 3 units detected');
+  assert(
+    isoResult.units[0].topics.every((t) => t.title.startsWith('Topic A')),
+    'Unit 1 contains strictly Topic A items'
+  );
+  assert(
+    isoResult.units[1].topics.every((t) => t.title.startsWith('Topic B')),
+    'Unit 2 contains strictly Topic B items'
+  );
+  assert(
+    isoResult.units[2].topics.every((t) => t.title.startsWith('Topic C')),
+    'Unit 3 contains strictly Topic C items'
+  );
+
+  // 9. Check Local PDFs if present in local developer environment
   const fixturesDir = path.join(__dirname, 'fixtures', 'syllabi');
   const fixturePdfNames = ['os.pdf', 'coa.pdf', 'cse309_obe.pdf', 'ml.pdf'];
   const presentPdfs = fixturePdfNames.filter((name) => fs.existsSync(path.join(fixturesDir, name)));
