@@ -6,6 +6,7 @@ import { Newsreader_500Medium, Newsreader_600SemiBold } from '@expo-google-fonts
 import { DMMono_400Regular, DMMono_500Medium } from '@expo-google-fonts/dm-mono';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from './src/context/AuthContext';
+import { StudySessionProvider } from './src/context/StudySessionContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import { ThemeProvider, useAppTheme } from './src/theme/theme';
 import { DialogProvider } from './src/components/ui/AppDialog';
@@ -21,7 +22,9 @@ const MainApp = () => {
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <DialogProvider>
         <AuthProvider>
-          <AppNavigator />
+          <StudySessionProvider>
+            <AppNavigator />
+          </StudySessionProvider>
         </AuthProvider>
       </DialogProvider>
     </PaperProvider>

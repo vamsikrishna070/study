@@ -456,19 +456,19 @@ const SubjectsScreen = ({ navigation }) => {
 
             <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled">
               <Field label="Subject Name">
-                <Input value={name} onChangeText={setName} placeholder="e.g. Machine Learning" />
+                <Input value={name} onChangeText={setName} placeholder="Enter subject name" />
               </Field>
 
               <View style={styles.gridRow}>
                 <Field label="Subject Code" style={{ flex: 1 }}>
-                  <Input value={code} onChangeText={setCode} placeholder="e.g. CS302" autoCapitalize="characters" />
+                  <Input value={code} onChangeText={setCode} placeholder="Enter subject code" autoCapitalize="characters" />
                 </Field>
                 <Field label="Credits" style={{ width: 100 }}>
                   <Input
                     value={credits}
                     onChangeText={setCredits}
                     keyboardType="numeric"
-                    placeholder="4"
+                    placeholder="Enter credits"
                   />
                 </Field>
               </View>
@@ -482,7 +482,7 @@ const SubjectsScreen = ({ navigation }) => {
                   />
                 </Field>
                 <Field label="Faculty" style={{ flex: 1.4 }}>
-                  <Input value={faculty} onChangeText={setFaculty} placeholder="e.g. Dr. Sharma" />
+                  <Input value={faculty} onChangeText={setFaculty} placeholder="Enter faculty name" />
                 </Field>
               </View>
 
@@ -494,7 +494,7 @@ const SubjectsScreen = ({ navigation }) => {
                 <Input
                   value={description}
                   onChangeText={setDescription}
-                  placeholder="Subject scope, objectives, or exam focus"
+                  placeholder="Add subject description"
                   multiline
                   numberOfLines={2}
                 />

@@ -22,6 +22,14 @@ import SettingsScreen from '../screens/settings/SettingsScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
 import OnboardingScreen from '../screens/auth/OnboardingScreen';
 
+// Study Sessions Feature
+import StartSessionScreen from '../screens/study/StartSessionScreen';
+import FocusSessionScreen from '../screens/study/FocusSessionScreen';
+import EndSessionScreen from '../screens/study/EndSessionScreen';
+import LogSessionScreen from '../screens/study/LogSessionScreen';
+import StudyHistoryScreen from '../screens/study/StudyHistoryScreen';
+import StudyAnalyticsScreen from '../screens/study/StudyAnalyticsScreen';
+
 import Sidebar from '../components/navigation/Sidebar';
 
 const Tab = createBottomTabNavigator();
@@ -83,7 +91,9 @@ const DrawerNavigator = () => {
       }}
     >
       <Drawer.Screen name="HomeDrawer" component={TabNavigator} />
-      
+      <Drawer.Screen name="StudySessions" component={StartSessionScreen} />
+      <Drawer.Screen name="StudyHistory" component={StudyHistoryScreen} />
+      <Drawer.Screen name="StudyAnalytics" component={StudyAnalyticsScreen} />
       <Drawer.Screen name="Syllabus" component={SyllabusScreen} />
       <Drawer.Screen name="Notes" component={NotesScreen} />
       <Drawer.Screen name="Resources" component={ResourcesScreen} />
@@ -109,6 +119,14 @@ const MainNavigator = () => {
       <Stack.Screen name="Tasks" component={TasksScreen} />
       <Stack.Screen name="Exams" component={ExamsScreen} />
       <Stack.Screen name="Notes" component={NotesScreen} />
+      
+      {/* Study Sessions Flow */}
+      <Stack.Screen name="StartSession" component={StartSessionScreen} />
+      <Stack.Screen name="FocusSession" component={FocusSessionScreen} />
+      <Stack.Screen name="EndSession" component={EndSessionScreen} />
+      <Stack.Screen name="LogSession" component={LogSessionScreen} />
+      <Stack.Screen name="StudyHistory" component={StudyHistoryScreen} />
+      <Stack.Screen name="StudyAnalytics" component={StudyAnalyticsScreen} />
     </Stack.Navigator>
   );
 };

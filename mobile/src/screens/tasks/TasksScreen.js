@@ -378,7 +378,7 @@ const TasksScreen = ({ route, navigation }) => {
 
             <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled">
               <Field label="Task Title">
-                <Input value={title} onChangeText={setTitle} placeholder="e.g. Read Chapter 4" />
+                <Input value={title} onChangeText={setTitle} placeholder="What do you need to study?" />
               </Field>
 
               <Field label="Subject">
@@ -386,7 +386,7 @@ const TasksScreen = ({ route, navigation }) => {
                   value={subjectId}
                   onValueChange={setSubjectId}
                   options={subjectOptions}
-                  placeholder="Select subject"
+                  placeholder="Select your subject"
                 />
               </Field>
 
@@ -403,7 +403,7 @@ const TasksScreen = ({ route, navigation }) => {
                     value={duration}
                     onChangeText={setDuration}
                     keyboardType="numeric"
-                    placeholder="45"
+                    placeholder="Enter duration in minutes"
                   />
                 </Field>
               </View>
@@ -456,7 +456,7 @@ const TasksScreen = ({ route, navigation }) => {
                 <Input
                   value={description}
                   onChangeText={setDescription}
-                  placeholder="Add task notes or problem numbers..."
+                  placeholder="Add task details"
                   multiline
                   style={{ minHeight: 80, alignItems: 'flex-start' }}
                   textAlignVertical="top"

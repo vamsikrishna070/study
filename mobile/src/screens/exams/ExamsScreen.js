@@ -364,7 +364,7 @@ const ExamsScreen = ({ route, navigation }) => {
 
             <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled">
               <Field label="Exam Name / Title">
-                <Input value={name} onChangeText={setName} placeholder="e.g. Midterm Examination" />
+                <Input value={name} onChangeText={setName} placeholder="Enter exam name" />
               </Field>
 
               <Field label="Subject">
@@ -372,7 +372,7 @@ const ExamsScreen = ({ route, navigation }) => {
                   value={subjectId}
                   onValueChange={setSubjectId}
                   options={subjectOptions}
-                  placeholder="Select subject"
+                  placeholder="Select your subject"
                 />
               </Field>
 
@@ -432,7 +432,7 @@ const ExamsScreen = ({ route, navigation }) => {
                 <Input
                   value={venue}
                   onChangeText={setVenue}
-                  placeholder="e.g. Hall 4, Room 201"
+                  placeholder="Enter exam venue"
                 />
               </Field>
 
@@ -440,7 +440,7 @@ const ExamsScreen = ({ route, navigation }) => {
                 <Input
                   value={notes}
                   onChangeText={setNotes}
-                  placeholder="e.g. Focus on Units 1-3, formulas permitted"
+                  placeholder="Add preparation notes"
                   multiline
                   style={{ minHeight: 80, alignItems: 'flex-start' }}
                   textAlignVertical="top"

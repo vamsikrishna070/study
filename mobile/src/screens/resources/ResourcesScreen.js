@@ -491,13 +491,13 @@ const ResourcesScreen = ({ route, navigation }) => {
                     value={subjectId}
                     onValueChange={setSubjectId}
                     options={subjectOptions}
-                    placeholder="No subject"
+                    placeholder="Optional"
                   />
                 </Field>
               </View>
 
               <Field label="Title">
-                <Input value={title} onChangeText={setTitle} placeholder="e.g. Dynamic Programming Guide" />
+                <Input value={title} onChangeText={setTitle} placeholder="Enter resource title" />
               </Field>
 
               {/* Conditional Input based on Resource Type */}
@@ -506,7 +506,7 @@ const ResourcesScreen = ({ route, navigation }) => {
                   <Input
                     value={url}
                     onChangeText={setUrl}
-                    placeholder={resourceType === 'youtube' ? 'https://youtube.com/watch?v=...' : 'https://...'}
+                    placeholder="Paste a link"
                     autoCapitalize="none"
                     autoCorrect={false}
                   />
@@ -588,18 +588,18 @@ const ResourcesScreen = ({ route, navigation }) => {
               </View>
 
               <Field label="Topic / Concept (Optional)">
-                <Input value={topic} onChangeText={setTopic} placeholder="e.g. Unit 3: Graph Algorithms" />
+                <Input value={topic} onChangeText={setTopic} placeholder="Enter topic" />
               </Field>
 
               <Field label="Tags (Comma separated)">
-                <Input value={tagsInput} onChangeText={setTagsInput} placeholder="algorithms, dp, cheat-sheet" />
+                <Input value={tagsInput} onChangeText={setTagsInput} placeholder="Add tags" />
               </Field>
 
               <Field label="Description (Optional)">
                 <Input
                   value={description}
                   onChangeText={setDescription}
-                  placeholder="Key takeaways or summary..."
+                  placeholder="Describe this resource"
                   multiline
                   style={{ minHeight: 80, alignItems: 'flex-start' }}
                   textAlignVertical="top"

@@ -13,7 +13,9 @@ import {
   Library,
   Bell,
   TrendingUp,
-  Settings
+  Settings,
+  Timer,
+  History
 } from 'lucide-react-native';
 import { DrawerContentScrollView } from '@react-navigation/drawer';
 import { DrawerActions } from '@react-navigation/native';
@@ -22,12 +24,14 @@ import { typography, spacing, radii, useAppTheme, useStyles } from '../../theme/
 
 const navItems = [
   { href: 'OverviewTab', label: 'Overview', icon: LayoutDashboard },
+  { href: 'StudySessions', label: 'Study Sessions', icon: Timer },
   { href: 'SubjectsTab', label: 'Subjects', icon: BookOpen },
   { href: 'Syllabus', label: 'Syllabus', icon: FileStack },
   { href: 'Notes', label: 'Notes', icon: FileText },
   { href: 'Resources', label: 'Resources', icon: Library },
   { href: 'TasksTab', label: 'Tasks', icon: ListChecks },
   { href: 'ExamsTab', label: 'Exams', icon: CalendarDays },
+  { href: 'StudyHistory', label: 'Study History', icon: History },
   { href: 'Reminders', label: 'Reminders', icon: Bell },
   { href: 'Progress', label: 'Progress', icon: TrendingUp },
 ];

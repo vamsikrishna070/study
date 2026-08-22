@@ -20,18 +20,23 @@ const subjectName = (subject) =>
   typeof subject === "object"
     ? subject?.name || "Unassigned"
     : subject || "Unassigned";
+
+const populateItems = (Model, filter) =>
+  Model.find(filter).populate("subject", "name code color").sort({ createdAt: -1 });
+
 const serialize = (doc) => {
   if (!doc) return doc;
   const value = doc.toObject ? doc.toObject() : doc;
   return {
     ...value,
     id: id(doc),
+    _id: id(doc),
     subjectId:
       value.subject?._id?.toString?.() ||
       value.subject?.toString?.() ||
       value.subjectId,
     subject: subjectName(value.subject),
-    duration: value.estimatedDuration,
+    duration: value.durationMinutes ?? value.estimatedDuration ?? 0,
     addedAt: value.createdAt,
     updatedAt: value.updatedAt,
   };
@@ -219,8 +224,6 @@ export async function deleteNote(req, res) {
   res.status(204).end();
 }
 
-const populateItems = (Model, filter) =>
-  Model.find(filter).populate("subject", "name").sort({ createdAt: -1 });
 export async function getTasks(req, res) {
   const items = await populateItems(Task, { user: req.user._id });
   res.json({ success: true, data: items.map(serialize) });
@@ -626,22 +629,140 @@ export async function deleteRecording(req, res) {
 }
 
 export async function getStudySessions(req, res) {
-  const items = await populateItems(StudySession, { user: req.user._id });
-  res.json({ success: true, data: items.map(serialize) });
-}
-export async function createStudySession(req, res) {
-  if (!required(req.body, ["startedAt"]))
-    return res
-      .status(400)
-      .json({ success: false, message: "Start time is required" });
-  const item = await StudySession.create({
-    ...req.body,
-    subject: req.body.subjectId || null,
-    user: req.user._id,
+  const filter = { user: req.user._id };
+  if (req.query.subjectId) filter.subject = req.query.subjectId;
+  if (req.query.sessionType) filter.sessionType = req.query.sessionType;
+
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 50));
+  const skip = (page - 1) * limit;
+
+  const [items, total] = await Promise.all([
+    StudySession.find(filter)
+      .populate("subject", "name code color")
+      .populate("task", "title")
+      .populate("exam", "name")
+      .sort({ startedAt: -1, createdAt: -1 })
+      .skip(skip)
+      .limit(limit),
+    StudySession.countDocuments(filter),
+  ]);
+
+  res.json({
+    success: true,
+    data: items.map(serialize),
+    pagination: {
+      total,
+      page,
+      limit,
+      pages: Math.ceil(total / limit) || 1,
+    },
   });
-  await item.populate("subject", "name");
+}
+
+export async function createStudySession(req, res) {
+  const {
+    subjectId,
+    subjectName: customSubjectName,
+    topic,
+    taskId,
+    examId,
+    sessionType = 'timer',
+    status = 'completed',
+    startedAt = new Date(),
+    endedAt,
+    pausedAt,
+    totalPausedMs = 0,
+    durationMinutes,
+    productivity,
+    goal,
+    notes,
+  } = req.body;
+
+  let computedDuration = Number(durationMinutes) || 0;
+  if (!computedDuration && startedAt && endedAt) {
+    const elapsedMs = new Date(endedAt) - new Date(startedAt) - (Number(totalPausedMs) || 0);
+    computedDuration = Math.max(1, Math.round(elapsedMs / 60000));
+  }
+
+  let finalSubjectName = customSubjectName || '';
+  if (subjectId && !finalSubjectName) {
+    const sub = await Subject.findOne({ _id: subjectId, user: req.user._id });
+    if (sub) finalSubjectName = sub.name;
+  }
+
+  const item = await StudySession.create({
+    user: req.user._id,
+    subject: subjectId || null,
+    subjectName: finalSubjectName,
+    topic: (topic || '').trim(),
+    task: taskId || null,
+    exam: examId || null,
+    sessionType,
+    status,
+    startedAt: new Date(startedAt),
+    endedAt: endedAt ? new Date(endedAt) : (status === 'completed' ? new Date() : null),
+    pausedAt: pausedAt ? new Date(pausedAt) : null,
+    totalPausedMs: Number(totalPausedMs) || 0,
+    durationMinutes: computedDuration,
+    productivity: productivity || null,
+    goal: (goal || '').trim(),
+    notes: (notes || '').trim(),
+  });
+
+  await item.populate([
+    { path: 'subject', select: 'name code color' },
+    { path: 'task', select: 'title' },
+    { path: 'exam', select: 'name' },
+  ]);
+
   res.status(201).json({ success: true, data: serialize(item) });
 }
+
+export async function updateStudySession(req, res) {
+  const item = await owned(StudySession, req.user._id, req.params.id);
+  if (!item) {
+    return res.status(404).json({ success: false, message: 'Study Session not found' });
+  }
+
+  const {
+    status,
+    endedAt,
+    pausedAt,
+    totalPausedMs,
+    durationMinutes,
+    productivity,
+    notes,
+    goal,
+    topic,
+  } = req.body;
+
+  if (status !== undefined) item.status = status;
+  if (endedAt !== undefined) item.endedAt = endedAt ? new Date(endedAt) : null;
+  if (pausedAt !== undefined) item.pausedAt = pausedAt ? new Date(pausedAt) : null;
+  if (totalPausedMs !== undefined) item.totalPausedMs = Number(totalPausedMs) || 0;
+  if (productivity !== undefined) item.productivity = productivity;
+  if (notes !== undefined) item.notes = notes.trim();
+  if (goal !== undefined) item.goal = goal.trim();
+  if (topic !== undefined) item.topic = topic.trim();
+
+  if (durationMinutes !== undefined) {
+    item.durationMinutes = Number(durationMinutes) || 0;
+  } else if (item.status === 'completed' && item.startedAt && item.endedAt) {
+    const elapsedMs = new Date(item.endedAt) - new Date(item.startedAt) - (item.totalPausedMs || 0);
+    item.durationMinutes = Math.max(1, Math.round(elapsedMs / 60000));
+  }
+
+  await item.save();
+  await item.populate([
+    { path: 'subject', select: 'name code color' },
+    { path: 'task', select: 'title' },
+    { path: 'exam', select: 'name' },
+  ]);
+
+  res.json({ success: true, data: serialize(item) });
+}
+
 export async function deleteStudySession(req, res) {
   const item = await owned(StudySession, req.user._id, req.params.id);
   if (!item)
@@ -650,6 +771,157 @@ export async function deleteStudySession(req, res) {
       .json({ success: false, message: "Study Session not found" });
   await item.deleteOne();
   res.status(204).end();
+}
+
+function formatDuration(minutes) {
+  if (!minutes || minutes <= 0) return '0m';
+  const hrs = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (hrs > 0 && mins > 0) return `${hrs}h ${mins}m`;
+  if (hrs > 0) return `${hrs}h`;
+  return `${mins}m`;
+}
+
+export async function getStudyStats(req, res) {
+  const userId = req.user._id;
+  const now = new Date();
+  const today = dayStart(now);
+  const startOfWeek = new Date(today);
+  startOfWeek.setDate(today.getDate() - 6);
+  const startOfMonth = new Date(today);
+  startOfMonth.setDate(today.getDate() - 29);
+
+  const allSessions = await StudySession.find({
+    user: userId,
+    status: { $ne: 'cancelled' },
+  })
+    .populate('subject', 'name code color')
+    .sort({ startedAt: -1 })
+    .lean();
+
+  let todayMinutes = 0;
+  let todayCount = 0;
+  let weekMinutes = 0;
+  let weekCount = 0;
+  let monthMinutes = 0;
+  let monthCount = 0;
+  let totalMinutes = 0;
+
+  const subjectMap = {};
+  const dailyBreakdownMap = {};
+
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    const key = d.toISOString().split('T')[0];
+    const dayLabel = new Intl.DateTimeFormat('en-US', { weekday: 'short' }).format(d);
+    dailyBreakdownMap[key] = { date: key, day: dayLabel, minutes: 0, hours: 0 };
+  }
+
+  allSessions.forEach((s) => {
+    const dur = s.durationMinutes || 0;
+    const sDate = s.startedAt ? new Date(s.startedAt) : new Date();
+    const sDayStart = dayStart(sDate);
+    const dateKey = sDate.toISOString().split('T')[0];
+
+    totalMinutes += dur;
+
+    if (sDayStart.getTime() === today.getTime()) {
+      todayMinutes += dur;
+      todayCount += 1;
+    }
+
+    if (sDayStart >= startOfWeek) {
+      weekMinutes += dur;
+      weekCount += 1;
+    }
+
+    if (sDayStart >= startOfMonth) {
+      monthMinutes += dur;
+      monthCount += 1;
+    }
+
+    if (dailyBreakdownMap[dateKey]) {
+      dailyBreakdownMap[dateKey].minutes += dur;
+      dailyBreakdownMap[dateKey].hours = Math.round((dailyBreakdownMap[dateKey].minutes / 60) * 10) / 10;
+    }
+
+    const subName = s.subject?.name || s.subjectName || 'General Study';
+    const subColor = s.subject?.color || '#3b82f6';
+    if (!subjectMap[subName]) {
+      subjectMap[subName] = { name: subName, color: subColor, minutes: 0, sessions: 0 };
+    }
+    subjectMap[subName].minutes += dur;
+    subjectMap[subName].sessions += 1;
+  });
+
+  let streak = 0;
+  let checkDate = today;
+  const distinctDays = [...new Set(allSessions.map(s => dayStart(s.startedAt).getTime()))].sort((a, b) => b - a);
+
+  if (distinctDays.includes(today.getTime())) {
+    streak = 1;
+    checkDate = new Date(today.getTime() - 86400000);
+    while (distinctDays.includes(checkDate.getTime())) {
+      streak += 1;
+      checkDate = new Date(checkDate.getTime() - 86400000);
+    }
+  } else if (distinctDays.includes(today.getTime() - 86400000)) {
+    streak = 1;
+    checkDate = new Date(today.getTime() - 2 * 86400000);
+    while (distinctDays.includes(checkDate.getTime())) {
+      streak += 1;
+      checkDate = new Date(checkDate.getTime() - 86400000);
+    }
+  }
+
+  const subjectDistribution = Object.values(subjectMap)
+    .map((sub) => ({
+      ...sub,
+      hours: Math.round((sub.minutes / 60) * 10) / 10,
+      percentage: totalMinutes > 0 ? Math.round((sub.minutes / totalMinutes) * 100) : 0,
+    }))
+    .sort((a, b) => b.minutes - a.minutes);
+
+  const topSubject = subjectDistribution[0] || null;
+  const avgSessionDuration = allSessions.length > 0 ? Math.round(totalMinutes / allSessions.length) : 0;
+
+  res.json({
+    success: true,
+    data: {
+      today: {
+        minutes: todayMinutes,
+        hours: Math.round((todayMinutes / 60) * 10) / 10,
+        formatted: formatDuration(todayMinutes),
+        sessionsCount: todayCount,
+      },
+      thisWeek: {
+        minutes: weekMinutes,
+        hours: Math.round((weekMinutes / 60) * 10) / 10,
+        formatted: formatDuration(weekMinutes),
+        sessionsCount: weekCount,
+      },
+      thisMonth: {
+        minutes: monthMinutes,
+        hours: Math.round((monthMinutes / 60) * 10) / 10,
+        formatted: formatDuration(monthMinutes),
+        sessionsCount: monthCount,
+      },
+      total: {
+        minutes: totalMinutes,
+        hours: Math.round((totalMinutes / 60) * 10) / 10,
+        formatted: formatDuration(totalMinutes),
+        sessionsCount: allSessions.length,
+      },
+      streak,
+      averageDurationMinutes: avgSessionDuration,
+      averageDurationFormatted: formatDuration(avgSessionDuration),
+      topSubject,
+      subjectDistribution,
+      weeklyChart: Object.values(dailyBreakdownMap),
+      recentSessions: allSessions.slice(0, 5).map(serialize),
+    },
+  });
 }
 
 export async function getNotifications(req, res) {

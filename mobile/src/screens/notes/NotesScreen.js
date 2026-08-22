@@ -433,7 +433,7 @@ const NotesScreen = ({ route, navigation }) => {
 
             <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled">
               <Field label="Note Title">
-                <Input value={title} onChangeText={setTitle} placeholder="e.g. Quicksort Algorithm" />
+                <Input value={title} onChangeText={setTitle} placeholder="Enter note title" />
               </Field>
 
               <View style={styles.gridRow}>
@@ -442,7 +442,7 @@ const NotesScreen = ({ route, navigation }) => {
                     value={subjectId}
                     onValueChange={setSubjectId}
                     options={subjectOptions}
-                    placeholder="Select a subject"
+                    placeholder="Select your subject"
                   />
                 </Field>
                 <Field label="Priority" style={{ width: 140 }}>
@@ -458,7 +458,7 @@ const NotesScreen = ({ route, navigation }) => {
                 <Input
                   value={topic}
                   onChangeText={setTopic}
-                  placeholder="e.g. Unit 2: Sorting"
+                  placeholder="Enter topic"
                 />
               </Field>
 
@@ -466,7 +466,7 @@ const NotesScreen = ({ route, navigation }) => {
                 <Input
                   value={tagsInput}
                   onChangeText={setTagsInput}
-                  placeholder="algorithms, exams, formulas"
+                  placeholder="Add tags"
                 />
               </Field>
 
@@ -474,7 +474,7 @@ const NotesScreen = ({ route, navigation }) => {
                 <Input
                   value={content}
                   onChangeText={setContent}
-                  placeholder="Write your note content here..."
+                  placeholder="Write your notes..."
                   multiline
                   style={{ minHeight: 140, alignItems: 'flex-start' }}
                   textAlignVertical="top"
