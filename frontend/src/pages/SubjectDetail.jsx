@@ -445,7 +445,7 @@ export default function SubjectDetail() {
               {subject.syllabusFile?.url && (
                 <DocumentPreviewCard
                   file={subject.syllabusFile}
-                  title="Syllabus PDF"
+                  title="Syllabus Document"
                   unitCount={units.length}
                   topicCount={totalTopics}
                   isExtracting={extracting}

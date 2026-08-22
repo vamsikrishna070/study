@@ -3,6 +3,10 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import {
   parsePdfBufferToText,
+  parseTxtBufferToText,
+  parseDocxBufferToText,
+  detectDocumentType,
+  parseDocumentBufferToText,
   extractSyllabusStructure,
   parseUnitNumber,
   romanToArabic,
@@ -13,6 +17,7 @@ import {
   splitCompositeTopic,
   cleanTopicTitle,
 } from '../services/syllabusExtractorService.js';
+import { buildSyntheticDocx } from './test_docx_builder.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -92,7 +97,97 @@ async function runTests() {
   assert(subNumTopics[0] === 'Process Concepts', `Subtopic 1: "${subNumTopics[0]}"`);
   assert(subNumTopics[3] === 'Inter-process Communication', `Subtopic 4: "${subNumTopics[3]}"`);
 
-  // 7. Structural Text Extraction Regression: Alphanumeric Course Codes (VTU / KTU style)
+  // 7. Document Format Detection Tests
+  const pdfHeaderBuf = Buffer.from('%PDF-1.4\n%...\n', 'utf8');
+  assert(detectDocumentType(pdfHeaderBuf, 'syllabus.pdf', 'application/pdf') === 'pdf', 'Format detector: PDF detected via magic bytes & extension');
+
+  const txtBuf = Buffer.from('UNIT 1\nIntroduction to Operating Systems\n', 'utf8');
+  assert(detectDocumentType(txtBuf, 'syllabus.txt', 'text/plain') === 'txt', 'Format detector: TXT detected via extension & UTF-8 buffer');
+
+  const docxFakeZipBuf = Buffer.from([0x50, 0x4B, 0x03, 0x04, 0x14, 0x00]);
+  assert(detectDocumentType(docxFakeZipBuf, 'syllabus.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') === 'docx', 'Format detector: DOCX detected via PK zip magic bytes');
+
+  const imageBuf = Buffer.from([0xFF, 0xD8, 0xFF, 0xE0]);
+  assert(detectDocumentType(imageBuf, 'photo.jpg', 'image/jpeg') === 'unsupported', 'Format detector: Rejected image/jpeg file');
+
+  const mp3Buf = Buffer.from([0x49, 0x44, 0x33]);
+  assert(detectDocumentType(mp3Buf, 'audio.mp3', 'audio/mpeg') === 'unsupported', 'Format detector: Rejected audio/mp3 file');
+
+  // 8. Plain Text (.txt) Parser Tests (BOM handling, CRLF normalization)
+  const txtWithUtf8Bom = Buffer.concat([Buffer.from([0xEF, 0xBB, 0xBF]), Buffer.from('Course Code: CS-101\r\nUNIT 1\r\nTopic A\r\n', 'utf8')]);
+  const parsedBomText = parseTxtBufferToText(txtWithUtf8Bom);
+  assert(!parsedBomText.startsWith('\uFEFF'), 'TXT parser: UTF-8 BOM cleanly stripped');
+  assert(!parsedBomText.includes('\r'), 'TXT parser: Windows CRLF normalized to Unix LF');
+
+  const sampleTxtSyllabus = `
+Course Title: Computer Organization and Architecture
+Subject Code: CS-201
+
+UNIT I: DIGITAL LOGIC AND REGISTER TRANSFER
+- Digital Logic Circuits: Logic gates, Boolean algebra, Map simplification
+- Combinational Circuits: Adders, Subtractors, Multiplexers, Decoders
+- Register Transfer Language: Register transfer, Bus and memory transfers
+- Arithmetic Microoperations: Binary adder, Binary subtractor
+
+UNIT II: BASIC COMPUTER ORGANIZATION
+1. Instruction Codes: Computer registers, Computer instructions, Timing and control
+2. Instruction Cycle: Memory reference instructions, Input-Output and interrupt
+3. Complete Computer Description and Design of basic computer
+
+UNIT III: CENTRAL PROCESSING UNIT
+- General Register Organization: Stack organization, Instruction formats
+- Addressing Modes: Data transfer and manipulation, Program control
+- RISC and CISC Architecture characteristics
+
+UNIT IV: PIPELINE AND VECTOR PROCESSING
+- Parallel Processing: Pipelining, Arithmetic pipeline, Instruction pipeline
+- Vector Processing: Array processors
+
+UNIT V: MEMORY AND INPUT-OUTPUT ORGANIZATION
+- Memory Hierarchy: Main memory, Auxiliary memory, Associative memory
+- Cache Memory: Mapping functions, Virtual memory, Memory management hardware
+- Input-Output Interface: Asynchronous data transfer, Modes of transfer, DMA
+
+Text Books:
+1. M. Morris Mano, Computer System Architecture, 3rd Edition, Pearson.
+`;
+
+  const txtExtractionResult = extractSyllabusStructure(sampleTxtSyllabus);
+  assert(txtExtractionResult.courseName === 'Computer Organization and Architecture', `TXT Course Name: "${txtExtractionResult.courseName}"`);
+  assert(txtExtractionResult.courseCode === 'CS-201', `TXT Course Code: "${txtExtractionResult.courseCode}"`);
+  assert(txtExtractionResult.units.length === 5, `TXT Units extracted: ${txtExtractionResult.units.length} (Expected: 5)`);
+  assert(txtExtractionResult.units[0].topics.some(t => t.title.includes('Boolean algebra')), 'TXT Unit 1 extracted bulleted subtopic');
+  assert(txtExtractionResult.units[1].topics.some(t => t.title.includes('Instruction Cycle')), 'TXT Unit 2 extracted numbered subtopic');
+
+  // 9. Word (.docx) Parser Tests (Headings, Paragraphs, and Tables)
+  const syntheticDocxBuffer = buildSyntheticDocx([
+    'Course Title: Operating Systems',
+    'Subject Code: CSE 302',
+    {
+      table: [
+        ['Unit No.', 'Unit Title', 'Topic 1', 'Topic 2'],
+        ['UNIT 1', 'Introduction', 'Overview of OS', 'System Calls'],
+        ['UNIT 2', 'Process Management', 'Process Scheduling', 'Inter-process Communication'],
+        ['UNIT 3', 'Process Synchronization', 'Critical Section', 'Semaphores'],
+        ['UNIT 4', 'Storage Management', 'Virtual Memory', 'Paging'],
+        ['UNIT 5', 'File Systems', 'Directory Structure', 'Disk Allocation']
+      ]
+    },
+    'Text Books:',
+    '1. Silberschatz, Galvin, Operating System Concepts, 9th Edition.'
+  ]);
+
+  const docxParsedText = await parseDocxBufferToText(syntheticDocxBuffer);
+  assert(docxParsedText.length > 50, 'DOCX parser: Extracted text from Word document');
+  const docxExtractionResult = extractSyllabusStructure(docxParsedText);
+  assert(docxExtractionResult.courseName === 'Operating Systems', `DOCX Course Name: "${docxExtractionResult.courseName}"`);
+  assert(docxExtractionResult.courseCode === 'CSE 302', `DOCX Course Code: "${docxExtractionResult.courseCode}"`);
+  assert(docxExtractionResult.units.length === 5, `DOCX Units extracted: ${docxExtractionResult.units.length} (Expected: 5)`);
+  assert(docxExtractionResult.units[0].unitName === 'Introduction', `DOCX Unit 1 Name: "${docxExtractionResult.units[0].unitName}"`);
+  assert(docxExtractionResult.units[0].topics.some(t => t.title === 'Overview of OS'), 'DOCX Unit 1 extracted table topic "Overview of OS"');
+  assert(docxExtractionResult.units[1].topics.some(t => t.title === 'Inter-process Communication'), 'DOCX Unit 2 extracted table topic "Inter-process Communication"');
+
+  // 10. Structural Text Extraction Regression: Alphanumeric Course Codes (VTU style)
   const vtuSyllabusText = `
 VISVESVARAYA TECHNOLOGICAL UNIVERSITY, BELAGAVI
 Course Code : 20CS41T
@@ -138,7 +233,7 @@ Text Books:
     'Module 4 preserved parenthesized comma in Contiguous Memory Allocation'
   );
 
-  // 8. Word-Based Unit Headers Test (Anna University / Traditional College format)
+  // 11. Word-Based Unit Headers Test (Anna University style)
   const wordHeaderSyllabus = `
 ANNA UNIVERSITY, CHENNAI
 CS8492 - DATABASE MANAGEMENT SYSTEMS
@@ -168,7 +263,7 @@ REFERENCES:
   assert(annaResult.units[0].unitNumber === 1, 'FIRST UNIT mapped to unitNumber 1');
   assert(annaResult.units[4].unitNumber === 5, 'FIFTH UNIT mapped to unitNumber 5');
 
-  // 9. Structural Text Extraction Regression (Operating Systems)
+  // 12. Structural Text Extraction Regression (Operating Systems)
   const sampleOsText = `
 SRM University AP, Andhra Pradesh
 Operating Systems
@@ -239,7 +334,7 @@ Course Utilization Plan – Lab
     'OS Lab experiments excluded from theory units'
   );
 
-  // 10. Structural Text Extraction Regression (Advanced Java from CSE309_OBE content)
+  // 13. Structural Text Extraction Regression (Advanced Java from CSE309_OBE content)
   const sampleJavaText = `
 SRM University AP, Andhra Pradesh
 Advanced JAVA Programming
@@ -323,7 +418,7 @@ Bloom’s Level of Cognitive Task
     `Unit 3 OCR Typo fixed in Unit Name: "${javaResult.units[2].unitName}"`
   );
 
-  // 11. Structural Text Extraction Regression: Standard University Paragraph & Semicolon Syllabus (JNTU)
+  // 14. Structural Text Extraction Regression: Standard University Paragraph & Semicolon Syllabus (JNTU)
   const standardJntuSyllabus = `
 JAWAHARLAL NEHRU TECHNOLOGICAL UNIVERSITY HYDERABAD
 B.Tech. in COMPUTER SCIENCE AND ENGINEERING
@@ -376,7 +471,7 @@ REFERENCES:
     'JNTU Textbooks excluded from topics'
   );
 
-  // 12. Structural Text Extraction Regression: Bulleted & Numbered Module Syllabus with Multi-line Headers
+  // 15. Structural Text Extraction Regression: Bulleted & Numbered Module Syllabus with Multi-line Headers
   const bulletedSyllabus = `
 NATIONAL INSTITUTE OF TECHNOLOGY
 DEPARTMENT OF COMPUTER SCIENCE
@@ -429,7 +524,7 @@ CO2: Design subnets and analyze routing.
     'Course outcomes excluded from topics'
   );
 
-  // 13. Unit-Topic Association & Strict Isolation Test
+  // 16. Unit-Topic Association & Strict Isolation Test
   const isolationTestText = `
 UNIT I: Foundations
 Topic A1
@@ -458,7 +553,7 @@ Topic C2
     'Unit 3 contains strictly Topic C items'
   );
 
-  // 14. Check Local PDFs if present
+  // 17. Check Local PDFs if present
   const fixturesDir = path.join(__dirname, 'fixtures', 'syllabi');
   const fixturePdfNames = ['os.pdf', 'coa.pdf', 'cse309_obe.pdf', 'ml.pdf'];
   const presentPdfs = fixturePdfNames.filter((name) => fs.existsSync(path.join(fixturesDir, name)));

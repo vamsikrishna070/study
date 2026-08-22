@@ -87,20 +87,31 @@ export default function Syllabus() {
   const currentSubject = allSubjects.find((s) => (s._id || s.id) === subjectId);
   const subjectColor = currentSubject?.color || 'var(--accent, #d97706)';
 
-  // Handle PDF file selection from native file picker
+  // Handle PDF, DOCX, or TXT file selection from native file picker
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     // Reset file input value so same file can be picked again
     e.target.value = '';
 
-    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
-      alert('Please select a valid PDF syllabus document.');
+    const validExtensions = ['.pdf', '.docx', '.txt'];
+    const validMimes = [
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/docx',
+      'text/plain',
+    ];
+    const fileExt = file.name.includes('.')
+      ? file.name.substring(file.name.lastIndexOf('.')).toLowerCase()
+      : '';
+
+    if (!validExtensions.includes(fileExt) && !validMimes.includes(file.type)) {
+      alert('Please upload a PDF, TXT, or DOCX syllabus file.');
       return;
     }
 
     if (file.size > 25 * 1024 * 1024) {
-      alert('The syllabus PDF must be smaller than 25 MB.');
+      alert('The syllabus file must be smaller than 25 MB.');
       return;
     }
 
@@ -112,7 +123,7 @@ export default function Syllabus() {
     try {
       setUploadingPdf(true);
       setExtractionError(null);
-      setExtractionStep('Uploading syllabus PDF...');
+      setExtractionStep('Uploading syllabus...');
 
       // 1. Upload file to backend
       const uploaded = await uploadFile(file);
@@ -121,19 +132,19 @@ export default function Syllabus() {
       }
 
       // 2. Save syllabusFile on subject
-      setExtractionStep('Attaching to subject...');
+      setExtractionStep('Reading document...');
       await apiClient.patch(`/subjects/${subjectId}`, {
         syllabusFile: {
           url: uploaded.url,
           publicId: uploaded.publicId || '',
           originalName: uploaded.originalName || file.name,
-          mimeType: uploaded.mimeType || 'application/pdf',
+          mimeType: uploaded.mimeType || (fileExt === '.docx' ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : fileExt === '.txt' ? 'text/plain' : 'application/pdf'),
           size: uploaded.size || file.size,
         },
       });
 
       // 3. Extract syllabus structure using backend extractor
-      setExtractionStep('Extracting units & topics from syllabus...');
+      setExtractionStep('Extracting units & topics...');
       setExtracting(true);
       
       const res = await apiClient.post(`/subjects/${subjectId}/syllabus/extract`);
@@ -143,12 +154,12 @@ export default function Syllabus() {
         setParsedUnits(extracted);
         setReviewVisible(true);
       } else {
-        alert('Syllabus PDF was uploaded successfully. Text extraction could not automatically detect structured units, but your document is safely attached.');
+        alert('Syllabus was uploaded successfully. Text extraction could not automatically detect structured units, but your document is safely attached.');
       }
 
       loadData(subjectId);
     } catch (err) {
-      const msg = err.response?.data?.message || err.message || 'Could not extract the syllabus. Please make sure the PDF contains readable syllabus text.';
+      const msg = err.response?.data?.message || err.message || 'Could not extract the syllabus. Please make sure the file contains readable syllabus text.';
       setExtractionError(msg);
       alert(msg);
     } finally {
@@ -245,7 +256,7 @@ export default function Syllabus() {
       <input
         type="file"
         ref={fileInputRef}
-        accept=".pdf,application/pdf"
+        accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/docx,text/plain"
         className="hidden"
         onChange={handleFileChange}
       />
@@ -256,7 +267,7 @@ export default function Syllabus() {
         detail={
           currentSubject
             ? `Tracking curriculum & topics for ${currentSubject.name}`
-            : 'Select a subject and upload a PDF syllabus.'
+            : 'Select a subject and upload a syllabus (PDF, DOCX, or TXT).'
         }
         action={
           subjectId && (
@@ -271,7 +282,7 @@ export default function Syllabus() {
                 <Sparkles size={16} />
               )}
               <span>
-                {uploadingPdf ? 'Uploading…' : extracting ? 'Extracting…' : 'Upload PDF'}
+                {uploadingPdf ? 'Uploading…' : extracting ? 'Extracting…' : 'Upload Syllabus'}
               </span>
             </Button>
           )
@@ -338,7 +349,7 @@ export default function Syllabus() {
             <div className="flex items-center gap-3 rounded-2xl border border-primary/25 bg-primary/10 p-5 text-sm font-semibold text-primary animate-pulse">
               <Loader2 size={20} className="animate-spin shrink-0" />
               <div>
-                <p className="font-bold">{extractionStep || 'Processing syllabus PDF…'}</p>
+                <p className="font-bold">{extractionStep || 'Processing syllabus document…'}</p>
                 <p className="text-xs font-normal opacity-85 mt-0.5">
                   Our universal syllabus parser is structuring your course curriculum into units & topics.
                 </p>
@@ -350,7 +361,7 @@ export default function Syllabus() {
           {currentSubject?.syllabusFile?.url ? (
             <DocumentPreviewCard
               file={currentSubject.syllabusFile}
-              title="Syllabus PDF"
+              title="Syllabus Document"
               unitCount={units.length}
               topicCount={totalTopics}
               isExtracting={extracting}
@@ -373,14 +384,19 @@ export default function Syllabus() {
               </div>
               <h3 className="font-display text-lg font-bold text-foreground">Attach Syllabus Document</h3>
               <p className="mt-1 text-xs text-muted-foreground max-w-sm mx-auto">
-                Upload your course PDF to automatically extract units and topics into your study plan
+                Upload your course PDF, DOCX, or TXT to automatically extract units and topics into your study plan
               </p>
+              <div className="mt-3">
+                <span className="text-[11px] font-medium text-muted-foreground bg-secondary/80 px-2.5 py-1 rounded-md">
+                  Supported formats: PDF • DOCX • TXT
+                </span>
+              </div>
               <div className="mt-4">
                 <span 
                   className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold text-white shadow-sm"
                   style={{ backgroundColor: subjectColor }}
                 >
-                  <Upload size={14} /> Choose PDF File
+                  <Upload size={14} /> Choose File
                 </span>
               </div>
             </div>

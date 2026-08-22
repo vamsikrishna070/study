@@ -3,6 +3,9 @@ import Unit from '../models/Unit.js';
 import Topic from '../models/Topic.js';
 import {
   parsePdfBufferToText,
+  parseTxtBufferToText,
+  parseDocxBufferToText,
+  detectDocumentType,
   extractSyllabusStructure,
 } from '../services/syllabusExtractorService.js';
 
@@ -14,7 +17,7 @@ class HttpError extends Error {
 }
 
 /**
- * @desc Extract syllabus units & topics from uploaded syllabus PDF
+ * @desc Extract syllabus units & topics from uploaded syllabus PDF, TXT, or DOCX document
  * @route POST /api/syllabus/:id/extract
  * @access Private
  */
@@ -37,7 +40,7 @@ export async function extractSyllabus(req, res) {
     if (!syllabusFile.url) {
       return res.status(400).json({
         success: false,
-        message: 'Syllabus PDF has not been uploaded for this subject.',
+        message: 'Syllabus document has not been uploaded for this subject.',
       });
     }
 
@@ -45,17 +48,17 @@ export async function extractSyllabus(req, res) {
     try {
       response = await fetch(syllabusFile.url);
     } catch (error) {
-      console.error('[SyllabusExtract] PDF fetch request failed', {
+      console.error('[SyllabusExtract] Document fetch request failed', {
         subjectId,
         message: error.message,
       });
-      throw new HttpError(502, 'Could not download syllabus PDF from storage.');
+      throw new HttpError(502, 'Could not download syllabus document from storage.');
     }
 
     if (!response.ok) {
       throw new HttpError(
         502,
-        `Could not download syllabus PDF from storage (${response.status} ${response.statusText}).`
+        `Could not download syllabus document from storage (${response.status} ${response.statusText}).`
       );
     }
 
@@ -63,30 +66,42 @@ export async function extractSyllabus(req, res) {
     const buffer = Buffer.from(arrayBuffer);
 
     if (!buffer.length) {
-      throw new HttpError(502, 'Downloaded syllabus PDF is empty.');
+      throw new HttpError(502, 'Downloaded syllabus document is empty.');
     }
 
-    // Verify PDF signature (%PDF-)
-    const signature = buffer.subarray(0, 4).toString('utf8');
-    if (signature !== '%PDF') {
-      throw new HttpError(400, 'Uploaded file is not a valid PDF.');
+    const docType = detectDocumentType(buffer, syllabusFile.originalName, syllabusFile.mimeType);
+    if (docType === 'unsupported') {
+      throw new HttpError(400, 'Please upload a PDF, TXT, or DOCX syllabus file.');
     }
 
     let text = '';
     try {
-      text = await parsePdfBufferToText(buffer);
+      if (docType === 'pdf') {
+        text = await parsePdfBufferToText(buffer);
+      } else if (docType === 'docx') {
+        text = await parseDocxBufferToText(buffer);
+      } else if (docType === 'txt') {
+        text = parseTxtBufferToText(buffer);
+      }
     } catch (error) {
-      console.error('[SyllabusExtract] PDF text parsing failed', {
+      console.error('[SyllabusExtract] Document text parsing failed', {
         subjectId,
+        docType,
         message: error.message,
       });
-      throw new HttpError(500, 'Unexpected PDF parsing error.');
+      if (docType === 'docx') {
+        throw new HttpError(422, 'Could not read the DOCX syllabus.');
+      } else if (docType === 'txt') {
+        throw new HttpError(422, 'Could not read the TXT syllabus.');
+      } else {
+        throw new HttpError(422, 'Could not extract readable text from PDF.');
+      }
     }
 
-    if (!text || text.trim().length < 30) {
+    if (!text || text.trim().length < 20) {
       return res.status(422).json({
         success: false,
-        message: 'Could not extract readable text from PDF.',
+        message: 'Could not extract readable syllabus content from this file.',
       });
     }
 
@@ -96,7 +111,7 @@ export async function extractSyllabus(req, res) {
     if (!units || units.length === 0) {
       return res.status(422).json({
         success: false,
-        message: 'Could not detect theory syllabus structure from this PDF.',
+        message: 'Could not detect theory syllabus structure from this document.',
       });
     }
 
@@ -114,6 +129,7 @@ export async function extractSyllabus(req, res) {
 
     console.info('[SyllabusExtract] Completed', {
       subjectId,
+      docType,
       courseName,
       courseCode,
       unitCount: formattedUnits.length,

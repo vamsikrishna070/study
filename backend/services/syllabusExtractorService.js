@@ -19,6 +19,13 @@ try {
   console.error('[SyllabusExtractor] Failed to load pdf-parse module:', error.message);
 }
 
+let mammothModule;
+try {
+  mammothModule = require('mammoth');
+} catch (error) {
+  console.error('[SyllabusExtractor] Failed to load mammoth module:', error.message);
+}
+
 /**
  * Parses raw text from PDF buffer using the appropriate pdf-parse instance
  */
@@ -41,6 +48,201 @@ export async function parsePdfBufferToText(buffer) {
   }
 
   throw new Error('No compatible PDF parser available.');
+}
+
+/**
+ * Parses raw text from plain text (.txt) buffer, handling UTF-8/UTF-16 BOMs and CRLF normalization
+ */
+export function parseTxtBufferToText(buffer) {
+  if (!buffer) return '';
+  let str = '';
+  if (Buffer.isBuffer(buffer)) {
+    // UTF-8 BOM: 0xEF, 0xBB, 0xBF
+    if (buffer.length >= 3 && buffer[0] === 0xEF && buffer[1] === 0xBB && buffer[2] === 0xBF) {
+      str = buffer.subarray(3).toString('utf8');
+    } else if (buffer.length >= 2 && buffer[0] === 0xFE && buffer[1] === 0xFF) {
+      // UTF-16 BE BOM
+      str = buffer.subarray(2).toString('utf16be');
+    } else if (buffer.length >= 2 && buffer[0] === 0xFF && buffer[1] === 0xFE) {
+      // UTF-16 LE BOM
+      str = buffer.subarray(2).toString('utf16le');
+    } else {
+      str = buffer.toString('utf8');
+    }
+  } else if (typeof buffer === 'string') {
+    str = buffer;
+  }
+
+  // Strip BOM char if still present
+  if (str.charCodeAt(0) === 0xFEFF) {
+    str = str.slice(1);
+  }
+
+  // Normalize Windows CRLF and Mac CR to LF, tabs to spaces, remove null bytes
+  return str
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .replace(/\t/g, ' ')
+    .replace(/\u0000/g, '')
+    .trim();
+}
+
+const TABLE_HEADER_REGEX_DOCX = /^(?:Unit\s*No\.?|Unit\s*Number|Unit\s*Name|Module\s*No\.?|Chapter\s*No\.?|Required|Contact\s*Hours?|CLOs?|Addressed|References?|Used|Referen\s*cesUsed|Experiment\s*Name|Exp\.?\s*No\.?|sl\.?\s*no\.?|s\.?\s*no\.?)$/i;
+const UNIT_START_REGEX_DOCX = /^(?:UNIT|MODULE|CHAPTER|SECTION|PART|BLOCK)\s*[:.\-–—]?\s*(?:[0-9IVXLCDM]+|[A-Za-z]+)/i;
+
+/**
+ * Parses structured text from Word (.docx) buffer using mammoth, preserving headings, lists, and tables
+ */
+export async function parseDocxBufferToText(buffer) {
+  if (!mammothModule) {
+    throw new Error('Mammoth DOCX parser is not installed.');
+  }
+
+  const htmlResult = await mammothModule.convertToHtml({ buffer });
+  const html = htmlResult?.value || '';
+
+  if (!html) return '';
+
+  // 1. Clean paragraphs and headers inside table cells so each cell is a single line
+  let cleaned = html.replace(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi, (match, cellContent) => {
+    const textOnly = cellContent.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    return '<td>' + textOnly + '</td>';
+  });
+
+  // 2. Format table rows into structured syllabus lines
+  cleaned = cleaned.replace(/<tr>([\s\S]*?)<\/tr>/gi, (match, rowContent) => {
+    const cells = [...rowContent.matchAll(/<td>([\s\S]*?)<\/td>/gi)].map(m => m[1].trim()).filter(Boolean);
+    if (cells.length === 0) return '';
+
+    // Check if entire row is a table header row (e.g. Unit No, Unit Title, Topics...)
+    if (TABLE_HEADER_REGEX_DOCX.test(cells[0])) {
+      return '';
+    }
+
+    // If first cell has UNIT header, structure as "UNIT X: Title\n- Topic1\n- Topic2"
+    if (UNIT_START_REGEX_DOCX.test(cells[0])) {
+      const unitPart = cells[0];
+      const titlePart = cells.length > 1 ? cells[1] : '';
+      const topicCells = cells.slice(2);
+      let rowLines = unitPart + (titlePart ? ': ' + titlePart : '') + '\n';
+      for (const tc of topicCells) {
+        rowLines += '- ' + tc + '\n';
+      }
+      return rowLines;
+    }
+
+    return cells.map(c => '- ' + c).join('\n') + '\n';
+  });
+
+  // 3. Convert paragraphs, headings, list items
+  cleaned = cleaned
+    .replace(/<\/h[1-6]>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<li[^>]*>/gi, '- ')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/\r/g, '\n')
+    .split('\n')
+    .map(l => l.trim())
+    .filter(Boolean)
+    .join('\n');
+
+  return cleaned;
+}
+
+/**
+ * Detects file type from buffer signature, original filename, and mimeType
+ * @returns {'pdf' | 'docx' | 'txt' | 'unsupported'}
+ */
+export function detectDocumentType(buffer, originalName = '', mimeType = '') {
+  const ext = (originalName.split('.').pop() || '').toLowerCase();
+  const mime = (mimeType || '').toLowerCase();
+
+  // Explicit rejections for unsupported media and archives
+  const rejectedExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'tiff', 'mp3', 'wav', 'm4a', 'aac', 'ogg', 'mp4', 'mov', 'avi', 'mkv', 'zip', 'rar', '7z', 'tar', 'gz', 'exe', 'apk', 'doc'];
+  if (
+    rejectedExts.includes(ext) ||
+    mime.startsWith('image/') ||
+    mime.startsWith('audio/') ||
+    mime.startsWith('video/') ||
+    mime === 'application/zip' ||
+    mime === 'application/x-zip-compressed' ||
+    mime === 'application/msword'
+  ) {
+    return 'unsupported';
+  }
+
+  // 1. Buffer Magic Number Checks
+  if (buffer && buffer.length >= 4) {
+    const magic4 = buffer.subarray(0, 4);
+    if (magic4.toString('utf8') === '%PDF') {
+      return 'pdf';
+    }
+    // Zip signature for DOCX: PK\x03\x04 (0x50, 0x4B, 0x03, 0x04)
+    if (magic4[0] === 0x50 && magic4[1] === 0x4B && magic4[2] === 0x03 && magic4[3] === 0x04) {
+      if (ext === 'docx' || mime.includes('wordprocessingml') || mime.includes('officedocument') || ext === '') {
+        return 'docx';
+      }
+      return 'unsupported';
+    }
+    // JPEG magic numbers (FF D8 FF)
+    if (magic4[0] === 0xFF && magic4[1] === 0xD8 && magic4[2] === 0xFF) return 'unsupported';
+    // PNG magic numbers (89 50 4E 47)
+    if (magic4[0] === 0x89 && magic4[1] === 0x50 && magic4[2] === 0x4E && magic4[3] === 0x47) return 'unsupported';
+    // MP3 ID3 header (49 44 33)
+    if (magic4[0] === 0x49 && magic4[1] === 0x44 && magic4[2] === 0x33) return 'unsupported';
+  }
+
+  // 2. Extension & MIME Checks
+  if (ext === 'pdf' || mime === 'application/pdf') {
+    return 'pdf';
+  }
+  if (
+    ext === 'docx' ||
+    mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+    mime === 'application/docx'
+  ) {
+    return 'docx';
+  }
+  if (ext === 'txt' || mime === 'text/plain' || mime.startsWith('text/')) {
+    return 'txt';
+  }
+
+  // 3. Fallback: If buffer is valid printable UTF-8 text without binary null bytes and extension is .txt or empty
+  if (buffer && buffer.length > 0 && buffer.length < 10 * 1024 * 1024 && (ext === 'txt' || ext === '')) {
+    const sample = buffer.subarray(0, Math.min(buffer.length, 1024));
+    const hasNullByte = sample.includes(0x00);
+    if (!hasNullByte) {
+      return 'txt';
+    }
+  }
+
+  return 'unsupported';
+}
+
+/**
+ * Universal document buffer to text parser supporting PDF, TXT, and DOCX
+ */
+export async function parseDocumentBufferToText(buffer, originalName = '', mimeType = '') {
+  const docType = detectDocumentType(buffer, originalName, mimeType);
+
+  if (docType === 'pdf') {
+    return await parsePdfBufferToText(buffer);
+  }
+
+  if (docType === 'docx') {
+    return await parseDocxBufferToText(buffer);
+  }
+
+  if (docType === 'txt') {
+    return parseTxtBufferToText(buffer);
+  }
+
+  throw new Error('Unsupported document format. Please upload a PDF, TXT, or DOCX syllabus file.');
 }
 
 /**
@@ -151,7 +353,7 @@ export function isReferenceOrJunk(line) {
   if (/^(?:Course\s+Unitization\s+Plan\s*\(Lab\)|Course\s+Utilization\s+Plan\s*[–-]\s*Lab|PART\s*\d*:\s*ASM|LIST\s+OF\s+EXPERIMENTS|LABORATORY\s+EXPERIMENTS)/i.test(trimmed)) return true;
 
   // Table header artifacts
-  if (/^(?:Unit\s*No\.?|Unit\s*Name|Required|Contact\s*Hours?|CLOs?|Addressed|References?|Used|Referen\s*cesUsed|Experiment\s*Name|Exp\.?\s*No\.?|sl\.?\s*no\.?|s\.?\s*no\.?|S\.No\.?|Hours?|Lecture\s*Hours?|Period|Marks?|Credits?|L\s*T\s*P\s*C)$/i.test(trimmed)) return true;
+  if (/^(?:Unit\s*No\.?|Unit\s*Number|Unit\s*Name|Module\s*No\.?|Chapter\s*No\.?|Required|Contact\s*Hours?|CLOs?|Addressed|References?|Used|Referen\s*cesUsed|Experiment\s*Name|Exp\.?\s*No\.?|sl\.?\s*no\.?|s\.?\s*no\.?|S\.No\.?|Hours?|Lecture\s*Hours?|Period|Marks?|Credits?|L\s*T\s*P\s*C)$/i.test(trimmed)) return true;
 
   // Evaluation, Bloom's, Course Outcomes, Designers, Assessments
   if (/^(?:Learning\s+Assessment|Recommended\s+Resources|Other\s+Resources|Bloom’s\s+Level|Course\s+Designers|Internal\s+Continuous|External\s+Evaluation|CLA-I|Mid-I|Lab\s+Performance|Cognitive\s+Task|Course\s+Objectives?|Course\s+Outcomes?|Program\s+Outcomes?|CO-PO\s+Mapping|Assessment\s+Pattern|Evaluation\s+Pattern|Marks\s+Distribution|Question\s+Paper\s+Pattern|Continuous\s+Internal\s+Assessment)/i.test(trimmed)) return true;
@@ -311,7 +513,7 @@ export function splitCompositeTopic(text) {
 
 /**
  * Structure-aware syllabus extractor supporting OBE tables, standard paragraphs, and bulleted syllabi
- * @param {string} rawText Raw extracted text from PDF
+ * @param {string} rawText Raw extracted text from PDF, TXT, or DOCX
  * @returns {{ courseName: string, courseCode: string, units: Array<{ unitNumber: number, unitName: string, topics: Array<{ title: string, confidence: number }> }> }}
  */
 export function extractSyllabusStructure(rawText) {
@@ -379,7 +581,7 @@ export function extractSyllabusStructure(rawText) {
   // Matches: UNIT 1, UNIT I, UNIT - 1, UNIT - I, UNIT: 1, UNIT: I, FIRST UNIT, UNIT 01, MODULE 1, MODULE I, CHAPTER 1, SECTION 1, etc.
   const UNIT_HEADER_REGEX = /^(?:UNIT|Unit|MODULE|Module|CHAPTER|Chapter|SECTION|Section|PART|Part|BLOCK|Block)\s*[:.\-–—]?\s*([0-9IVXLCDM]+|[A-Za-z]+)(?:[\s:.\-–—]+(.*))?$/i;
   const WORD_UNIT_HEADER_REGEX = /^(FIRST|SECOND|THIRD|FOURTH|FIFTH|SIXTH|SEVENTH|EIGHTH|NINTH|TENTH)\s+(?:UNIT|Unit|MODULE|Module|CHAPTER|Chapter)\s*[:.\-–—]?(?:[\s:.\-–—]+(.*))?$/i;
-  const TABLE_HEADER_REGEX = /^(?:Unit\s*No\.?|Unit\s*Name|Required|Contact\s*Hours?|CLOs?|Addressed|References?|Used|Referen\s*cesUsed|Experiment\s*Name|Exp\.?\s*No\.?|sl\.?\s*no\.?|s\.?\s*no\.?)$/i;
+  const TABLE_HEADER_REGEX = /^(?:Unit\s*No\.?|Unit\s*Number|Unit\s*Name|Module\s*No\.?|Chapter\s*No\.?|Required|Contact\s*Hours?|CLOs?|Addressed|References?|Used|Referen\s*cesUsed|Experiment\s*Name|Exp\.?\s*No\.?|sl\.?\s*no\.?|s\.?\s*no\.?)$/i;
   const PAGE_NUMBER_REGEX = /^--\s*\d+\s*(?:of\s*\d+)?\s*--$|^Page\s+\d+(?:\s+of\s+\d+)?$/i;
 
   let inTheory = false;

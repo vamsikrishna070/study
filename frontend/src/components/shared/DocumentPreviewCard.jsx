@@ -45,7 +45,9 @@ export function DocumentPreviewCard({
     return null;
   }
 
-  const originalName = file.originalName || 'Syllabus.pdf';
+  const originalName = file.originalName || 'Syllabus';
+  const ext = originalName.includes('.') ? originalName.substring(originalName.lastIndexOf('.')).toLowerCase() : '';
+  const fileTypeLabel = ext === '.docx' ? 'Word Document' : ext === '.txt' ? 'Text Document' : 'PDF Document';
   const sizeText = formatSize(file.size);
 
   const handleView = () => {
@@ -120,7 +122,7 @@ export function DocumentPreviewCard({
   };
 
   const handleConfirmRemove = () => {
-    if (confirm('Remove Syllabus PDF?\n\nThis will remove the attached syllabus document from this subject. You can upload a new syllabus at any time.')) {
+    if (confirm('Remove Syllabus Document?\n\nThis will remove the attached syllabus document from this subject. You can upload a new syllabus at any time.')) {
       onRemove?.();
     }
   };
@@ -141,7 +143,7 @@ export function DocumentPreviewCard({
             {originalName}
           </h3>
           <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="font-medium">PDF Document</span>
+            <span className="font-medium">{fileTypeLabel}</span>
             {!!sizeText && <span>•</span>}
             {!!sizeText && <span className="font-mono">{sizeText}</span>}
           </div>
@@ -190,7 +192,7 @@ export function DocumentPreviewCard({
           style={{ backgroundColor: accentColor }}
         >
           {viewing ? <Loader2 size={16} className="animate-spin" /> : <Eye size={16} />}
-          <span>{viewing ? 'Opening…' : 'View PDF'}</span>
+          <span>{viewing ? 'Opening…' : ext === '.pdf' ? 'View PDF' : 'View Document'}</span>
         </button>
 
         {unitCount === 0 && onExtract && (
@@ -218,7 +220,7 @@ export function DocumentPreviewCard({
               'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-medium transition-colors hover:bg-secondary',
               downloadSuccess ? 'text-accent' : 'text-muted-foreground hover:text-foreground'
             )}
-            title="Download PDF"
+            title="Download document"
           >
             {downloading ? (
               <Loader2 size={14} className="animate-spin" />
@@ -238,7 +240,7 @@ export function DocumentPreviewCard({
               'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-medium transition-colors hover:bg-secondary',
               shareSuccess ? 'text-accent' : 'text-muted-foreground hover:text-foreground'
             )}
-            title="Share PDF link"
+            title="Share document link"
           >
             {sharing ? (
               <Loader2 size={14} className="animate-spin" />
@@ -255,7 +257,7 @@ export function DocumentPreviewCard({
               type="button"
               onClick={onReplace}
               className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-              title="Replace syllabus PDF"
+              title="Replace syllabus document"
             >
               <RefreshCw size={14} />
               <span>Replace</span>
@@ -268,7 +270,7 @@ export function DocumentPreviewCard({
             type="button"
             onClick={handleConfirmRemove}
             className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-medium text-destructive transition-colors hover:bg-destructive/10"
-            title="Remove syllabus PDF"
+            title="Remove syllabus document"
           >
             <Trash2 size={14} />
             <span>Remove</span>
