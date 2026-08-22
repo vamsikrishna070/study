@@ -18,6 +18,7 @@ import importantPointRoutes from './importantPointRoutes.js';
 import searchRoutes from './searchRoutes.js';
 import uploadRoutes from './uploadRoutes.js';
 import collegeRoutes from './collegeRoutes.js';
+import appRoutes from './appRoutes.js';
 
 import mongoose from 'mongoose';
 
@@ -32,6 +33,7 @@ router.get('/health', (_req, res) => {
     message: 'StudyArena API is running'
   });
 });
+router.use('/app', appRoutes);
 router.use('/auth', authRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/subjects', subjectRoutes);

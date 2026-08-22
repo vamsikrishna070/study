@@ -1,7 +1,8 @@
 import React, { useContext, useState } from 'react';
 import { View, StyleSheet, ScrollView, Text, TouchableOpacity, Switch, Alert, Image } from 'react-native';
-import { Camera, Moon, Sun, Trophy, ToggleLeft, ToggleRight, Bell } from 'lucide-react-native';
+import { Camera, Moon, Sun, Trophy, ToggleLeft, ToggleRight, Bell, Smartphone, RefreshCw } from 'lucide-react-native';
 import { AuthContext } from '../../context/AuthContext';
+import { AppUpdateContext } from '../../context/AppUpdateContext';
 import { Header } from '../../components/ui/Header';
 import { PageHeading } from '../../components/ui/PageHeading';
 import { Button } from '../../components/ui/Button';
@@ -17,6 +18,7 @@ const SettingsScreen = ({ navigation }) => {
   const { colors, typography, spacing, radii, theme, isDark, toggleTheme } = useAppTheme();
   const styles = useStyles(createStyles);
   const { showSuccess, showError, showDialog } = useAppDialog();
+  const { appVersion, isChecking: isCheckingUpdate, checkUpdate } = useContext(AppUpdateContext);
 
   const { user, logout, setUser } = useContext(AuthContext);
   const [form, setForm] = useState({
@@ -209,6 +211,34 @@ const SettingsScreen = ({ navigation }) => {
           </View>
         </View>
 
+        {/* App Version & Updates Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionEyebrow}>Updates</Text>
+          <Text style={styles.sectionTitle}>App Version & Updates</Text>
+          <Text style={styles.sectionDetail}>
+            Installed build: {appVersion?.displayString || 'v1.0.0 (Build 1)'}
+          </Text>
+          <View style={{ marginTop: spacing.md }}>
+            <Button
+              variant="outline"
+              loading={isCheckingUpdate}
+              disabled={isCheckingUpdate}
+              onPress={async () => {
+                const res = await checkUpdate(true);
+                if (res?.success) {
+                  if (!res.isUpdateAvailable) {
+                    showSuccess('Up to Date', `You are using the latest version of StudyArena (${res.installedVersion}).`);
+                  }
+                } else if (res?.error) {
+                  showError('Update Check Failed', 'Could not reach the update service. Please check your connection and try again.');
+                }
+              }}
+            >
+              {isCheckingUpdate ? 'Checking for updates...' : 'Check for Updates'}
+            </Button>
+          </View>
+        </View>
+
         {/* Account Section */}
         <View style={[styles.section, styles.dangerSection]}>
           <Text style={[styles.sectionTitle, { color: colors.destructive }]}>Account</Text>
@@ -227,7 +257,7 @@ const SettingsScreen = ({ navigation }) => {
             and actually beginning. Keep it honest, keep it useful.
           </Text>
           <View style={styles.bannerFooter}>
-            <Text style={styles.bannerVersion}>StudyArena · v1.0</Text>
+            <Text style={styles.bannerVersion}>StudyArena · {appVersion?.displayString || 'v1.0.0'}</Text>
           </View>
         </View>
 

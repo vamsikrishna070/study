@@ -10,6 +10,7 @@ import { StudySessionProvider } from './src/context/StudySessionContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import { ThemeProvider, useAppTheme } from './src/theme/theme';
 import { DialogProvider } from './src/components/ui/AppDialog';
+import { AppUpdateProvider } from './src/context/AppUpdateContext';
 import { Provider as PaperProvider } from 'react-native-paper';
 
 import { StatusBar } from 'expo-status-bar';
@@ -21,11 +22,13 @@ const MainApp = () => {
     <PaperProvider theme={theme}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <DialogProvider>
-        <AuthProvider>
-          <StudySessionProvider>
-            <AppNavigator />
-          </StudySessionProvider>
-        </AuthProvider>
+        <AppUpdateProvider>
+          <AuthProvider>
+            <StudySessionProvider>
+              <AppNavigator />
+            </StudySessionProvider>
+          </AuthProvider>
+        </AppUpdateProvider>
       </DialogProvider>
     </PaperProvider>
   );
