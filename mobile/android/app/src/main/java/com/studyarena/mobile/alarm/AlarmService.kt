@@ -183,26 +183,46 @@ class AlarmService : Service() {
             // 1. Try custom soundUri if provided
             if (!soundUri.isNullOrBlank()) {
                 try {
-                    val uri = if (soundUri.startsWith("content://") || soundUri.startsWith("file://")) {
-                        Uri.parse(soundUri)
-                    } else {
-                        val file = File(soundUri)
-                        if (file.exists()) Uri.fromFile(file) else Uri.parse(soundUri)
+                    val cleanPath = when {
+                        soundUri.startsWith("file://") -> Uri.parse(soundUri).path ?: soundUri.removePrefix("file://")
+                        else -> soundUri
                     }
-                    val mp = MediaPlayer().apply {
-                        setDataSource(this@AlarmService, uri)
-                        setAudioAttributes(
+                    val file = File(cleanPath)
+
+                    if (file.exists() && file.canRead()) {
+                        val mp = MediaPlayer()
+                        java.io.FileInputStream(file).use { fis ->
+                            mp.setDataSource(fis.fd)
+                        }
+                        mp.setAudioAttributes(
                             AudioAttributes.Builder()
                                 .setUsage(AudioAttributes.USAGE_ALARM)
                                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                                 .build()
                         )
-                        isLooping = true
-                        prepare()
-                        start()
+                        mp.isLooping = true
+                        mp.prepare()
+                        mp.start()
+                        player = mp
+                        Log.d(TAG, "Playing custom alarm audio from file descriptor: $cleanPath")
+                    } else if (soundUri.startsWith("content://")) {
+                        contentResolver.openFileDescriptor(Uri.parse(soundUri), "r")?.use { pfd ->
+                            val mp = MediaPlayer().apply {
+                                setDataSource(pfd.fileDescriptor)
+                                setAudioAttributes(
+                                    AudioAttributes.Builder()
+                                        .setUsage(AudioAttributes.USAGE_ALARM)
+                                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                                        .build()
+                                )
+                                isLooping = true
+                                prepare()
+                                start()
+                            }
+                            player = mp
+                            Log.d(TAG, "Playing custom alarm audio from content descriptor: $soundUri")
+                        }
                     }
-                    player = mp
-                    Log.d(TAG, "Playing custom alarm audio from $soundUri")
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to play custom soundUri: $soundUri", e)
                 }

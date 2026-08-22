@@ -244,6 +244,18 @@ const SubjectsScreen = ({ navigation }) => {
     });
   };
 
+  const handleViewSyllabus = async (file) => {
+    if (!file?.url) {
+      showError('Error', 'Syllabus document URL is not available.');
+      return;
+    }
+    try {
+      await viewDocument(file.url, file.originalName || 'Syllabus.pdf');
+    } catch (e) {
+      showError('Couldn’t Open Document', e?.message || 'Unable to open PDF document.');
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Header />
@@ -366,7 +378,7 @@ const SubjectsScreen = ({ navigation }) => {
                       <View style={styles.syllabusActionsRow}>
                         <TouchableOpacity
                           style={[styles.syllabusActionBtn, { borderColor: subjectColor }]}
-                          onPress={() => viewDocument(item.syllabusFile.url, item.syllabusFile.originalName)}
+                          onPress={() => handleViewSyllabus(item.syllabusFile)}
                           activeOpacity={0.7}
                         >
                           <Eye size={14} color={subjectColor} style={{ marginRight: 4 }} />

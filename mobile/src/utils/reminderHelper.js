@@ -9,14 +9,14 @@
 export const validateReminderDateTime = (selectedDate, selectedTime, scheduleType = 'one-time', weekdays = []) => {
   const now = new Date();
   
-  if (!selectedDate || isNaN(new Date(selectedDate).getTime())) {
+  if (scheduleType === 'one-time' && (!selectedDate || isNaN(new Date(selectedDate).getTime()))) {
     return { isValid: false, error: 'Please select a valid date.' };
   }
   if (!selectedTime || isNaN(new Date(selectedTime).getTime())) {
     return { isValid: false, error: 'Please select a valid time.' };
   }
 
-  const d = new Date(selectedDate);
+  const d = (scheduleType === 'one-time' && selectedDate) ? new Date(selectedDate) : new Date();
   const t = new Date(selectedTime);
 
   const combined = new Date(

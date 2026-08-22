@@ -1,18 +1,19 @@
 export const appVersionConfig = {
-  latestVersion: '1.0.1',
-  latestVersionCode: 2,
+  latestVersion: '1.0.2',
+  latestVersionCode: 3,
 
   minimumSupportedVersionCode: 1,
 
   downloadUrl:
     process.env.APP_DOWNLOAD_URL ||
-    'https://github.com/vamsikrishna070/study/releases/download/v1.0.1/studyarena-1.0.1.apk',
+    'https://github.com/vamsikrishna070/study/releases/download/v1.0.2/studyarena-1.0.2.apk',
     
   releaseNotes: [
-    'Improved reminders and notification accuracy',
-    'Enhanced study sessions and focus timer',
-    'Mobile UI and navigation improvements',
-    'Bug fixes and performance enhancements'
+    'Complete voice notes & audio playback in Notes & Resources',
+    'Dedicated native PDF viewer without triggering system share sheet',
+    'Password visibility toggle alignment & state fixes',
+    'Responsive update dialog & authoritative version comparison',
+    'Bug fixes and performance improvements'
   ],
 
   forceUpdate: false,

@@ -16,10 +16,14 @@ const dayStart = (value = new Date()) => {
   return date;
 };
 const id = (doc) => doc?._id?.toString?.() || doc?.id;
-const subjectName = (subject) =>
-  typeof subject === "object"
+const subjectName = (subject, customSubject) => {
+  if (customSubject && typeof customSubject === "string" && customSubject.trim()) {
+    return customSubject.trim();
+  }
+  return typeof subject === "object"
     ? subject?.name || "Unassigned"
     : subject || "Unassigned";
+};
 
 const populateItems = (Model, filter) =>
   Model.find(filter).populate("subject", "name code color").sort({ createdAt: -1 });
@@ -27,15 +31,20 @@ const populateItems = (Model, filter) =>
 const serialize = (doc) => {
   if (!doc) return doc;
   const value = doc.toObject ? doc.toObject() : doc;
+  const subjId =
+    value.subject?._id?.toString?.() ||
+    (value.subject && typeof value.subject === "string" && value.subject.length === 24
+      ? value.subject
+      : null) ||
+    value.subjectId ||
+    null;
   return {
     ...value,
     id: id(doc),
     _id: id(doc),
-    subjectId:
-      value.subject?._id?.toString?.() ||
-      value.subject?.toString?.() ||
-      value.subjectId,
-    subject: subjectName(value.subject),
+    subjectId: subjId,
+    subject: subjectName(value.subject, value.customSubject),
+    customSubject: value.customSubject || "",
     duration: value.durationMinutes ?? value.estimatedDuration ?? 0,
     addedAt: value.createdAt,
     updatedAt: value.updatedAt,
@@ -172,48 +181,105 @@ export async function getNotes(req, res) {
     .filter(
       (item) =>
         !search ||
-        `${item.title} ${item.content} ${item.subject} ${item.topic} ${(item.tags || []).join(" ")}`
+        `${item.title} ${item.content} ${item.subject} ${item.customSubject || ""} ${item.topic} ${(item.tags || []).join(" ")}`
           .toLowerCase()
           .includes(search),
     );
   res.json({ success: true, data });
 }
 export async function createNote(req, res) {
-  if (!required(req.body, ["title", "subjectId"]))
-    return res
-      .status(400)
-      .json({
-        success: false,
-        message: "Title and subject are required",
-      });
-  const subject = await owned(Subject, req.user._id, req.body.subjectId);
-  if (!subject)
-    return res
-      .status(404)
-      .json({ success: false, message: "Subject not found" });
+  const { title, subjectId, customSubject } = req.body;
+  if (!title || !title.trim()) {
+    return res.status(400).json({
+      success: false,
+      message: "Title is required",
+    });
+  }
+
+  const cleanCustomSubject = typeof customSubject === "string" ? customSubject.trim() : "";
+  const hasSubjectId =
+    subjectId &&
+    subjectId !== "other" &&
+    subjectId !== "Other" &&
+    subjectId !== "";
+
+  if (!hasSubjectId && !cleanCustomSubject) {
+    return res.status(400).json({
+      success: false,
+      message: "Title and subject are required",
+    });
+  }
+
+  let subject = null;
+  if (hasSubjectId) {
+    subject = await owned(Subject, req.user._id, subjectId);
+    if (!subject) {
+      return res.status(404).json({ success: false, message: "Subject not found" });
+    }
+  }
+
   const item = await Note.create({
     ...req.body,
-    subject: subject._id,
+    subject: subject ? subject._id : null,
+    customSubject: cleanCustomSubject,
     user: req.user._id,
   });
-  await item.populate("subject", "name");
+
+  if (subject) {
+    await item.populate("subject", "name");
+  }
+
   res.status(201).json({ success: true, data: serialize(item) });
 }
 export async function updateNote(req, res) {
   const item = await owned(Note, req.user._id, req.params.id);
-  if (!item)
+  if (!item) {
     return res.status(404).json({ success: false, message: "Note not found" });
-  if (req.body.subjectId) {
-    const subject = await owned(Subject, req.user._id, req.body.subjectId);
-    if (!subject)
-      return res
-        .status(404)
-        .json({ success: false, message: "Subject not found" });
-    item.subject = subject._id;
   }
-  Object.assign(item, { ...req.body, subject: item.subject });
+
+  const { subjectId, customSubject } = req.body;
+  const hasSubjectId =
+    subjectId &&
+    subjectId !== "other" &&
+    subjectId !== "Other" &&
+    subjectId !== "";
+  const cleanCustomSubject =
+    typeof customSubject === "string"
+      ? customSubject.trim()
+      : customSubject !== undefined
+      ? ""
+      : item.customSubject;
+
+  if (subjectId !== undefined || customSubject !== undefined) {
+    if (!hasSubjectId && !cleanCustomSubject) {
+      return res.status(400).json({
+        success: false,
+        message: "Title and subject are required",
+      });
+    }
+  }
+
+  if (hasSubjectId) {
+    const subject = await owned(Subject, req.user._id, subjectId);
+    if (!subject) {
+      return res.status(404).json({ success: false, message: "Subject not found" });
+    }
+    item.subject = subject._id;
+    item.customSubject = "";
+  } else if (cleanCustomSubject) {
+    item.subject = null;
+    item.customSubject = cleanCustomSubject;
+  }
+
+  Object.assign(item, {
+    ...req.body,
+    subject: item.subject,
+    customSubject: item.customSubject,
+  });
   await item.save();
-  await item.populate("subject", "name");
+  if (item.subject) {
+    await item.populate("subject", "name");
+  }
   res.json({ success: true, data: serialize(item) });
 }
 export async function deleteNote(req, res) {

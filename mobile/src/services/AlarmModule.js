@@ -54,6 +54,19 @@ export const stopAudioPreview = async () => {
   }
 };
 
+export const openNativeDocument = async (fileUri, mimeType = 'application/pdf') => {
+  if (Platform.OS !== 'android' || !AlarmModule || typeof AlarmModule.openDocument !== 'function') {
+    return false;
+  }
+
+  try {
+    return await AlarmModule.openDocument(fileUri, mimeType);
+  } catch (e) {
+    console.warn('Failed to open native document:', e);
+    return false;
+  }
+};
+
 export const checkExactAlarmPermission = async () => {
   if (Platform.OS !== 'android' || !AlarmModule) return true;
   return await AlarmModule.checkExactAlarmPermission();

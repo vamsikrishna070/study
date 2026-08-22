@@ -1,11 +1,13 @@
 import { Platform } from 'react-native';
 import { Paths, File, Directory } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import * as WebBrowser from 'expo-web-browser';
+import { openNativeDocument } from './AlarmModule';
 
 // ─── Directory Helpers ─────────────────────────────────────────────────────────
 
 const DOCUMENTS_CACHE_DIR_NAME = 'documents';
-const CUSTOM_SOUNDS_DIR_NAME = 'custom_sounds';
+const CUSTOM_SOUNDS_DIR_NAME = 'audio';
 
 /**
  * Ensures the target sub-directory exists in cache or documents path
@@ -20,7 +22,7 @@ export function getOrCreateDirectory(base = 'cache', subDir = DOCUMENTS_CACHE_DI
     try {
       dir.create({ intermediates: true });
     } catch (e) {
-      // Fallback: directory might already exist
+      // Directory might already exist
     }
   }
   return dir;
@@ -52,7 +54,7 @@ export async function validatePdfFile(fileOrUri) {
     const file = typeof fileOrUri === 'string' ? new File(fileOrUri) : fileOrUri;
     if (!file.exists || file.size === 0) return false;
 
-    // Check first 16 bytes for %PDF- signature
+    // Check first bytes for %PDF- signature
     const textSample = await file.text();
     return textSample.startsWith('%PDF') || textSample.includes('%PDF-');
   } catch (e) {
@@ -76,7 +78,6 @@ export async function validatePdfFile(fileOrUri) {
  */
 export function getCachedPdfFile(remoteUrl, originalName = 'document.pdf') {
   const cacheDir = getOrCreateDirectory('cache', DOCUMENTS_CACHE_DIR_NAME);
-  // Generate deterministic name using hash-like key and sanitized original name
   let hash = 0;
   for (let i = 0; i < remoteUrl.length; i++) {
     hash = (hash << 5) - hash + remoteUrl.charCodeAt(i);
@@ -138,10 +139,10 @@ export async function downloadPdf(remoteUrl, originalName = 'document.pdf', onPr
   }
 }
 
-// ─── PDF Viewing & Sharing ────────────────────────────────────────────────────
+// ─── PDF Viewing (No Share Sheet) ─────────────────────────────────────────────
 
 /**
- * Prepares and opens a local or remote PDF with the native PDF viewer experience
+ * Opens a local or remote PDF with native PDF viewer without triggering system share sheet
  * @param {string} urlOrUri Remote URL or local file URI
  * @param {string} originalName
  * @returns {Promise<{ success: boolean, uri: string }>}
@@ -152,29 +153,70 @@ export async function viewPdf(urlOrUri, originalName = 'document.pdf') {
   }
 
   const safeName = getSafeFilename(originalName, 'document.pdf');
-  let localUri = urlOrUri;
+  let localFile;
 
-  // If remote URL, silently download to cache first
+  // 1. If remote URL, silently download/retrieve from local cache first
   if (urlOrUri.startsWith('http://') || urlOrUri.startsWith('https://')) {
-    const res = await downloadPdf(urlOrUri, safeName);
-    localUri = res.uri;
+    try {
+      const res = await downloadPdf(urlOrUri, safeName);
+      localFile = new File(res.uri);
+    } catch (dlErr) {
+      if (__DEV__) console.warn('[DocumentService] Download error, falling back to direct URL browser:', dlErr);
+      // Fallback to in-app browser with remote HTTPS URL
+      try {
+        await WebBrowser.openBrowserAsync(urlOrUri, {
+          presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
+          showTitle: true,
+          enableBarCollapsing: true,
+        });
+        return { success: true, uri: urlOrUri };
+      } catch (wbErr) {
+        throw new Error('Could not open remote document.');
+      }
+    }
+  } else {
+    localFile = new File(urlOrUri);
   }
 
-  const isAvailable = await Sharing.isAvailableAsync();
-  if (isAvailable) {
-    await Sharing.shareAsync(localUri, {
-      mimeType: 'application/pdf',
-      dialogTitle: `View ${safeName}`,
-      UTI: 'com.adobe.pdf',
-    });
-    return { success: true, uri: localUri };
-  } else {
-    throw new Error('Document viewing is not supported on this device.');
+  // 2. Validate local file exists and is not empty
+  if (!localFile || !localFile.exists || localFile.size === 0) {
+    throw new Error('Could not access document file.');
   }
+
+  // 3. On Android: Launch native PDF viewer via ACTION_VIEW intent (no share sheet)
+  if (Platform.OS === 'android') {
+    try {
+      const opened = await openNativeDocument(localFile.uri, 'application/pdf');
+      if (opened) {
+        return { success: true, uri: localFile.uri };
+      }
+    } catch (nativeErr) {
+      if (__DEV__) console.warn('[DocumentService] Native document viewer intent failed:', nativeErr);
+    }
+  }
+
+  // 4. Safe fallback for remote URLs or devices without a standalone PDF reader app:
+  // Open the HTTPS URL in Chrome Custom Tabs / in-app browser (never pass file:// to Custom Tabs)
+  if (urlOrUri.startsWith('http://') || urlOrUri.startsWith('https://')) {
+    try {
+      await WebBrowser.openBrowserAsync(urlOrUri, {
+        presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
+        showTitle: true,
+        enableBarCollapsing: true,
+      });
+      return { success: true, uri: urlOrUri };
+    } catch (e) {
+      if (__DEV__) console.warn('[DocumentService] In-app browser failed:', e);
+    }
+  }
+
+  throw new Error('No application found on device to view this document.');
 }
 
+// ─── PDF Sharing (Explicit Share Action Only) ──────────────────────────────────
+
 /**
- * Shares a PDF with external apps (WhatsApp, Drive, Email, etc.)
+ * Shares a PDF with external apps (WhatsApp, Drive, Email, etc.) ONLY on explicit user request
  * @param {string} urlOrUri
  * @param {string} originalName
  * @returns {Promise<void>}
@@ -207,7 +249,7 @@ export async function sharePdf(urlOrUri, originalName = 'document.pdf') {
 // ─── Custom Audio Persistent Storage ──────────────────────────────────────────
 
 /**
- * Copies a selected audio file (content:// or file://) to persistent app storage
+ * Copies a selected audio file (content:// or file://) to persistent app storage (Paths.document/audio/)
  * @param {{ uri: string, name?: string, mimeType?: string, size?: number }} asset
  * @returns {Promise<{ uri: string, name: string, size: number }>}
  */
@@ -217,35 +259,88 @@ export async function saveCustomAudio(asset) {
   }
 
   const sourceUri = asset.uri;
-  const rawName = asset.name || 'custom_sound.mp3';
-  const cleanName = getSafeFilename(rawName, 'custom_sound.mp3');
-  const uniqueName = `${Date.now()}_${cleanName}`;
+  const isContentUri = sourceUri.startsWith('content://');
+  const isFileUri = sourceUri.startsWith('file://');
+  const rawName = asset.name || 'custom_sound';
+
+  // Determine actual file extension without assuming .mp3
+  let ext = '';
+  if (rawName && rawName.includes('.')) {
+    ext = rawName.substring(rawName.lastIndexOf('.')).toLowerCase();
+  } else if (asset.mimeType) {
+    const mime = asset.mimeType.toLowerCase();
+    if (mime.includes('wav')) ext = '.wav';
+    else if (mime.includes('m4a') || mime.includes('mp4') || mime.includes('aac')) ext = '.m4a';
+    else if (mime.includes('ogg') || mime.includes('opus')) ext = '.ogg';
+    else if (mime.includes('flac')) ext = '.flac';
+    else if (mime.includes('3gp')) ext = '.3gp';
+    else if (mime.includes('mpeg') || mime.includes('mp3')) ext = '.mp3';
+    else ext = '.mp3';
+  } else {
+    ext = '.mp3';
+  }
+
+  const baseName = rawName && rawName.includes('.') ? rawName.substring(0, rawName.lastIndexOf('.')) : (rawName || 'custom_sound');
+  const cleanBase = getSafeFilename(baseName, 'custom_sound');
+  const uniqueName = `audio_${Date.now()}_${cleanBase}${ext}`;
+
+  console.log(`[AUDIO PICK DEBUG]
+asset: ${JSON.stringify(asset)}
+uri: ${sourceUri}
+name: ${rawName}
+mimeType: ${asset.mimeType || 'unknown'}
+size: ${asset.size ?? -1}
+fileName: ${uniqueName}
+isContentUri: ${isContentUri}
+isFileUri: ${isFileUri}
+copyStarted: true`);
 
   const soundsDir = getOrCreateDirectory('document', CUSTOM_SOUNDS_DIR_NAME);
   const destinationFile = new File(soundsDir, uniqueName);
 
   try {
     const sourceFile = new File(sourceUri);
-    if (sourceFile.exists) {
-      sourceFile.copy(destinationFile);
-    } else {
-      // If content:// uri or virtual uri, download/stream to destination
-      await File.downloadFileAsync(sourceUri, destinationFile, { idempotent: true });
+    let copyMethod = 'copy';
+    try {
+      await sourceFile.copy(destinationFile);
+    } catch (copyErr) {
+      copyMethod = 'arrayBuffer fallback';
+      console.warn('[AUDIO PICK DEBUG] sourceFile.copy direct failed, trying arrayBuffer stream:', copyErr?.message);
+      const buffer = await sourceFile.arrayBuffer();
+      if (buffer && buffer.byteLength > 0) {
+        await destinationFile.write(new Uint8Array(buffer));
+      } else {
+        throw new Error('Read 0 bytes from source audio file.');
+      }
     }
 
-    if (!destinationFile.exists || destinationFile.size === 0) {
-      throw new Error('Audio file could not be saved to internal storage.');
+    const destinationExists = destinationFile.exists;
+    const destinationSize = destinationFile.size;
+
+    console.log(`[AUDIO PICK DEBUG]
+copyCompleted: true (${copyMethod})
+destinationUri: ${destinationFile.uri}
+destinationExists: ${destinationExists}
+destinationSize: ${destinationSize}`);
+
+    if (!destinationExists || destinationSize === 0) {
+      throw new Error(`Audio file copy failed validation: exists=${destinationExists}, size=${destinationSize}`);
     }
 
     return {
       uri: destinationFile.uri,
       name: rawName,
-      size: destinationFile.size,
+      size: destinationSize,
     };
   } catch (error) {
-    if (__DEV__) {
-      console.warn('[DocumentService] Save custom audio error:', error);
-    }
-    throw new Error('Could not process selected audio file. Please choose another file.');
+    console.error(`[AUDIO PICK ERROR]
+message: ${error?.message}
+stack: ${error?.stack}
+asset: ${JSON.stringify(asset)}
+uri: ${sourceUri}
+mimeType: ${asset.mimeType || 'unknown'}
+size: ${asset.size ?? -1}
+name: ${rawName}`);
+    throw error;
   }
 }

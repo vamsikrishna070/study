@@ -240,21 +240,24 @@ const RemindersScreen = ({ navigation }) => {
           'audio/m4a',
           'audio/aac',
           'audio/ogg',
+          'audio/flac',
           '*/*',
         ],
         copyToCacheDirectory: true,
+        multiple: false,
       });
+
       if (result.canceled || !result.assets || result.assets.length === 0) return;
       const asset = result.assets[0];
 
       const saved = await saveCustomAudio(asset);
 
       setSoundId('custom');
-      setSoundName(saved.name || 'Custom Audio');
+      setSoundName(saved.name || asset.name || 'Custom Audio');
       setSoundUri(saved.uri);
     } catch (e) {
-      console.warn('Error selecting audio file:', e);
-      showError('Audio Picker Error', 'Could not access the selected audio file. Please choose another audio file.');
+      console.error('[AUDIO PICK ERROR] in RemindersScreen:', e);
+      showError('Audio Picker Error', e?.message || 'Could not access the selected audio file. Please choose another audio file.');
     }
   };
 
@@ -279,11 +282,23 @@ const RemindersScreen = ({ navigation }) => {
 
   // ─── Validation ───────────────────────────────────────────────────────────────
 
+  const handleScheduleTypeChange = (type) => {
+    setScheduleType(type);
+    if (type === 'one-time') {
+      const now = new Date();
+      if (selectedDate < now) {
+        setSelectedDate(now);
+      }
+    }
+    setFormError(null);
+  };
+
   const buildRemindAt = () => {
+    const baseDate = scheduleType === 'one-time' ? selectedDate : new Date();
     const combined = new Date(
-      selectedDate.getFullYear(),
-      selectedDate.getMonth(),
-      selectedDate.getDate(),
+      baseDate.getFullYear(),
+      baseDate.getMonth(),
+      baseDate.getDate(),
       selectedTime.getHours(),
       selectedTime.getMinutes(),
       0,
@@ -748,17 +763,19 @@ const RemindersScreen = ({ navigation }) => {
               {/* When Section */}
               <Text style={[styles.fieldLabel, { marginTop: 8 }]}>When</Text>
 
-              {/* Date Picker Trigger */}
-              <TouchableOpacity
-                style={styles.pickerRow}
-                onPress={() => setShowDatePicker(true)}
-                activeOpacity={0.7}
-              >
-                <CalendarDays size={18} color={colors.primary} style={{ marginRight: 10 }} />
-                <Text style={styles.pickerText}>{formatDate(selectedDate)}</Text>
-              </TouchableOpacity>
+              {/* Date Picker Trigger (Only shown for one-time reminders) */}
+              {scheduleType === 'one-time' && (
+                <TouchableOpacity
+                  style={styles.pickerRow}
+                  onPress={() => setShowDatePicker(true)}
+                  activeOpacity={0.7}
+                >
+                  <CalendarDays size={18} color={colors.primary} style={{ marginRight: 10 }} />
+                  <Text style={styles.pickerText}>{formatDate(selectedDate)}</Text>
+                </TouchableOpacity>
+              )}
 
-              {showDatePicker && (
+              {showDatePicker && scheduleType === 'one-time' && (
                 <DateTimePicker
                   value={selectedDate}
                   mode="date"
@@ -813,7 +830,7 @@ const RemindersScreen = ({ navigation }) => {
                       styles.recurrenceChip,
                       scheduleType === opt.value && styles.recurrenceChipActive,
                     ]}
-                    onPress={() => setScheduleType(opt.value)}
+                    onPress={() => handleScheduleTypeChange(opt.value)}
                     activeOpacity={0.7}
                   >
                     <Text
@@ -877,7 +894,7 @@ const RemindersScreen = ({ navigation }) => {
                       soundId === opt.value && styles.recurrenceChipActive,
                     ]}
                     onPress={() => {
-                      handleAudioSelect(opt.value);
+                      setSoundId(opt.value);
                       if (previewingSound) {
                         stopAudioPreview();
                         setPreviewingSound(null);
@@ -913,7 +930,7 @@ const RemindersScreen = ({ navigation }) => {
                   >
                     <FileMusic size={16} color={colors.primary} />
                     <Text style={styles.pickAudioBtnText}>
-                      {soundUri ? 'Change Audio File' : 'Pick Audio File (MP3, WAV)'}
+                      {soundUri ? 'Change Audio File' : 'Pick Audio File (MP3, WAV, M4A, AAC)'}
                     </Text>
                   </TouchableOpacity>
                 </View>

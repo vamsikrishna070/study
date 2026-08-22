@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.content.pm.PackageManager
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.net.Uri
@@ -14,6 +15,7 @@ import android.util.Log
 import com.facebook.react.bridge.*
 import org.json.JSONObject
 import java.io.File
+import java.io.FileInputStream
 
 class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
 
@@ -173,29 +175,48 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
             val context = reactApplicationContext
             var player: MediaPlayer? = null
 
-            // 1. Try custom soundUri if provided and file exists
+            // 1. Try custom soundUri if provided
             if (!soundUri.isNullOrBlank()) {
                 try {
-                    val uri = if (soundUri.startsWith("content://") || soundUri.startsWith("file://")) {
-                        Uri.parse(soundUri)
-                    } else {
-                        val file = File(soundUri)
-                        if (file.exists()) Uri.fromFile(file) else Uri.parse(soundUri)
+                    val cleanPath = when {
+                        soundUri.startsWith("file://") -> Uri.parse(soundUri).path ?: soundUri.removePrefix("file://")
+                        else -> soundUri
                     }
+                    val file = File(cleanPath)
 
-                    val mp = MediaPlayer().apply {
-                        setDataSource(context, uri)
-                        setAudioAttributes(
+                    if (file.exists() && file.canRead()) {
+                        val mp = MediaPlayer()
+                        FileInputStream(file).use { fis ->
+                            mp.setDataSource(fis.fd)
+                        }
+                        mp.setAudioAttributes(
                             AudioAttributes.Builder()
                                 .setUsage(AudioAttributes.USAGE_MEDIA)
                                 .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                                 .build()
                         )
-                        isLooping = false
-                        prepare()
-                        start()
+                        mp.isLooping = false
+                        mp.prepare()
+                        mp.start()
+                        player = mp
+                        Log.d(TAG, "Successfully started preview for file: $cleanPath")
+                    } else if (soundUri.startsWith("content://")) {
+                        context.contentResolver.openFileDescriptor(Uri.parse(soundUri), "r")?.use { pfd ->
+                            val mp = MediaPlayer().apply {
+                                setDataSource(pfd.fileDescriptor)
+                                setAudioAttributes(
+                                    AudioAttributes.Builder()
+                                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                                        .build()
+                                )
+                                isLooping = false
+                                prepare()
+                                start()
+                            }
+                            player = mp
+                        }
                     }
-                    player = mp
                 } catch (e: Exception) {
                     Log.w(TAG, "Failed to preview custom soundUri: $soundUri", e)
                 }
@@ -250,6 +271,77 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
             promise.resolve(true)
         } catch (e: Exception) {
             promise.reject("PREVIEW_STOP_ERROR", e.message)
+        }
+    }
+
+    @ReactMethod
+    fun openDocument(fileUri: String, mimeType: String, promise: Promise) {
+        try {
+            val context = reactApplicationContext.currentActivity ?: reactApplicationContext
+            val cleanMimeType = if (mimeType.isBlank()) "application/pdf" else mimeType
+
+            val contentUri: Uri = if (fileUri.startsWith("content://")) {
+                Uri.parse(fileUri)
+            } else {
+                val cleanPath = when {
+                    fileUri.startsWith("file://") -> Uri.parse(fileUri).path ?: fileUri.removePrefix("file://")
+                    else -> fileUri
+                }
+                val file = File(cleanPath)
+                if (!file.exists() || file.length() == 0L) {
+                    promise.resolve(false)
+                    return
+                }
+                androidx.core.content.FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.FileSystemFileProvider",
+                    file
+                )
+            }
+
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(contentUri, cleanMimeType)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+
+            val packageManager = context.packageManager
+            val resList = packageManager.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
+
+            for (resolveInfo in resList) {
+                val packageName = resolveInfo.activityInfo.packageName
+                context.grantUriPermission(packageName, contentUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+
+            if (resList.isNotEmpty()) {
+                context.startActivity(intent)
+                promise.resolve(true)
+            } else {
+                val genericIntent = Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(contentUri, "*/*")
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                val genericList = packageManager.queryIntentActivities(genericIntent, 0)
+                for (resolveInfo in genericList) {
+                    val packageName = resolveInfo.activityInfo.packageName
+                    context.grantUriPermission(packageName, contentUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+
+                if (genericList.isNotEmpty()) {
+                    val chooser = Intent.createChooser(genericIntent, "Open with").apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(chooser)
+                    promise.resolve(true)
+                } else {
+                    Log.d(TAG, "No activity available on device to open document mimeType=$cleanMimeType")
+                    promise.resolve(false)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error opening document via native intent: $fileUri", e)
+            promise.resolve(false)
         }
     }
 

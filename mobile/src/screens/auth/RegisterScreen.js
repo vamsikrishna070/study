@@ -42,9 +42,6 @@ const RegisterScreen = ({ navigation }) => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -202,30 +199,16 @@ const RegisterScreen = ({ navigation }) => {
             )}
 
             <Field label="Confirm Password">
-              <View style={styles.passwordInputWrapper}>
-                <Input
-                  value={confirmPassword}
-                  onChangeText={(text) => {
-                    setConfirmPassword(text);
-                    if (errorMsg) setErrorMsg('');
-                  }}
-                  secureTextEntry={!showConfirmPassword}
-                  placeholder="Re-enter your password"
-                  editable={!loading}
-                  style={styles.passwordInput}
-                />
-                <TouchableOpacity
-                  style={styles.visibilityToggle}
-                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                  activeOpacity={0.7}
-                >
-                  {showConfirmPassword ? (
-                    <EyeOff size={18} color={colors.mutedForeground} />
-                  ) : (
-                    <Eye size={18} color={colors.mutedForeground} />
-                  )}
-                </TouchableOpacity>
-              </View>
+              <Input
+                value={confirmPassword}
+                onChangeText={(text) => {
+                  setConfirmPassword(text);
+                  if (errorMsg) setErrorMsg('');
+                }}
+                secureTextEntry
+                placeholder="Re-enter your password"
+                editable={!loading}
+              />
             </Field>
 
             {/* Password Match Indicator */}

@@ -20,8 +20,9 @@ import {
   Search,
   SlidersHorizontal,
   Mic,
+  Pencil,
 } from 'lucide-react-native';
-import { getNotes, createNote, deleteNote } from '../../api/notes';
+import { getNotes, createNote, updateNote, deleteNote } from '../../api/notes';
 import { getSubjects } from '../../api/subjects';
 import { AuthContext } from '../../context/AuthContext';
 import { Header } from '../../components/ui/Header';
@@ -35,6 +36,7 @@ import { SelectPicker } from '../../components/ui/SelectPicker';
 import { AttachmentUploader } from '../../components/ui/AttachmentUploader';
 import { AttachmentCard } from '../../components/ui/AttachmentCard';
 import { VoiceRecorderModal } from '../../components/ui/VoiceRecorderModal';
+import { globalAudioPlayer } from '../../services/audioPlayerService';
 import { useAppDialog } from '../../components/ui/AppDialog';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme, useStyles } from '../../theme/theme';
@@ -75,9 +77,12 @@ const NotesScreen = ({ route, navigation }) => {
 
   // Note Modal State
   const [modalVisible, setModalVisible] = useState(paramOpenCreate);
+  const [editingId, setEditingId] = useState(null);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [subjectId, setSubjectId] = useState(paramSubjectId || '');
+  const [customSubject, setCustomSubject] = useState('');
+  const [customSubjectError, setCustomSubjectError] = useState('');
   const [topic, setTopic] = useState('');
   const [priority, setPriority] = useState('medium');
   const [tagsInput, setTagsInput] = useState('');
@@ -118,10 +123,15 @@ const NotesScreen = ({ route, navigation }) => {
 
   useEffect(() => {
     loadData();
+    return () => {
+      globalAudioPlayer.stop();
+    };
   }, [paramSubjectId, filterSubjectId]);
 
   useEffect(() => {
-    if (paramOpenCreate) setModalVisible(true);
+    if (paramOpenCreate) {
+      openCreateModal();
+    }
   }, [paramOpenCreate]);
 
   const onRefresh = useCallback(() => {
@@ -129,7 +139,41 @@ const NotesScreen = ({ route, navigation }) => {
     loadData();
   }, [filterSubjectId]);
 
-  const handleCreate = async () => {
+  const openCreateModal = () => {
+    setEditingId(null);
+    setTitle('');
+    setContent('');
+    setSubjectId(paramSubjectId || (subjects.length > 0 ? (subjects[0]._id || subjects[0].id) : 'other'));
+    setCustomSubject('');
+    setCustomSubjectError('');
+    setTopic('');
+    setPriority('medium');
+    setTagsInput('');
+    setAttachments([]);
+    setModalVisible(true);
+  };
+
+  const openEditModal = (item) => {
+    setEditingId(item._id || item.id);
+    setTitle(item.title || '');
+    setContent(item.content || '');
+    const isCustom = !!item.customSubject || !item.subjectId;
+    if (isCustom) {
+      setSubjectId('other');
+      setCustomSubject(item.customSubject || (typeof item.subject === 'string' && item.subject !== 'Unassigned' ? item.subject : ''));
+    } else {
+      setSubjectId(item.subjectId);
+      setCustomSubject('');
+    }
+    setCustomSubjectError('');
+    setTopic(item.topic || '');
+    setPriority(item.priority || 'medium');
+    setTagsInput((item.tags || []).join(', '));
+    setAttachments(item.attachments || []);
+    setModalVisible(true);
+  };
+
+  const handleSave = async () => {
     if (!title.trim()) {
       showError('Validation Error', 'Please enter a note title.');
       return;
@@ -137,6 +181,14 @@ const NotesScreen = ({ route, navigation }) => {
     if (!subjectId) {
       showError('Validation Error', 'Please select a subject for this note.');
       return;
+    }
+
+    if (subjectId === 'other') {
+      const trimmedCustom = customSubject.trim();
+      if (!trimmedCustom) {
+        setCustomSubjectError('Please enter a subject name.');
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -149,27 +201,42 @@ const NotesScreen = ({ route, navigation }) => {
       const payload = {
         title: title.trim(),
         content: content.trim(),
-        subjectId,
+        subjectId: subjectId === 'other' ? undefined : subjectId,
+        customSubject: subjectId === 'other' ? customSubject.trim() : '',
         topic: topic.trim(),
         priority,
         tags: parsedTags,
         attachments,
       };
 
-      const res = await createNote(payload);
+      if (editingId) {
+        const res = await updateNote(editingId, payload);
+        const updated = res.data || res;
+        setData((prev) =>
+          prev.map((item) =>
+            (item._id || item.id) === editingId ? { ...item, ...updated } : item
+          )
+        );
+      } else {
+        const res = await createNote(payload);
+        const created = res.data || res;
+        if (created) {
+          setData((prev) => [created, ...prev]);
+        } else {
+          await loadData();
+        }
+      }
+
       setModalVisible(false);
+      setEditingId(null);
       setTitle('');
       setContent('');
       setTopic('');
       setPriority('medium');
       setTagsInput('');
       setAttachments([]);
-
-      if (res.data) {
-        setData((prev) => [res.data, ...prev]);
-      } else {
-        await loadData();
-      }
+      setCustomSubject('');
+      setCustomSubjectError('');
     } catch (e) {
       showError('Error', e?.response?.data?.message || 'Failed to save note.');
     } finally {
@@ -198,9 +265,10 @@ const NotesScreen = ({ route, navigation }) => {
 
   // Filter notes locally for search and priority
   const filteredNotes = data.filter((item) => {
+    const subjectDisplayName = item.customSubject || item.subject?.name || item.subject || '';
     const matchesSearch =
       !search ||
-      `${item.title} ${item.content} ${item.subject?.name || item.subject || ''} ${item.topic || ''} ${(item.tags || []).join(' ')}`
+      `${item.title} ${item.content} ${subjectDisplayName} ${item.topic || ''} ${(item.tags || []).join(' ')}`
         .toLowerCase()
         .includes(search.toLowerCase());
 
@@ -209,14 +277,20 @@ const NotesScreen = ({ route, navigation }) => {
     return matchesSearch && matchesPriority;
   });
 
-  const subjectOptions = subjects.map((s) => ({
-    label: `${s.name} (${s.code})`,
-    value: s._id || s.id,
-  }));
+  const subjectOptions = [
+    ...subjects.map((s) => ({
+      label: `${s.name} (${s.code})`,
+      value: s._id || s.id,
+    })),
+    { label: 'Other', value: 'other' },
+  ];
 
   const filterSubjectOptions = [
     { label: 'All subjects', value: '' },
-    ...subjectOptions,
+    ...subjects.map((s) => ({
+      label: `${s.name} (${s.code})`,
+      value: s._id || s.id,
+    })),
   ];
 
   const getPriorityBadgeColor = (p) => {
@@ -250,7 +324,7 @@ const NotesScreen = ({ route, navigation }) => {
               title="Notes"
               detail="Capture ideas, explanations, formulas, and key concepts."
               action={
-                <Button size="sm" onPress={() => setModalVisible(true)}>
+                <Button size="sm" onPress={openCreateModal}>
                   <Plus size={16} color={colors.primaryForeground} style={{ marginRight: 6 }} />
                   New note
                 </Button>
@@ -328,7 +402,7 @@ const NotesScreen = ({ route, navigation }) => {
               }
               icon={FileText}
               action={
-                <Button onPress={() => setModalVisible(true)}>
+                <Button onPress={openCreateModal}>
                   <Plus size={16} color={colors.primaryForeground} style={{ marginRight: 6 }} />
                   Create note
                 </Button>
@@ -340,6 +414,7 @@ const NotesScreen = ({ route, navigation }) => {
           const noteId = item._id || item.id;
           const priorityColor = getPriorityBadgeColor(item.priority);
           const atts = item.attachments || [];
+          const displaySubject = item.customSubject || item.subject?.name || item.subject;
 
           return (
             <View style={styles.card}>
@@ -365,9 +440,9 @@ const NotesScreen = ({ route, navigation }) => {
 
               {/* Subject and Topic Chips */}
               <View style={styles.chipRow}>
-                {!!(item.subject?.name || item.subject) && (
+                {!!displaySubject && (
                   <Text style={styles.subjectChip}>
-                    {item.subject?.name || item.subject}
+                    {displaySubject}
                   </Text>
                 )}
                 {!!item.topic && (
@@ -375,9 +450,11 @@ const NotesScreen = ({ route, navigation }) => {
                 )}
               </View>
 
-              <Text style={styles.cardPreview} numberOfLines={3}>
-                {item.content}
-              </Text>
+              {!!item.content && (
+                <Text style={styles.cardPreview} numberOfLines={3}>
+                  {item.content}
+                </Text>
+              )}
 
               {/* Tags */}
               {item.tags?.length > 0 && (
@@ -403,20 +480,30 @@ const NotesScreen = ({ route, navigation }) => {
                 <Text style={styles.cardDate}>
                   {new Date(item.createdAt || item.updatedAt || Date.now()).toLocaleDateString()}
                 </Text>
-                <Button
-                  variant="danger"
-                  onPress={() => handleDelete(noteId)}
-                  style={styles.deleteBtn}
-                >
-                  Delete
-                </Button>
+                <View style={styles.cardActionButtons}>
+                  <Button
+                    variant="outline"
+                    onPress={() => openEditModal(item)}
+                    style={styles.editBtn}
+                  >
+                    <Pencil size={13} color={colors.foreground} style={{ marginRight: 4 }} />
+                    Edit
+                  </Button>
+                  <Button
+                    variant="danger"
+                    onPress={() => handleDelete(noteId)}
+                    style={styles.deleteBtn}
+                  >
+                    Delete
+                  </Button>
+                </View>
               </View>
             </View>
           );
         }}
       />
 
-      {/* New Note Modal */}
+      {/* Note Create / Edit Modal */}
       <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={() => setModalVisible(false)}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -425,7 +512,7 @@ const NotesScreen = ({ route, navigation }) => {
           <View style={styles.modalBackdrop} />
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>New Note</Text>
+              <Text style={styles.modalTitle}>{editingId ? 'Edit Note' : 'New Note'}</Text>
               <Button variant="quiet" style={styles.closeBtn} onPress={() => setModalVisible(false)}>
                 <X size={20} color={colors.foreground} />
               </Button>
@@ -440,7 +527,13 @@ const NotesScreen = ({ route, navigation }) => {
                 <Field label="Subject *" style={{ flex: 1 }}>
                   <SelectPicker
                     value={subjectId}
-                    onValueChange={setSubjectId}
+                    onValueChange={(val) => {
+                      setSubjectId(val);
+                      if (val !== 'other') {
+                        setCustomSubject('');
+                        setCustomSubjectError('');
+                      }
+                    }}
                     options={subjectOptions}
                     placeholder="Select your subject"
                   />
@@ -454,6 +547,23 @@ const NotesScreen = ({ route, navigation }) => {
                 </Field>
               </View>
 
+              {/* Custom Subject Input (when Other is selected) */}
+              {subjectId === 'other' && (
+                <Field label="Custom Subject *" error={customSubjectError}>
+                  <Input
+                    value={customSubject}
+                    onChangeText={(text) => {
+                      setCustomSubject(text);
+                      if (text.trim().length > 0) {
+                        setCustomSubjectError('');
+                      }
+                    }}
+                    placeholder="Enter subject name"
+                    autoFocus
+                  />
+                </Field>
+              )}
+
               <Field label="Topic / Unit (optional)">
                 <Input
                   value={topic}
@@ -466,7 +576,7 @@ const NotesScreen = ({ route, navigation }) => {
                 <Input
                   value={tagsInput}
                   onChangeText={setTagsInput}
-                  placeholder="Add tags (optional)"
+                  placeholder="Add tags (comma separated)"
                 />
               </Field>
 
@@ -511,11 +621,16 @@ const NotesScreen = ({ route, navigation }) => {
               </Button>
               <Button
                 style={styles.modalBtn}
-                onPress={handleCreate}
+                onPress={handleSave}
                 loading={submitting}
-                disabled={!title.trim() || !subjectId || submitting}
+                disabled={
+                  !title.trim() ||
+                  !subjectId ||
+                  (subjectId === 'other' && !customSubject.trim()) ||
+                  submitting
+                }
               >
-                Save Note
+                {editingId ? 'Update Note' : 'Save Note'}
               </Button>
             </View>
           </View>
@@ -681,6 +796,12 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
       color: colors.mutedForeground,
       textTransform: 'uppercase',
     },
+    cardActionButtons: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+    },
+    editBtn: { minHeight: 32, paddingVertical: 4, paddingHorizontal: 12 },
     deleteBtn: { minHeight: 32, paddingVertical: 4, paddingHorizontal: 12 },
     modalContainer: { flex: 1, justifyContent: 'flex-end' },
     modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(24,32,49,0.48)' },

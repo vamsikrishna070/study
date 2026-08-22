@@ -33,7 +33,7 @@ export function Input({
       style
     ]}>
       <RNTextInput
-        style={[styles.input, secureTextEntry && { paddingRight: 44 }]}
+        style={[styles.input, secureTextEntry && styles.inputSecure]}
         placeholderTextColor={colors.mutedForeground}
         secureTextEntry={isSecure}
         onFocus={() => setIsFocused(true)}
@@ -64,11 +64,12 @@ const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.crea
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 44,
+    minHeight: 48,
     backgroundColor: colors.background,
     borderRadius: radii.xl,
     borderWidth: 1,
     borderColor: colors.cardBorder,
+    position: 'relative',
   },
   focused: {
     borderColor: colors.accent,
@@ -79,15 +80,20 @@ const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.crea
   input: {
     flex: 1,
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 12,
     fontFamily: typography.sans.regular,
     fontSize: 14,
     color: colors.foreground,
   },
+  inputSecure: {
+    paddingRight: 48,
+  },
   iconContainer: {
     position: 'absolute',
-    right: 12,
-    height: '100%',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: 48,
     justifyContent: 'center',
     alignItems: 'center',
   }

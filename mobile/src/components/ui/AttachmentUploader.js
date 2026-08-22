@@ -6,7 +6,7 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
-import { CloudUpload, Image as ImageIcon, Plus, Link, Video } from 'lucide-react-native';
+import { CloudUpload, Image as ImageIcon, Plus, Link, Video, Music } from 'lucide-react-native';
 import { useAppTheme, useStyles } from '../../theme/theme';
 import { useAppDialog } from './AppDialog';
 import { Input } from './Input';
@@ -20,6 +20,7 @@ export function AttachmentUploader({
   allowYouTube = true,
   allowDocuments = true,
   allowImages = true,
+  allowAudio = true,
   style,
 }) {
   const { colors, typography, spacing, radii } = useAppTheme();
@@ -53,6 +54,32 @@ export function AttachmentUploader({
       }
     } catch (err) {
       showError('Upload Error', err.message || 'Failed to upload image.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleAudioPick = async () => {
+    try {
+      setUploading(true);
+      const uploaded = await pickAndUploadDocument({
+        type: [
+          'audio/*',
+          'audio/mpeg',
+          'audio/mp3',
+          'audio/wav',
+          'audio/x-wav',
+          'audio/m4a',
+          'audio/x-m4a',
+          'audio/aac',
+          'audio/ogg',
+        ],
+      });
+      if (uploaded) {
+        onAttachmentsChange([...attachments, { type: 'recording', ...uploaded }]);
+      }
+    } catch (err) {
+      showError('Upload Error', err.message || 'Failed to upload audio file.');
     } finally {
       setUploading(false);
     }
@@ -106,6 +133,18 @@ export function AttachmentUploader({
           >
             <ImageIcon size={16} color={colors.accent} />
             <Text style={styles.actionBtnText}>Image</Text>
+          </TouchableOpacity>
+        )}
+
+        {allowAudio && (
+          <TouchableOpacity
+            style={[styles.actionBtn, uploading && styles.disabled]}
+            onPress={handleAudioPick}
+            disabled={uploading}
+            activeOpacity={0.7}
+          >
+            <Music size={16} color={colors.accent} />
+            <Text style={styles.actionBtnText}>Audio</Text>
           </TouchableOpacity>
         )}
 

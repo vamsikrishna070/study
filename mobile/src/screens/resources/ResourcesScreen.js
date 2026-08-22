@@ -26,8 +26,12 @@ import {
   Star,
   Mic,
   CloudUpload,
+  Play,
+  Pause,
+  RotateCcw,
 } from 'lucide-react-native';
 import { viewDocument } from '../../utils/documentViewer';
+import { globalAudioPlayer } from '../../services/audioPlayerService';
 import { getResources, createResource, deleteResource, updateResource } from '../../api/resources';
 import { getSubjects } from '../../api/subjects';
 import { AuthContext } from '../../context/AuthContext';
@@ -87,6 +91,93 @@ const ResourceIcon = ({ type, mimeType, color }) => {
   }
 
   return <IconComponent size={20} color={iconColor} />;
+};
+
+const ResourceAudioBar = ({ url, title, resourceId }) => {
+  const { colors, typography, radii } = useAppTheme();
+  const [playbackState, setPlaybackState] = useState('idle');
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const handleToggle = async () => {
+    if (!url) {
+      setErrorMsg('No audio URL found for this resource.');
+      return;
+    }
+
+    if (playbackState === 'playing') {
+      await globalAudioPlayer.pause();
+      setPlaybackState('paused');
+    } else if (playbackState === 'paused') {
+      await globalAudioPlayer.resume();
+      setPlaybackState('playing');
+    } else {
+      setErrorMsg('');
+      setPlaybackState('loading');
+      await globalAudioPlayer.play(url, (update) => {
+        if (update.status === 'error') {
+          setPlaybackState('error');
+          setErrorMsg(update.error || 'Failed to play audio');
+        } else {
+          setPlaybackState(update.status);
+        }
+      });
+    }
+  };
+
+  return (
+    <View style={{ marginTop: 8, marginBottom: 4 }}>
+      <TouchableOpacity
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: playbackState === 'playing' ? colors.primary : `${colors.primary}14`,
+          borderRadius: radii.md,
+          paddingVertical: 9,
+          paddingHorizontal: 12,
+          borderWidth: 1,
+          borderColor: playbackState === 'playing' ? colors.primary : `${colors.primary}30`,
+        }}
+        onPress={handleToggle}
+        activeOpacity={0.7}
+      >
+        {playbackState === 'loading' ? (
+          <ActivityIndicator size="small" color={colors.primary} style={{ marginRight: 8 }} />
+        ) : playbackState === 'playing' ? (
+          <Pause size={16} color={colors.primaryForeground} style={{ marginRight: 8 }} />
+        ) : playbackState === 'paused' ? (
+          <Play size={16} color={colors.primary} style={{ marginRight: 8 }} />
+        ) : playbackState === 'finished' ? (
+          <RotateCcw size={16} color={colors.primary} style={{ marginRight: 8 }} />
+        ) : (
+          <Play size={16} color={colors.primary} style={{ marginRight: 8 }} />
+        )}
+
+        <Text
+          style={{
+            fontFamily: typography.sans.bold,
+            fontSize: 13,
+            color: playbackState === 'playing' ? colors.primaryForeground : colors.primary,
+          }}
+        >
+          {playbackState === 'loading'
+            ? 'Loading...'
+            : playbackState === 'playing'
+            ? 'Pause'
+            : playbackState === 'paused'
+            ? 'Resume'
+            : playbackState === 'finished'
+            ? 'Play Again'
+            : 'Play Voice Note'}
+        </Text>
+      </TouchableOpacity>
+      {Boolean(errorMsg) && (
+        <Text style={{ color: colors.destructive, fontSize: 11, textAlign: 'center', marginTop: 4 }}>
+          {errorMsg}
+        </Text>
+      )}
+    </View>
+  );
 };
 
 const ResourcesScreen = ({ route, navigation }) => {
@@ -150,6 +241,9 @@ const ResourcesScreen = ({ route, navigation }) => {
 
   useEffect(() => {
     loadData();
+    return () => {
+      globalAudioPlayer.stop();
+    };
   }, [paramSubjectId]);
 
   useEffect(() => {
@@ -309,7 +403,11 @@ const ResourcesScreen = ({ route, navigation }) => {
       return;
     }
 
-    await viewDocument(targetUrl, item.title || 'Resource');
+    try {
+      await viewDocument(targetUrl, item.title || 'Resource');
+    } catch (e) {
+      showError('Couldn’t Open Document', e?.message || 'Unable to open this document.');
+    }
   };
 
   const subjectOptions = [
@@ -370,6 +468,10 @@ const ResourcesScreen = ({ route, navigation }) => {
           const isFile = !!item.fileData;
           const targetUrl = isFile ? item.fileData?.url : item.url;
           const isImg = item.fileData?.mimeType?.startsWith('image/') || /\.(jpg|jpeg|png|webp)$/i.test(targetUrl || '');
+          const isAudio =
+            item.resourceType === 'recording' ||
+            item.fileData?.mimeType?.startsWith('audio/') ||
+            /\.(mp3|wav|m4a|aac|ogg)$/i.test(targetUrl || '');
 
           return (
             <View style={styles.card}>
@@ -415,6 +517,11 @@ const ResourcesScreen = ({ route, navigation }) => {
                 </Text>
               )}
 
+              {/* Dedicated Audio Player Bar for Audio Resources */}
+              {isAudio && targetUrl && (
+                <ResourceAudioBar url={targetUrl} title={item.title} />
+              )}
+
               {/* Image thumbnail preview if image */}
               {isImg && targetUrl && (
                 <Image
@@ -436,20 +543,22 @@ const ResourcesScreen = ({ route, navigation }) => {
               )}
 
               <View style={styles.cardFooter}>
-                <TouchableOpacity
-                  style={styles.openBtn}
-                  onPress={() => handleOpenResource(item)}
-                  activeOpacity={0.7}
-                >
-                  <ExternalLink size={14} color={colors.accent} />
-                  <Text style={styles.openBtnText}>
-                    {isFile ? 'View File' : 'Open Resource'}
-                  </Text>
-                </TouchableOpacity>
+                {!isAudio && (
+                  <TouchableOpacity
+                    style={styles.openBtn}
+                    onPress={() => handleOpenResource(item)}
+                    activeOpacity={0.7}
+                  >
+                    <ExternalLink size={14} color={colors.accent} />
+                    <Text style={styles.openBtnText}>
+                      {isFile ? 'View File' : 'Open Resource'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
                 <Button
                   variant="danger"
                   onPress={() => handleDelete(resId)}
-                  style={styles.deleteBtn}
+                  style={[styles.deleteBtn, isAudio && { marginLeft: 'auto' }]}
                 >
                   Delete
                 </Button>

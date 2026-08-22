@@ -6,24 +6,24 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Alert,
   Platform,
 } from 'react-native';
 import { Mic, Square, Play, Pause, Trash2, CloudUpload, X } from 'lucide-react-native';
+import {
+  useAudioRecorder,
+  RecordingPresets,
+  requestRecordingPermissionsAsync,
+  getRecordingPermissionsAsync,
+  setAudioModeAsync,
+} from 'expo-audio';
 import { useAppTheme, useStyles } from '../../theme/theme';
 import { useAppDialog } from './AppDialog';
 import { Button } from './Button';
 import { Input } from './Input';
 import { Field } from './Field';
 import { uploadFileToServer } from '../../utils/fileUploader';
-
-// We import expo-audio dynamically or defensively to handle all environments
-let expoAudio = null;
-try {
-  expoAudio = require('expo-audio');
-} catch (e) {
-  console.log('[VoiceRecorder] expo-audio import notice:', e.message);
-}
+import { saveCustomAudio } from '../../services/documentService';
+import { globalAudioPlayer } from '../../services/audioPlayerService';
 
 export function VoiceRecorderModal({
   visible,
@@ -35,15 +35,20 @@ export function VoiceRecorderModal({
   const { showError, showDialog } = useAppDialog();
 
   const [title, setTitle] = useState('');
-  const [recordingStatus, setRecordingStatus] = useState('idle'); // idle | recording | stopped
+  const [recordingStatus, setRecordingStatus] = useState('idle'); // 'idle' | 'recording' | 'stopped'
   const [recordUri, setRecordUri] = useState(null);
   const [duration, setDuration] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [uploading, setUploading] = useState(false);
 
   const timerRef = useRef(null);
-  const recorderRef = useRef(null);
-  const playerRef = useRef(null);
+
+  // Official SDK 54+ expo-audio hook
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY, (status) => {
+    if (status?.hasError) {
+      console.error('[VOICE RECORDER] Recording status error:', status.error);
+    }
+  });
 
   useEffect(() => {
     if (visible) {
@@ -74,33 +79,41 @@ export function VoiceRecorderModal({
 
   const cleanupAudio = async () => {
     try {
-      if (recorderRef.current) {
-        if (typeof recorderRef.current.stop === 'function') {
-          await recorderRef.current.stop();
-        }
-        recorderRef.current = null;
+      if (recorder?.isRecording) {
+        await recorder.stop();
       }
-      if (playerRef.current) {
-        if (typeof playerRef.current.pause === 'function') {
-          playerRef.current.pause();
-        }
-        playerRef.current = null;
-      }
+      await globalAudioPlayer.stop();
+      setIsPlaying(false);
+      await setAudioModeAsync({
+        allowsRecording: false,
+        playsInSilentMode: true,
+      });
     } catch (e) {
-      console.log('[Audio cleanup]', e);
+      console.warn('[VOICE RECORDER] Audio cleanup notice:', e?.message || e);
     }
   };
 
   const requestPermission = async () => {
-    if (expoAudio?.AudioModule?.requestRecordingPermissionsAsync) {
-      const { granted } = await expoAudio.AudioModule.requestRecordingPermissionsAsync();
-      return granted;
+    try {
+      if (typeof getRecordingPermissionsAsync === 'function') {
+        const current = await getRecordingPermissionsAsync();
+        if (current.granted) return true;
+      }
+      if (typeof requestRecordingPermissionsAsync === 'function') {
+        const req = await requestRecordingPermissionsAsync();
+        return req.granted;
+      }
+    } catch (e) {
+      console.warn('[VOICE RECORDER] Permission request error:', e?.message || e);
     }
     return true;
   };
 
   const handleStartRecord = async () => {
     try {
+      await globalAudioPlayer.stop();
+      setIsPlaying(false);
+
       const hasPermission = await requestPermission();
       if (!hasPermission) {
         showDialog({
@@ -112,17 +125,19 @@ export function VoiceRecorderModal({
         return;
       }
 
+      await setAudioModeAsync({
+        allowsRecording: true,
+        playsInSilentMode: true,
+      });
+
       setDuration(0);
-      if (expoAudio?.AudioRecorder) {
-        const recorder = new expoAudio.AudioRecorder();
-        await recorder.prepareToRecordAsync();
-        recorder.record();
-        recorderRef.current = recorder;
-      }
+      await recorder.prepareToRecordAsync();
+      recorder.record();
 
       setRecordingStatus('recording');
       startTimer();
     } catch (err) {
+      console.error('[VOICE RECORDER] Start recording error:', err);
       showError('Recording Error', err.message || 'Failed to start recording.');
     }
   };
@@ -130,41 +145,46 @@ export function VoiceRecorderModal({
   const handleStopRecord = async () => {
     try {
       stopTimer();
-      let uri = null;
-      if (recorderRef.current) {
-        if (typeof recorderRef.current.stop === 'function') {
-          await recorderRef.current.stop();
-        }
-        uri = recorderRef.current.uri;
+      await recorder.stop();
+      const uri = recorder.uri;
+
+      await setAudioModeAsync({
+        allowsRecording: false,
+        playsInSilentMode: true,
+      });
+
+      if (!uri) {
+        throw new Error('Recording stopped but no audio file was produced.');
       }
+
+      console.log(`[VOICE RECORDER DEBUG]\nrecordedUri: ${uri}`);
       setRecordUri(uri);
       setRecordingStatus('stopped');
     } catch (err) {
+      console.error('[VOICE RECORDER] Stop recording error:', err);
       showError('Recording Error', err.message || 'Failed to stop recording.');
     }
   };
 
   const handlePlayPause = async () => {
-    if (!recordUri || !expoAudio?.createAudioPlayer) return;
+    if (!recordUri) return;
 
     try {
       if (isPlaying) {
-        if (playerRef.current) playerRef.current.pause();
+        await globalAudioPlayer.pause();
         setIsPlaying(false);
       } else {
-        if (!playerRef.current) {
-          playerRef.current = expoAudio.createAudioPlayer(recordUri);
-          playerRef.current.addListener('playbackStatusUpdate', (status) => {
-            if (status.didJustFinish) {
-              setIsPlaying(false);
-            }
-          });
-        }
-        playerRef.current.play();
-        setIsPlaying(true);
+        await globalAudioPlayer.play(recordUri, (status) => {
+          if (status.status === 'playing') {
+            setIsPlaying(true);
+          } else if (status.status === 'finished' || status.status === 'paused' || status.status === 'error') {
+            setIsPlaying(false);
+          }
+        });
       }
     } catch (e) {
-      console.log('Playback error:', e);
+      console.error('[VOICE RECORDER] Playback error:', e);
+      setIsPlaying(false);
     }
   };
 
@@ -176,33 +196,58 @@ export function VoiceRecorderModal({
 
     setUploading(true);
     try {
-      const fileName = `${title.replace(/[^a-zA-Z0-9_-]/g, '_')}_${Date.now()}.m4a`;
+      await globalAudioPlayer.stop();
+      setIsPlaying(false);
+
+      const safeBase = title.replace(/[^a-zA-Z0-9_-]/g, '_') || 'Voice_Note';
+      const fileName = `${safeBase}_${Date.now()}.m4a`;
+
+      // 1. First persist to internal app storage so local file is always permanent
+      let persistentUri = recordUri;
+      let verifiedSize = 0;
+      try {
+        const saved = await saveCustomAudio({
+          uri: recordUri,
+          name: fileName,
+        });
+        persistentUri = saved.uri;
+        verifiedSize = saved.size;
+      } catch (saveErr) {
+        console.warn('[VOICE RECORDER] Could not save to persistent audio directory, using recordUri:', saveErr);
+      }
+
       let uploadedData = {
-        url: recordUri || '',
+        url: persistentUri || '',
         publicId: '',
         originalName: title || 'Voice Recording',
         mimeType: 'audio/m4a',
-        size: 0,
+        size: verifiedSize,
         duration,
       };
 
-      if (recordUri) {
+      // 2. Upload to Cloudinary / server
+      try {
         const res = await uploadFileToServer({
-          uri: recordUri,
+          uri: persistentUri || recordUri,
           name: fileName,
           mimeType: 'audio/m4a',
         });
-        uploadedData = {
-          ...res,
-          duration,
-          originalName: title || res.originalName || 'Voice Recording',
-        };
+        if (res && res.url) {
+          uploadedData = {
+            ...res,
+            duration,
+            originalName: title || res.originalName || 'Voice Recording',
+          };
+        }
+      } catch (uploadErr) {
+        console.warn('[VOICE RECORDER] Upload failed, retaining persistent local file:', uploadErr);
+        // Retain local persistentUri so note/resource still works offline
       }
 
       onSave?.(uploadedData);
       onClose();
     } catch (err) {
-      showError('Upload Failed', err.message || 'Could not upload voice recording.');
+      showError('Save Error', err.message || 'Could not save voice recording.');
     } finally {
       setUploading(false);
     }
@@ -271,7 +316,7 @@ export function VoiceRecorderModal({
 
               {recordingStatus === 'stopped' && (
                 <View style={styles.stoppedControls}>
-                  {recordUri && expoAudio?.createAudioPlayer && (
+                  {recordUri && (
                     <TouchableOpacity
                       style={styles.playbackBtn}
                       onPress={handlePlayPause}
@@ -288,6 +333,8 @@ export function VoiceRecorderModal({
                   <TouchableOpacity
                     style={styles.resetBtn}
                     onPress={() => {
+                      globalAudioPlayer.stop();
+                      setIsPlaying(false);
                       setRecordingStatus('idle');
                       setDuration(0);
                       setRecordUri(null);
