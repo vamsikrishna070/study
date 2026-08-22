@@ -6,8 +6,12 @@ import {
   extractSyllabusStructure,
   parseUnitNumber,
   romanToArabic,
+  wordToNumber,
   cleanOcrTypo,
   isReferenceOrJunk,
+  splitRespectingParentheses,
+  splitCompositeTopic,
+  cleanTopicTitle,
 } from '../services/syllabusExtractorService.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -28,7 +32,7 @@ async function runTests() {
     }
   }
 
-  // 1. Number and Roman Numeral Parsing Tests
+  // 1. Number, Roman Numeral, and Word Parsing Tests
   assert(romanToArabic('I') === 1, 'Roman I -> 1');
   assert(romanToArabic('II') === 2, 'Roman II -> 2');
   assert(romanToArabic('III') === 3, 'Roman III -> 3');
@@ -36,6 +40,13 @@ async function runTests() {
   assert(romanToArabic('V') === 5, 'Roman V -> 5');
   assert(parseUnitNumber('3') === 3, 'Arabic 3 -> 3');
   assert(parseUnitNumber('Unit IV') === 4, 'Unit IV -> 4');
+  assert(parseUnitNumber('UNIT 01') === 1, 'Zero-padded UNIT 01 -> 1');
+  assert(parseUnitNumber('MODULE 05') === 5, 'Zero-padded MODULE 05 -> 5');
+  assert(wordToNumber('First') === 1, 'Word First -> 1');
+  assert(wordToNumber('Second') === 2, 'Word Second -> 2');
+  assert(wordToNumber('Third') === 3, 'Word Third -> 3');
+  assert(wordToNumber('Fourth') === 4, 'Word Fourth -> 4');
+  assert(wordToNumber('Fifth') === 5, 'Word Fifth -> 5');
 
   // 2. OCR and Typo Correction Tests
   assert(
@@ -58,8 +69,106 @@ async function runTests() {
     isReferenceOrJunk('https://docs.oracle.com/javase/tutorial/jdbc/basics/connecting.html'),
     'URL link detected and filtered'
   );
+  assert(isReferenceOrJunk('NPTEL Courses / MOOCs on Database Systems'), 'MOOCs/NPTEL detected as non-theory');
+  assert(isReferenceOrJunk('Continuous Internal Assessment (CIA) - 50 Marks'), 'CIA evaluation pattern detected as non-theory');
 
-  // 4. Structural Text Extraction Regression (Operating Systems)
+  // 4. Parentheses-Aware Delimiter Splitting Tests
+  const parenTestStr = 'Contiguous Memory Allocation (Single partition, Multiple partition), Segmentation, Paging (Demand Paging, Page Faults)';
+  const parenParts = splitRespectingParentheses(parenTestStr, ',');
+  assert(parenParts.length === 3, `Parentheses-aware comma split: 3 parts extracted (got ${parenParts.length})`);
+  assert(parenParts[0].includes('Single partition, Multiple partition'), 'First part preserved internal comma within parentheses');
+  assert(parenParts[2].includes('Demand Paging, Page Faults'), 'Third part preserved internal comma within parentheses');
+
+  // 5. Topic Title Punctuation and Bullet Cleanup Tests
+  assert(cleanTopicTitle('• Introduction to Operating Systems.') === 'Introduction to Operating Systems', 'Cleaned bullet and trailing dot');
+  assert(cleanTopicTitle('1. Process Scheduling Algorithms;') === 'Process Scheduling Algorithms', 'Cleaned numbered bullet and trailing semicolon');
+  assert(cleanTopicTitle('1.1.2 Advanced Memory Management -') === 'Advanced Memory Management', 'Cleaned hierarchical sub-numbering and trailing dash');
+  assert(cleanTopicTitle('(a) Deadlock Prevention.') === 'Deadlock Prevention', 'Cleaned lettered bullet and trailing dot');
+
+  // 6. In-Paragraph Multi-Subtopic Splitting Tests
+  const inParagraphNumbered = '1.1 Process Concepts 1.2 Process Scheduling 1.3 Operations on Processes 1.4 Inter-process Communication';
+  const subNumTopics = splitCompositeTopic(inParagraphNumbered);
+  assert(subNumTopics.length === 4, `In-paragraph numbered subtopics: 4 atomic topics extracted (got ${subNumTopics.length})`);
+  assert(subNumTopics[0] === 'Process Concepts', `Subtopic 1: "${subNumTopics[0]}"`);
+  assert(subNumTopics[3] === 'Inter-process Communication', `Subtopic 4: "${subNumTopics[3]}"`);
+
+  // 7. Structural Text Extraction Regression: Alphanumeric Course Codes (VTU / KTU style)
+  const vtuSyllabusText = `
+VISVESVARAYA TECHNOLOGICAL UNIVERSITY, BELAGAVI
+Course Code : 20CS41T
+Course Title : OPERATING SYSTEMS
+
+MODULE - 01
+Introduction to Operating Systems
+- Abstract view of OS, Goals of OS, Operation of OS
+- Resource Allocator, System calls, Dual-mode operation
+
+MODULE - 02 (10 Hours)
+Process Management
+- Process state, PCB, Context Switch, Process Scheduling
+- Inter-process Communication, Shared Memory, Message Passing
+
+MODULE - 03
+Deadlocks & Synchronization
+(12 Hours)
+- Critical Section Problem, Peterson's Solution, Semaphores
+- Deadlock characterization, Deadlock prevention, Banker's Algorithm
+
+MODULE - 04
+Memory Management
+- Address binding, Logical vs Physical address space
+- Contiguous Memory Allocation (Fixed partition, Variable partition), Paging
+
+MODULE - 05
+Secondary Storage and File Systems
+- Disk structure, Disk scheduling (FCFS, SSTF, SCAN, LOOK)
+- File system interface, Access methods, Directory structure
+
+Text Books:
+1. Abraham Silberschatz, Peter Baer Galvin, Greg Gagne, Operating System Concepts, 9th Edition, Wiley.
+`;
+  const vtuResult = extractSyllabusStructure(vtuSyllabusText);
+  assert(vtuResult.courseCode === '20CS41T', `VTU Alphanumeric Course Code: "${vtuResult.courseCode}"`);
+  assert(vtuResult.courseName === 'OPERATING SYSTEMS', `VTU Course Name: "${vtuResult.courseName}"`);
+  assert(vtuResult.units.length === 5, `VTU Modules detected: ${vtuResult.units.length} (Expected: 5)`);
+  assert(vtuResult.units[1].unitName === 'Process Management', `Module 2 Name cleaned hours: "${vtuResult.units[1].unitName}"`);
+  assert(vtuResult.units[2].unitName === 'Deadlocks & Synchronization', `Module 3 Name captured across hours line: "${vtuResult.units[2].unitName}"`);
+  assert(
+    vtuResult.units[3].topics.some((t) => t.title.includes('Fixed partition, Variable partition')),
+    'Module 4 preserved parenthesized comma in Contiguous Memory Allocation'
+  );
+
+  // 8. Word-Based Unit Headers Test (Anna University / Traditional College format)
+  const wordHeaderSyllabus = `
+ANNA UNIVERSITY, CHENNAI
+CS8492 - DATABASE MANAGEMENT SYSTEMS
+
+FIRST UNIT: INTRODUCTION TO RELATIONAL DATABASES
+Purpose of Database System - Views of data - Data Models - Database System Architecture - Entity Relationship model - ER Diagrams
+
+SECOND UNIT: SQL AND QUERY OPTIMIZATION
+Relational Algebra - SQL queries - Nested queries - Aggregation - Views - Integrity Constraints
+
+THIRD UNIT: TRANSACTIONS AND CONCURRENCY
+Transaction Concepts - ACID Properties - Serializability - Concurrency Control - Lock based protocols
+
+FOURTH UNIT: TRENDS IN DATABASE TECHNOLOGY
+RAID - Storage Systems - Query Processing - B+ Trees - Hashing
+
+FIFTH UNIT: ADVANCED TOPICS
+Distributed Databases - Object Oriented Databases - XML Databases - NoSQL
+
+REFERENCES:
+1. Silberschatz, Korth, Database Systems, McGraw Hill.
+`;
+  const annaResult = extractSyllabusStructure(wordHeaderSyllabus);
+  assert(annaResult.courseCode === 'CS8492', `Anna University Course Code: "${annaResult.courseCode}"`);
+  assert(annaResult.courseName === 'DATABASE MANAGEMENT SYSTEMS', `Anna University Course Name: "${annaResult.courseName}"`);
+  assert(annaResult.units.length === 5, `Word-based Units detected: ${annaResult.units.length} (Expected: 5)`);
+  assert(annaResult.units[0].unitNumber === 1, 'FIRST UNIT mapped to unitNumber 1');
+  assert(annaResult.units[4].unitNumber === 5, 'FIFTH UNIT mapped to unitNumber 5');
+
+  // 9. Structural Text Extraction Regression (Operating Systems)
   const sampleOsText = `
 SRM University AP, Andhra Pradesh
 Operating Systems
@@ -130,7 +239,7 @@ Course Utilization Plan – Lab
     'OS Lab experiments excluded from theory units'
   );
 
-  // 5. Structural Text Extraction Regression (Advanced Java from CSE309_OBE content)
+  // 10. Structural Text Extraction Regression (Advanced Java from CSE309_OBE content)
   const sampleJavaText = `
 SRM University AP, Andhra Pradesh
 Advanced JAVA Programming
@@ -214,7 +323,7 @@ Bloom’s Level of Cognitive Task
     `Unit 3 OCR Typo fixed in Unit Name: "${javaResult.units[2].unitName}"`
   );
 
-  // 6. Structural Text Extraction Regression: Standard University Paragraph & Semicolon Syllabus (JNTU / Anna University / VTU style)
+  // 11. Structural Text Extraction Regression: Standard University Paragraph & Semicolon Syllabus (JNTU)
   const standardJntuSyllabus = `
 JAWAHARLAL NEHRU TECHNOLOGICAL UNIVERSITY HYDERABAD
 B.Tech. in COMPUTER SCIENCE AND ENGINEERING
@@ -267,7 +376,7 @@ REFERENCES:
     'JNTU Textbooks excluded from topics'
   );
 
-  // 7. Structural Text Extraction Regression: Bulleted & Numbered Module Syllabus with Multi-line Headers
+  // 12. Structural Text Extraction Regression: Bulleted & Numbered Module Syllabus with Multi-line Headers
   const bulletedSyllabus = `
 NATIONAL INSTITUTE OF TECHNOLOGY
 DEPARTMENT OF COMPUTER SCIENCE
@@ -320,7 +429,7 @@ CO2: Design subnets and analyze routing.
     'Course outcomes excluded from topics'
   );
 
-  // 8. Unit-Topic Association & Strict Isolation Test
+  // 13. Unit-Topic Association & Strict Isolation Test
   const isolationTestText = `
 UNIT I: Foundations
 Topic A1
@@ -349,7 +458,7 @@ Topic C2
     'Unit 3 contains strictly Topic C items'
   );
 
-  // 9. Check Local PDFs if present in local developer environment
+  // 14. Check Local PDFs if present
   const fixturesDir = path.join(__dirname, 'fixtures', 'syllabi');
   const fixturePdfNames = ['os.pdf', 'coa.pdf', 'cse309_obe.pdf', 'ml.pdf'];
   const presentPdfs = fixturePdfNames.filter((name) => fs.existsSync(path.join(fixturesDir, name)));
