@@ -31,6 +31,7 @@ import {
   Field,
   inputClass,
 } from "../components/shared.jsx";
+import { DocumentPreviewCard } from "../components/shared/DocumentPreviewCard.jsx";
 import SyllabusReviewModal from "../components/subjects/SyllabusReviewModal.jsx";
 
 function UnitForm({ subjectId, onClose, onSuccess }) {
@@ -442,53 +443,15 @@ export default function SubjectDetail() {
               </section>
 
               {subject.syllabusFile?.url && (
-                <section className="rounded-2xl border border-card-border bg-card p-6">
-                  <h3 className="font-display text-xl mb-3">
-                    Attached Syllabus
-                  </h3>
-                  <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-background">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-secondary text-primary rounded-lg">
-                        <BookOpen size={20} />
-                      </div>
-                      <div>
-                        <p className="font-semibold text-sm">
-                          {subject.syllabusFile.originalName || "Syllabus PDF"}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          PDF Document
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <a
-                        href={subject.syllabusFile.url}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        <Button variant="outline" className="h-8 text-xs">
-                          View PDF
-                        </Button>
-                      </a>
-                      <Button
-                        variant="quiet"
-                        onClick={() => handleDownload(subject.syllabusFile.url, subject.syllabusFile.originalName)}
-                        className="h-8 w-8 rounded-full p-0 text-muted-foreground hover:text-foreground"
-                        title="Download PDF"
-                      >
-                        <Download size={14} />
-                      </Button>
-                      <Button
-                        variant="quiet"
-                        onClick={() => handleShare(subject.syllabusFile.url)}
-                        className="h-8 w-8 rounded-full p-0 text-muted-foreground hover:text-foreground"
-                        title="Share link"
-                      >
-                        {copiedLink ? <Check size={14} className="text-green-500" /> : <Share2 size={14} />}
-                      </Button>
-                    </div>
-                  </div>
-                </section>
+                <DocumentPreviewCard
+                  file={subject.syllabusFile}
+                  title="Syllabus PDF"
+                  unitCount={units.length}
+                  topicCount={totalTopics}
+                  isExtracting={extracting}
+                  onExtract={units.length === 0 ? extractSyllabusFromPDF : null}
+                  accentColor={subject.color || 'var(--accent, #d97706)'}
+                />
               )}
             </div>
 

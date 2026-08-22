@@ -1,451 +1,546 @@
-import { useState, useEffect, useMemo } from "react";
-import { BookOpen, CheckCircle, Circle, Play, Wand2 } from "lucide-react";
-import { Link } from "react-router-dom";
-import apiClient from "../services/apiClient.js";
-import Shell from "../components/Shell.jsx";
-import {
-  PageHeading,
-  Button,
-  LoadingBlock,
-  QueryState,
-  cx,
-} from "../components/shared.jsx";
-import SyllabusReviewModal from "../components/subjects/SyllabusReviewModal.jsx";
-import { uploadFile } from "../services/apiHooks.js";
-
-function UploadModal({ subjects, onClose, onUploaded }) {
-  const [subjectId, setSubjectId] = useState("");
-  const [file, setFile] = useState(null);
-  const [dragging, setDragging] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState("");
-
-  function selectFile(selectedFile) {
-    if (!selectedFile) return;
-    if (selectedFile.type !== "application/pdf") {
-      setError("Please upload a PDF syllabus.");
-      return;
-    }
-    if (selectedFile.size > 15 * 1024 * 1024) {
-      setError("The syllabus PDF must be smaller than 15 MB.");
-      return;
-    }
-    setError("");
-    setFile(selectedFile);
-  }
-
-  async function handleSubmit(event) {
-    event.preventDefault();
-    if (!subjectId) return setError("Please select a subject.");
-    if (!file) return setError("Please select a syllabus PDF.");
-
-    try {
-      setUploading(true);
-      setError("");
-
-      const fileData = await uploadFile(file);
-      await apiClient.patch(`/subjects/${subjectId}`, {
-        syllabusFile: fileData,
-      });
-
-      onUploaded(subjectId, fileData);
-    } catch (err) {
-      setError(err.message || "Upload failed");
-    } finally {
-      setUploading(false);
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-      <div className="flex max-h-[calc(100dvh-32px)] w-full max-w-xl flex-col overflow-hidden rounded-3xl border border-card-border bg-background shadow-2xl">
-        <div className="flex items-center justify-between border-b border-card-border px-6 py-5">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-              Syllabus
-            </p>
-            <h2 className="mt-1 text-2xl font-semibold text-foreground">
-              Upload syllabus
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full px-3 py-2 text-muted-foreground hover:bg-muted"
-          >
-            ✕
-          </button>
-        </div>
-        <form onSubmit={handleSubmit} className="overflow-y-auto p-6">
-          <label className="mb-2 block text-sm font-medium">Subject</label>
-          <select
-            value={subjectId}
-            onChange={(e) => setSubjectId(e.target.value)}
-            className="mb-6 h-12 w-full rounded-xl border border-card-border bg-background px-4 outline-none focus:border-primary"
-          >
-            <option value="">Select subject</option>
-            {subjects.map((s) => (
-              <option key={s._id} value={s._id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-
-          <label
-            onDragEnter={(e) => {
-              e.preventDefault();
-              setDragging(true);
-            }}
-            onDragOver={(e) => e.preventDefault()}
-            onDragLeave={() => setDragging(false)}
-            onDrop={(e) => {
-              e.preventDefault();
-              setDragging(false);
-              selectFile(e.dataTransfer.files?.[0]);
-            }}
-            className={cx(
-              "flex min-h-48 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-6 text-center transition",
-              dragging
-                ? "border-primary bg-primary/5"
-                : "border-card-border hover:border-primary/50",
-            )}
-          >
-            <input
-              type="file"
-              accept=".pdf,application/pdf"
-              className="hidden"
-              onChange={(e) => selectFile(e.target.files?.[0])}
-            />
-            <div className="mb-3 text-4xl">📄</div>
-            {file ? (
-              <>
-                <p className="font-medium text-foreground">{file.name}</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {(file.size / 1024 / 1024).toFixed(2)} MB
-                </p>
-              </>
-            ) : (
-              <>
-                <p className="font-medium">Drop your syllabus PDF here</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  or click to browse (Max 15MB)
-                </p>
-              </>
-            )}
-          </label>
-
-          {error && (
-            <div className="mt-4 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-600">
-              {error}
-            </div>
-          )}
-
-          <div className="mt-6 flex justify-end gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-xl border border-card-border px-5 py-3 font-medium hover:bg-muted"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={uploading}
-              className="rounded-xl bg-primary px-5 py-3 font-medium text-primary-foreground disabled:opacity-60"
-            >
-              {uploading ? "Uploading..." : "Upload & Proceed"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { 
+  Sparkles, 
+  Layers, 
+  CloudUpload, 
+  ChevronRight, 
+  ChevronDown, 
+  CheckCircle2, 
+  Circle, 
+  Loader2, 
+  BookOpen, 
+  Upload 
+} from 'lucide-react';
+import apiClient from '../services/apiClient.js';
+import { uploadFile } from '../services/apiHooks.js';
+import Shell from '../components/Shell.jsx';
+import { PageHeading, Button, LoadingBlock, QueryState, cx } from '../components/shared.jsx';
+import { DocumentPreviewCard } from '../components/shared/DocumentPreviewCard.jsx';
+import SyllabusReviewModal from '../components/subjects/SyllabusReviewModal.jsx';
 
 export default function Syllabus() {
-  const [subjects, setSubjects] = useState([]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialSubjectId = searchParams.get('subject') || '';
+
+  const [subjectId, setSubjectId] = useState(initialSubjectId);
+  const [allSubjects, setAllSubjects] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [units, setUnits] = useState([]);
   const [topics, setTopics] = useState([]);
+  const [error, setError] = useState(null);
+  const [expandedUnits, setExpandedUnits] = useState({});
 
-  const [selectedSubject, setSelectedSubject] = useState("all");
-  const [showUpload, setShowUpload] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
+  // Extraction & Upload state
+  const [uploadingPdf, setUploadingPdf] = useState(false);
   const [extracting, setExtracting] = useState(false);
-  const [parsedSyllabusData, setParsedSyllabusData] = useState(null);
-  const [extractTargetSubject, setExtractTargetSubject] = useState(null);
+  const [extractionStep, setExtractionStep] = useState('');
+  const [reviewVisible, setReviewVisible] = useState(false);
+  const [parsedUnits, setParsedUnits] = useState([]);
+  const [extractionError, setExtractionError] = useState(null);
 
-  const loadData = async () => {
+  const fileInputRef = useRef(null);
+
+  const loadData = useCallback(async (targetSubjId = subjectId) => {
     try {
-      setLoading(true);
-      const [subjRes, unitsRes, topicsRes] = await Promise.all([
-        apiClient.get("/subjects"),
-        apiClient.get("/units"),
-        apiClient.get("/topics"),
+      setError(null);
+      const subsRes = await apiClient.get('/subjects');
+      const subsData = subsRes.data?.data || subsRes.data || [];
+      setAllSubjects(subsData);
+
+      const activeId = targetSubjId || (subsData.length > 0 ? (subsData[0]._id || subsData[0].id) : '');
+      if (!subjectId && activeId) {
+        setSubjectId(activeId);
+      }
+
+      if (!activeId) {
+        setLoading(false);
+        return;
+      }
+
+      const [unitsRes, topicsRes] = await Promise.all([
+        apiClient.get(`/units?subjectId=${activeId}`),
+        apiClient.get(`/topics?subjectId=${activeId}`),
       ]);
-      setSubjects(subjRes.data.data);
-      setUnits(unitsRes.data.data);
-      setTopics(topicsRes.data.data);
-    } catch (err) {
-      setError("Failed to load syllabus data");
+
+      const unitsData = unitsRes.data?.data || unitsRes.data || [];
+      const topicsData = topicsRes.data?.data || topicsRes.data || [];
+      setUnits(unitsData);
+      setTopics(topicsData);
+
+      if (unitsData.length > 0) {
+        // Expand first unit by default
+        const firstId = unitsData[0]._id || unitsData[0].id;
+        setExpandedUnits(prev => ({ [firstId]: true, ...prev }));
+      }
+    } catch (e) {
+      setError('Failed to load syllabus data.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [subjectId]);
 
   useEffect(() => {
-    loadData();
-  }, []);
+    loadData(subjectId);
+  }, [subjectId, loadData]);
 
-  const toggleTopic = async (topic) => {
+  const currentSubject = allSubjects.find((s) => (s._id || s.id) === subjectId);
+  const subjectColor = currentSubject?.color || 'var(--accent, #d97706)';
+
+  // Handle PDF file selection from native file picker
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Reset file input value so same file can be picked again
+    e.target.value = '';
+
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      alert('Please select a valid PDF syllabus document.');
+      return;
+    }
+
+    if (file.size > 25 * 1024 * 1024) {
+      alert('The syllabus PDF must be smaller than 25 MB.');
+      return;
+    }
+
+    if (!subjectId) {
+      alert('Please select a subject before uploading a syllabus.');
+      return;
+    }
+
     try {
-      const newStatus =
-        topic.status === "completed" ? "not-started" : "completed";
-      await apiClient.patch(`/topics/${topic._id}`, { status: newStatus });
-      setTopics(
-        topics.map((t) =>
-          t._id === topic._id ? { ...t, status: newStatus } : t,
-        ),
-      );
+      setUploadingPdf(true);
+      setExtractionError(null);
+      setExtractionStep('Uploading syllabus PDF...');
+
+      // 1. Upload file to backend
+      const uploaded = await uploadFile(file);
+      if (!uploaded || !uploaded.url) {
+        throw new Error('File upload failed.');
+      }
+
+      // 2. Save syllabusFile on subject
+      setExtractionStep('Attaching to subject...');
+      await apiClient.patch(`/subjects/${subjectId}`, {
+        syllabusFile: {
+          url: uploaded.url,
+          publicId: uploaded.publicId || '',
+          originalName: uploaded.originalName || file.name,
+          mimeType: uploaded.mimeType || 'application/pdf',
+          size: uploaded.size || file.size,
+        },
+      });
+
+      // 3. Extract syllabus structure using backend extractor
+      setExtractionStep('Extracting units & topics from syllabus...');
+      setExtracting(true);
+      
+      const res = await apiClient.post(`/subjects/${subjectId}/syllabus/extract`);
+      const extracted = res.data?.data?.units || res.data?.units || [];
+
+      if (extracted.length > 0) {
+        setParsedUnits(extracted);
+        setReviewVisible(true);
+      } else {
+        alert('Syllabus PDF was uploaded successfully. Text extraction could not automatically detect structured units, but your document is safely attached.');
+      }
+
+      loadData(subjectId);
     } catch (err) {
-      // ignore
+      const msg = err.response?.data?.message || err.message || 'Could not extract the syllabus. Please make sure the PDF contains readable syllabus text.';
+      setExtractionError(msg);
+      alert(msg);
+    } finally {
+      setUploadingPdf(false);
+      setExtracting(false);
+      setExtractionStep('');
     }
   };
 
-  const handleExtract = async (subjectId) => {
+  // Re-extract from currently attached PDF
+  const handleExtractExisting = async () => {
+    if (!currentSubject?.syllabusFile?.url) return;
     setExtracting(true);
-    setExtractTargetSubject(subjectId);
+    setExtractionError(null);
+    setExtractionStep('Extracting units & topics...');
+
     try {
-      const res = await apiClient.post(
-        `/subjects/${subjectId}/syllabus/extract`,
-      );
-      setParsedSyllabusData(res.data.data);
+      const res = await apiClient.post(`/subjects/${subjectId}/syllabus/extract`);
+      const extracted = res.data?.data?.units || res.data?.units || [];
+
+      if (extracted.length > 0) {
+        setParsedUnits(extracted);
+        setReviewVisible(true);
+      } else {
+        alert('Could not detect structured units from this PDF. You can add units manually.');
+      }
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to extract syllabus text.");
+      const msg = err.response?.data?.message || 'Could not extract the syllabus. Please make sure the PDF contains readable syllabus text.';
+      setExtractionError(msg);
+      alert(msg);
     } finally {
       setExtracting(false);
+      setExtractionStep('');
     }
   };
 
-  const displayedSubjects = useMemo(() => {
-    if (selectedSubject === "all") return subjects;
-    return subjects.filter((s) => s._id === selectedSubject);
-  }, [subjects, selectedSubject]);
+  // Remove attached syllabus PDF
+  const handleRemoveSyllabus = async () => {
+    if (!subjectId) return;
+    try {
+      await apiClient.patch(`/subjects/${subjectId}`, {
+        syllabusFile: { url: '', publicId: '', originalName: '', mimeType: '', size: 0 },
+      });
+      loadData(subjectId);
+    } catch (err) {
+      alert('Failed to remove syllabus PDF.');
+    }
+  };
 
-  if (loading)
-    return (
-      <Shell>
-        <LoadingBlock lines={8} />
-      </Shell>
+  // Toggle topic completion state
+  const toggleTopic = async (topic) => {
+    const isCompleted = topic.status === 'completed' || topic.completed;
+    const newStatus = isCompleted ? 'not-started' : 'completed';
+    const topicId = topic._id || topic.id;
+
+    // Optimistic UI update
+    setTopics((prev) =>
+      prev.map((t) =>
+        (t._id || t.id) === topicId
+          ? { ...t, status: newStatus, completed: !isCompleted }
+          : t
+      )
     );
-  if (error)
-    return (
-      <Shell>
-        <QueryState error={error} onRetry={loadData} label="Syllabus" />
-      </Shell>
-    );
+
+    try {
+      await apiClient.patch(`/topics/${topicId}`, { 
+        status: newStatus,
+        completed: !isCompleted 
+      });
+    } catch (e) {
+      // Revert state on error
+      setTopics((prev) =>
+        prev.map((t) =>
+          (t._id || t.id) === topicId
+            ? { ...t, status: topic.status, completed: topic.completed }
+            : t
+        )
+      );
+      alert('Failed to update topic status. Please try again.');
+    }
+  };
+
+  const toggleUnit = (uId) => {
+    setExpandedUnits((prev) => ({ ...prev, [uId]: !prev[uId] }));
+  };
+
+  const totalTopics = topics.length;
+  const completedTopics = topics.filter((t) => t.status === 'completed' || t.completed).length;
+  const progressPercent = totalTopics > 0 ? Math.round((completedTopics / totalTopics) * 100) : 0;
 
   return (
     <Shell>
-      <PageHeading
-        eyebrow="Structure"
-        title="Syllabus"
-        detail="Turn your course syllabus into a trackable study plan."
+      {/* Hidden Native File Input */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        accept=".pdf,application/pdf"
+        className="hidden"
+        onChange={handleFileChange}
       />
 
-      <div className="mt-6 space-y-6 mb-8">
-        <div className="flex flex-col gap-3 rounded-2xl border border-card-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-1 gap-3">
-            <select
-              value={selectedSubject}
-              onChange={(e) => setSelectedSubject(e.target.value)}
-              className="h-11 min-w-0 flex-1 rounded-xl border border-card-border bg-background px-4 text-sm outline-none focus:border-primary sm:max-w-xs"
+      <PageHeading
+        eyebrow="The curriculum"
+        title="Syllabus"
+        detail={
+          currentSubject
+            ? `Tracking curriculum & topics for ${currentSubject.name}`
+            : 'Select a subject and upload a PDF syllabus.'
+        }
+        action={
+          subjectId && (
+            <Button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingPdf || extracting}
+              className="gap-2 shadow-sm"
             >
-              <option value="all">All subjects</option>
-              {subjects.map((s) => (
-                <option key={s._id} value={s._id}>
-                  {s.name}
-                </option>
-              ))}
+              {uploadingPdf || extracting ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <Sparkles size={16} />
+              )}
+              <span>
+                {uploadingPdf ? 'Uploading…' : extracting ? 'Extracting…' : 'Upload PDF'}
+              </span>
+            </Button>
+          )
+        }
+      />
+
+      {/* Subject Selector Bar */}
+      {allSubjects.length > 0 && (
+        <div className="mt-6 mb-8 flex flex-col gap-3 rounded-2xl border border-card-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between shadow-sm">
+          <div className="flex flex-1 items-center gap-3">
+            <label htmlFor="subject-select" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground shrink-0">
+              Subject:
+            </label>
+            <select
+              id="subject-select"
+              value={subjectId}
+              onChange={(e) => {
+                const newId = e.target.value;
+                setSubjectId(newId);
+                setSearchParams(newId ? { subject: newId } : {});
+                setUnits([]);
+                setTopics([]);
+              }}
+              className="h-11 min-w-0 flex-1 rounded-xl border border-card-border bg-background px-4 text-sm font-medium outline-none focus:border-primary sm:max-w-md"
+            >
+              {allSubjects.map((s) => {
+                const sId = s._id || s.id;
+                return (
+                  <option key={sId} value={sId}>
+                    {s.name} ({s.code}) {s.credits ? `• ${s.credits} Credits` : ''}
+                  </option>
+                );
+              })}
             </select>
           </div>
-          <Button onClick={() => setShowUpload(true)}>Upload Syllabus</Button>
+
+          {currentSubject && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: subjectColor }} />
+              <span className="font-semibold text-foreground">{currentSubject.code}</span>
+              <span>·</span>
+              <span>Semester {currentSubject.semester || 1}</span>
+            </div>
+          )}
         </div>
-      </div>
+      )}
 
-      <div className="space-y-12">
-        {displayedSubjects.map((subject) => {
-          const subjectUnits = units.filter((u) => u.subjectId === subject._id);
-          const subjectTopics = topics.filter((t) => t.subjectId === subject._id);
-          const compTopics = subjectTopics.filter(
-            (t) => t.status === "completed",
-          ).length;
-          const prog = subjectTopics.length
-            ? Math.round((compTopics / subjectTopics.length) * 100)
-            : 0;
-
-          return (
-            <div key={subject._id} className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="font-display text-2xl">{subject.name}</h2>
-                  <p className="text-sm text-muted-foreground uppercase tracking-widest font-mono mt-1">
-                    {subject.code} · {subject.credits} Credits
-                  </p>
-                </div>
-                {subjectUnits.length > 0 && (
-                  <div className="flex items-center gap-4 text-right">
-                    <div>
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-                        Overall Progress
-                      </p>
-                      <p className="font-display text-xl">{prog}%</p>
-                    </div>
-                    <div className="w-24 h-2 bg-muted rounded-full overflow-hidden flex">
-                      <div
-                        className="h-full bg-accent transition-all duration-500"
-                        style={{ width: `${prog}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                )}
+      {loading ? (
+        <LoadingBlock lines={8} />
+      ) : error ? (
+        <QueryState error={error} onRetry={() => loadData(subjectId)} label="Syllabus" />
+      ) : !allSubjects.length ? (
+        <div className="rounded-3xl border border-dashed border-border bg-card/60 p-12 text-center">
+          <BookOpen size={48} className="mx-auto text-muted-foreground opacity-50 mb-4" />
+          <h2 className="font-display text-2xl">No Subjects Found</h2>
+          <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
+            Create your first subject before uploading a syllabus.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {/* Active Extraction Progress Banner */}
+          {(uploadingPdf || extracting) && (
+            <div className="flex items-center gap-3 rounded-2xl border border-primary/25 bg-primary/10 p-5 text-sm font-semibold text-primary animate-pulse">
+              <Loader2 size={20} className="animate-spin shrink-0" />
+              <div>
+                <p className="font-bold">{extractionStep || 'Processing syllabus PDF…'}</p>
+                <p className="text-xs font-normal opacity-85 mt-0.5">
+                  Our universal syllabus parser is structuring your course curriculum into units & topics.
+                </p>
               </div>
+            </div>
+          )}
 
-              {!subject.syllabusFile?.url && subjectUnits.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-border p-8 text-center bg-card/50">
-                  <p className="text-muted-foreground text-sm">
-                    No syllabus uploaded yet.
-                  </p>
-                </div>
-              ) : subject.syllabusFile?.url && subjectUnits.length === 0 ? (
-                <div className="rounded-2xl border border-border p-6 bg-card flex justify-between items-center">
-                  <div>
-                    <p className="font-semibold text-sm">
-                      Syllabus PDF attached
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Ready for extraction.
-                    </p>
-                  </div>
+          {/* Attached Syllabus Document Preview Card OR Upload Prompt */}
+          {currentSubject?.syllabusFile?.url ? (
+            <DocumentPreviewCard
+              file={currentSubject.syllabusFile}
+              title="Syllabus PDF"
+              unitCount={units.length}
+              topicCount={totalTopics}
+              isExtracting={extracting}
+              extractionError={extractionError}
+              onReplace={() => fileInputRef.current?.click()}
+              onRemove={handleRemoveSyllabus}
+              onExtract={units.length === 0 ? handleExtractExisting : null}
+              accentColor={subjectColor}
+            />
+          ) : (
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              className="group cursor-pointer rounded-2xl border-2 border-dashed border-card-border bg-card p-8 text-center transition-all hover:border-primary/60 hover:bg-card/90"
+            >
+              <div 
+                className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl transition-transform group-hover:scale-105"
+                style={{ backgroundColor: `${subjectColor}1A` }}
+              >
+                <CloudUpload size={28} style={{ color: subjectColor }} />
+              </div>
+              <h3 className="font-display text-lg font-bold text-foreground">Attach Syllabus Document</h3>
+              <p className="mt-1 text-xs text-muted-foreground max-w-sm mx-auto">
+                Upload your course PDF to automatically extract units and topics into your study plan
+              </p>
+              <div className="mt-4">
+                <span 
+                  className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold text-white shadow-sm"
+                  style={{ backgroundColor: subjectColor }}
+                >
+                  <Upload size={14} /> Choose PDF File
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Overall Completion Progress Card */}
+          {totalTopics > 0 && (
+            <div className="rounded-2xl border border-card-border bg-card p-5 shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm font-bold text-foreground">Overall Completion</span>
+                <span className="font-mono text-base font-bold" style={{ color: subjectColor }}>
+                  {progressPercent}%
+                </span>
+              </div>
+              <div className="h-2.5 w-full rounded-full bg-secondary overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-500 ease-out"
+                  style={{ width: `${progressPercent}%`, backgroundColor: subjectColor }}
+                />
+              </div>
+              <p className="mt-2.5 text-xs text-muted-foreground">
+                {completedTopics} of {totalTopics} topics completed
+              </p>
+            </div>
+          )}
+
+          {/* Units & Topics Accordion List */}
+          {units.length === 0 ? (
+            <div className="rounded-2xl border border-card-border bg-card p-10 text-center shadow-sm">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-secondary text-muted-foreground">
+                <Layers size={24} />
+              </div>
+              <h3 className="font-display text-lg font-bold text-foreground">No Units Extracted</h3>
+              <p className="mt-1 text-xs text-muted-foreground max-w-md mx-auto">
+                {currentSubject?.syllabusFile?.url
+                  ? 'Extract units and topics from your attached syllabus PDF to start tracking your curriculum.'
+                  : 'Upload a PDF syllabus to track each unit and topic.'}
+              </p>
+              {currentSubject?.syllabusFile?.url && (
+                <div className="mt-5">
                   <Button
+                    onClick={handleExtractExisting}
                     disabled={extracting}
-                    onClick={() => handleExtract(subject._id)}
+                    className="gap-2 shadow-sm"
                   >
-                    {extracting && extractTargetSubject === subject._id ? (
-                      "Extracting..."
-                    ) : (
-                      <>
-                        <Wand2 size={16} className="mr-2" /> Auto-Extract from
-                        PDF
-                      </>
-                    )}
+                    {extracting ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                    <span>Extract Topics from PDF</span>
                   </Button>
-                </div>
-              ) : (
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                  {subjectUnits.map((unit, idx) => {
-                    const uTopics = subjectTopics
-                      .filter((t) => t.unit === unit._id)
-                      .sort((a, b) => a.order - b.order);
-                    const completedCount = uTopics.filter(
-                      (t) => t.status === "completed",
-                    ).length;
-                    return (
-                      <div
-                        key={unit._id}
-                        className="rounded-xl border border-card-border bg-card overflow-hidden flex flex-col shadow-sm"
-                      >
-                        <div className="p-5 border-b border-border/50 bg-secondary/30">
-                          <h3 className="font-display text-lg mb-1">
-                            {unit.title}
-                          </h3>
-                          <div className="flex items-center gap-3">
-                            <div className="flex-1 h-1.5 overflow-hidden rounded-full bg-border">
-                              <div
-                                className="h-full bg-accent transition-all duration-500"
-                                style={{
-                                  width: `${uTopics.length ? (completedCount / uTopics.length) * 100 : 0}%`,
-                                }}
-                              />
-                            </div>
-                            <span className="text-xs font-semibold text-muted-foreground">
-                              {completedCount}/{uTopics.length}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="p-3 flex-1 overflow-y-auto">
-                          {uTopics.length === 0 ? (
-                            <p className="text-xs text-muted-foreground p-4 text-center">
-                              No topics
-                            </p>
-                          ) : (
-                            <div className="space-y-1">
-                              {uTopics.map((topic) => (
-                                <div
-                                  key={topic._id}
-                                  className="flex items-start justify-between rounded-lg p-2 hover:bg-background group transition-colors"
-                                >
-                                  <button
-                                    onClick={() => toggleTopic(topic)}
-                                    className="flex items-start gap-3 text-left mt-0.5"
-                                  >
-                                    {topic.status === "completed" ? (
-                                      <CheckCircle
-                                        size={16}
-                                        className="text-accent shrink-0 mt-0.5"
-                                      />
-                                    ) : (
-                                      <Circle
-                                        size={16}
-                                        className="text-muted-foreground opacity-50 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5"
-                                      />
-                                    )}
-                                    <span
-                                      className={cx(
-                                        "text-sm transition-all leading-tight",
-                                        topic.status === "completed" &&
-                                          "text-muted-foreground line-through opacity-70",
-                                      )}
-                                    >
-                                      {topic.name || topic.title}
-                                    </span>
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
                 </div>
               )}
             </div>
-          );
-        })}
-      </div>
+          ) : (
+            <div className="space-y-3.5">
+              {units.map((unit, index) => {
+                const uId = unit._id || unit.id || String(index);
+                const isExpanded = !!expandedUnits[uId];
+                const unitTopics = topics.filter(
+                  (t) => (t.unit?._id || t.unit?.id || t.unit) === uId || t.unit === unit.title || t.unit === unit.name
+                );
+                const completedInUnit = unitTopics.filter((t) => t.status === 'completed' || t.completed).length;
 
-      {showUpload && (
-        <UploadModal
-          subjects={subjects}
-          onClose={() => setShowUpload(false)}
-          onUploaded={(subjId) => {
-            setShowUpload(false);
-            loadData();
-            handleExtract(subjId);
-          }}
-        />
+                return (
+                  <div key={uId} className="rounded-2xl border border-card-border bg-card overflow-hidden shadow-sm transition-all">
+                    {/* Unit Accordion Header */}
+                    <button
+                      type="button"
+                      onClick={() => toggleUnit(uId)}
+                      className="flex w-full items-center p-4 text-left hover:bg-secondary/40 transition-colors"
+                    >
+                      <div 
+                        className="mr-3.5 flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-xs font-bold font-mono"
+                        style={{ backgroundColor: `${subjectColor}1A`, color: subjectColor }}
+                      >
+                        U{index + 1}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h4 className="truncate font-display text-base font-bold text-foreground">
+                          {unit.title || unit.name || `Unit ${index + 1}`}
+                        </h4>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {completedInUnit} / {unitTopics.length} completed
+                        </p>
+                      </div>
+                      <div className="ml-3 text-muted-foreground">
+                        {isExpanded ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
+                      </div>
+                    </button>
+
+                    {/* Expandable Topics List */}
+                    {isExpanded && (
+                      <div className="border-t border-card-border bg-background/50 px-4 py-2">
+                        {unitTopics.length === 0 ? (
+                          <p className="py-3 text-xs italic text-muted-foreground text-center">
+                            No topics in this unit.
+                          </p>
+                        ) : (
+                          <div className="divide-y divide-card-border/60">
+                            {unitTopics.map((topic, tIdx) => {
+                              const isDone = topic.status === 'completed' || topic.completed;
+                              const topicKey = topic._id || topic.id || tIdx;
+
+                              return (
+                                <div
+                                  key={topicKey}
+                                  onClick={() => toggleTopic(topic)}
+                                  className="group flex cursor-pointer items-start gap-3 py-2.5 transition-colors hover:bg-secondary/30 rounded-lg px-2 -mx-2"
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toggleTopic(topic);
+                                    }}
+                                    className="mt-0.5 shrink-0 transition-transform active:scale-90"
+                                  >
+                                    {isDone ? (
+                                      <CheckCircle2 size={18} style={{ color: subjectColor }} />
+                                    ) : (
+                                      <Circle size={18} className="text-muted-foreground opacity-60 group-hover:opacity-100" />
+                                    )}
+                                  </button>
+                                  <span
+                                    className={cx(
+                                      'text-sm leading-relaxed transition-all select-none',
+                                      isDone
+                                        ? 'line-through text-muted-foreground opacity-70'
+                                        : 'text-foreground'
+                                    )}
+                                  >
+                                    {topic.title || topic.name}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       )}
-      {parsedSyllabusData && extractTargetSubject && (
+
+      {/* Syllabus Review & Confirmation Modal */}
+      {reviewVisible && subjectId && (
         <SyllabusReviewModal
-          subjectId={extractTargetSubject}
-          parsedData={parsedSyllabusData}
+          subjectId={subjectId}
+          parsedData={{ units: parsedUnits }}
           onClose={() => {
-            setParsedSyllabusData(null);
-            setExtractTargetSubject(null);
+            setReviewVisible(false);
+            setParsedUnits([]);
           }}
-          onSuccess={loadData}
+          onSuccess={() => {
+            setReviewVisible(false);
+            setParsedUnits([]);
+            loadData(subjectId);
+          }}
         />
       )}
     </Shell>
