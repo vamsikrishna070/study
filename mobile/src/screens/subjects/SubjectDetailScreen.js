@@ -23,6 +23,7 @@ import {
   FileText,
   Sparkles,
   Layers,
+  CloudUpload,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../../components/ui/Button';
@@ -386,7 +387,7 @@ const SubjectDetailScreen = ({ route, navigation }) => {
                   <ActivityIndicator size="small" color="#ffffff" />
                 ) : (
                   <>
-                    <UploadCloud size={18} color="#ffffff" style={{ marginRight: 8 }} />
+                    <CloudUpload size={18} color="#ffffff" style={{ marginRight: 8 }} />
                     <Text style={styles.uploadBtnText}>Upload Syllabus PDF</Text>
                   </>
                 )}

@@ -18,6 +18,7 @@ import {
   ChevronDown,
   Sparkles,
   Layers,
+  CloudUpload,
 } from 'lucide-react-native';
 import {
   extractSyllabus,
@@ -352,7 +353,7 @@ const SyllabusScreen = ({ route, navigation }) => {
                 disabled={uploadingPdf}
                 activeOpacity={0.75}
               >
-                <UploadCloud size={24} color={subjectColor} style={{ marginBottom: 6 }} />
+                <CloudUpload size={24} color={subjectColor} style={{ marginBottom: 6 }} />
                 <Text style={styles.uploadPromptTitle}>Attach Syllabus Document</Text>
                 <Text style={styles.uploadPromptSub}>
                   Upload PDF to automatically extract units and topics

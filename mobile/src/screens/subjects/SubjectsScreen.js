@@ -23,6 +23,8 @@ import {
   ChevronRight,
   Trash2,
   Sparkles,
+  Pencil,
+  CloudUpload,
 } from 'lucide-react-native';
 import { getSubjects, createSubject, updateSubject, deleteSubject } from '../../api/subjects';
 import { extractSyllabus } from '../../api/syllabus';
@@ -417,7 +419,7 @@ const SubjectsScreen = ({ navigation }) => {
                       onPress={() => openEditModal(item)}
                       activeOpacity={0.7}
                     >
-                      <Edit2 size={15} color={colors.mutedForeground} />
+                      <Pencil size={15} color={colors.mutedForeground} />
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -520,7 +522,7 @@ const SubjectsScreen = ({ navigation }) => {
                       </View>
                     ) : (
                       <>
-                        <UploadCloud size={24} color={colors.primary} style={{ marginBottom: 6 }} />
+                        <CloudUpload size={24} color={colors.primary} style={{ marginBottom: 6 }} />
                         <Text style={styles.uploadBoxTitle}>Upload Syllabus PDF</Text>
                         <Text style={styles.uploadBoxSub}>Supported: PDF documents up to 15 MB</Text>
                       </>

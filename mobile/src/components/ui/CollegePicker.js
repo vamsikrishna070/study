@@ -20,7 +20,9 @@ import {
   MapPin, 
   Building2, 
   ChevronDown, 
-  ArrowLeft 
+  ArrowLeft,
+  Pencil,
+  CircleQuestionMark
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme, useStyles } from '../../theme/theme';
@@ -437,7 +439,7 @@ export function CollegePicker({
                           onPress={() => setIsManualMode(true)}
                           activeOpacity={0.8}
                         >
-                          <Edit3 size={15} color={colors.primary} style={{ marginRight: 6 }} />
+                          <Pencil size={15} color={colors.primary} style={{ marginRight: 6 }} />
                           <Text style={styles.manualFallbackBtnText}>Enter My College Manually</Text>
                         </TouchableOpacity>
                       </View>
@@ -452,7 +454,7 @@ export function CollegePicker({
                     onPress={() => setIsManualMode(true)}
                     activeOpacity={0.7}
                   >
-                    <HelpCircle size={15} color={colors.primary} style={{ marginRight: 6 }} />
+                    <CircleQuestionMark size={15} color={colors.primary} style={{ marginRight: 6 }} />
                     <Text style={styles.unlistedLinkText}>My college isn't listed</Text>
                   </TouchableOpacity>
                 </View>

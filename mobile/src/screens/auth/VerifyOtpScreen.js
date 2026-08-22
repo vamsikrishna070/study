@@ -1,6 +1,6 @@
 import React, { useState, useContext, useEffect, useRef } from 'react';
 import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Text, TouchableOpacity, TextInput } from 'react-native';
-import { KeyRound, Lock, ArrowLeft, RefreshCw } from 'lucide-react-native';
+import { KeyRound, Lock, ArrowLeft, RefreshCw, CircleCheck } from 'lucide-react-native';
 import { AuthContext } from '../../context/AuthContext';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -174,7 +174,7 @@ const VerifyOtpScreen = ({ route, navigation }) => {
             )}
             {!!successMsg && (
               <View style={styles.successContainer}>
-                <CheckCircle2 size={16} color="#10B981" style={{ marginRight: 6 }} />
+                <CircleCheck size={16} color="#10B981" style={{ marginRight: 6 }} />
                 <Text style={styles.successText}>{successMsg}</Text>
               </View>
             )}

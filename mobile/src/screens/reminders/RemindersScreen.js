@@ -9,7 +9,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import { 
   Bell, Plus, CalendarDays, Clock, Trash2, BellOff, ChevronRight, X, 
-  Repeat, Music, Volume2, VolumeX, FileMusic, Check 
+  Repeat, Music, Volume2, VolumeX, FileMusic, Check, CircleAlert 
 } from 'lucide-react-native';
 import { getReminders, createReminder, updateReminder, deleteReminder } from '../../api/reminders';
 import { getSubjects } from '../../api/subjects';
@@ -794,7 +794,7 @@ const RemindersScreen = ({ navigation }) => {
               {/* Inline Date/Time Error Box */}
               {!!formError && (
                 <View style={styles.inlineErrorBox}>
-                  <AlertCircle size={14} color={colors.destructive} style={{ marginRight: 6 }} />
+                  <CircleAlert size={14} color={colors.destructive} style={{ marginRight: 6 }} />
                   <Text style={styles.inlineErrorText}>{formError}</Text>
                 </View>
               )}
