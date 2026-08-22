@@ -120,6 +120,14 @@ const MainNavigator = () => {
       <Stack.Screen name="Exams" component={ExamsScreen} />
       <Stack.Screen name="Notes" component={NotesScreen} />
       
+      {/* App Workspace & Management Screens */}
+      <Stack.Screen name="Settings" component={SettingsScreen} />
+      <Stack.Screen name="Profile" component={ProfileScreen} />
+      <Stack.Screen name="Reminders" component={RemindersScreen} />
+      <Stack.Screen name="Syllabus" component={SyllabusScreen} />
+      <Stack.Screen name="Resources" component={ResourcesScreen} />
+      <Stack.Screen name="Progress" component={ProgressScreen} />
+
       {/* Study Sessions Flow */}
       <Stack.Screen name="StartSession" component={StartSessionScreen} />
       <Stack.Screen name="FocusSession" component={FocusSessionScreen} />

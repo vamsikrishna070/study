@@ -74,7 +74,15 @@ export const Header = ({ showBack, navigation: customNavigation }) => {
 
   const handleProfilePress = () => {
     if (typeof navigation.navigate === 'function') {
-      navigation.navigate('Settings');
+      try {
+        navigation.navigate('Settings');
+      } catch (_) {
+        try {
+          navigation.navigate('DrawerRoot', { screen: 'Settings' });
+        } catch (e) {
+          console.log('[Header] Navigation to Settings failed:', e.message);
+        }
+      }
     }
   };
 
