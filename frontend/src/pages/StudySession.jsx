@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Play, Square, Mic, MicOff, Pause, Save, CheckCircle } from 'lucide-react';
 import apiClient from '../services/apiClient.js';
+import { uploadFile } from '../services/apiHooks.js';
 import Shell from '../components/Shell.jsx';
 import { PageHeading, Button, cx } from '../components/shared.jsx';
 
@@ -105,7 +106,6 @@ export default function StudySession() {
     setUploading(true);
     try {
       const file = new File([audioBlobRef.current], `voice-memo-${Date.now()}.webm`, { type: 'audio/webm' });
-      const { uploadFile } = await import('../services/apiHooks.js');
       const data = await uploadFile(file);
       
       await apiClient.post('/recordings', {

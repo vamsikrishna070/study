@@ -70,7 +70,7 @@ export default function SubjectModal({ initial, onClose }) {
       qc.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
       onClose();
     };
-    initial ? update.mutate({ id: initial.id, data }, { onSuccess: done }) : create.mutate({ data }, { onSuccess: done });
+    initial ? update.mutate({ id: initial.id || initial._id, data }, { onSuccess: done }) : create.mutate({ data }, { onSuccess: done });
   };
   
   const canSubmit = !create.isPending && !update.isPending && !uploading && form.name && form.code;

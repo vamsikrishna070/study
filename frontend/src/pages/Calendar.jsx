@@ -38,7 +38,7 @@ export default function Calendar() {
     const dateStr = new Date(year, month, day + 1).toISOString().slice(0, 10);
     const dayExams = (exams || []).filter(e => toDateString(e.date) === dateStr).map(e => ({ ...e, eventType: 'exam' }));
     const dayTasks = (tasks || []).filter(t => toDateString(t.dueDate) === dateStr).map(t => ({ ...t, eventType: 'task' }));
-    const dayRems = (reminders || []).filter(r => toDateString(r.date) === dateStr).map(r => ({ ...r, eventType: 'reminder' }));
+    const dayRems = (reminders || []).filter(r => toDateString(r.remindAt || r.date) === dateStr).map(r => ({ ...r, eventType: 'reminder' }));
     return [...dayExams, ...dayTasks, ...dayRems];
   };
 

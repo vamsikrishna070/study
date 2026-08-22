@@ -9,27 +9,38 @@ const PRIORITY_STYLES = {
 };
 
 const PRIORITY_LABELS = {
-  exam: 'Exam',
+  exam: 'Exam essential',
   high: 'High',
   medium: 'Medium',
   low: 'Low',
 };
 
 export default function NoteCard({ note, onEdit, onDelete }) {
-  const preview = note.content?.slice(0, 150) + (note.content?.length > 150 ? '…' : '');
+  const preview = note.content?.slice(0, 160) + (note.content?.length > 160 ? '…' : '');
+  const displaySubject = note.customSubject || note.subject?.name || note.subject;
 
   return (
-    <article className="card-lift group flex flex-col rounded-2xl border border-card-border bg-card p-5 transition-all" data-testid={`card-note-${note.id}`}>
+    <article className="card-lift group flex flex-col rounded-2xl border border-card-border bg-card p-5 transition-all" data-testid={`card-note-${note.id || note._id}`}>
       {/* Top: Priority badge + actions */}
       <div className="mb-3 flex items-start justify-between gap-3">
         <span className={cx('inline-flex items-center rounded-full px-2.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wider', PRIORITY_STYLES[note.priority] || PRIORITY_STYLES.medium)}>
           {PRIORITY_LABELS[note.priority] || note.priority}
         </span>
         <div className="flex shrink-0 gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-          <button onClick={onEdit} className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground" data-testid={`button-edit-note-${note.id}`} aria-label="Edit note">
+          <button
+            onClick={onEdit}
+            className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+            data-testid={`button-edit-note-${note.id || note._id}`}
+            aria-label="Edit note"
+          >
             <Pencil size={13} />
           </button>
-          <button onClick={onDelete} className="rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive" data-testid={`button-delete-note-${note.id}`} aria-label="Delete note">
+          <button
+            onClick={onDelete}
+            className="rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+            data-testid={`button-delete-note-${note.id || note._id}`}
+            aria-label="Delete note"
+          >
             <Trash2 size={13} />
           </button>
         </div>
@@ -39,8 +50,10 @@ export default function NoteCard({ note, onEdit, onDelete }) {
       <h2 className="font-display text-xl leading-tight">{note.title}</h2>
 
       {/* Preview */}
-      {preview && (
+      {preview ? (
         <p className="mt-2 flex-1 text-sm leading-6 text-muted-foreground line-clamp-3">{preview}</p>
+      ) : (
+        <p className="mt-2 flex-1 text-xs italic text-muted-foreground/60">No additional note text</p>
       )}
 
       {/* Tags */}
@@ -61,11 +74,11 @@ export default function NoteCard({ note, onEdit, onDelete }) {
       {/* Footer: meta info */}
       <div className="mt-4 flex items-end justify-between border-t border-border pt-3 text-[11px] text-muted-foreground">
         <div className="flex flex-col gap-1">
-          {note.subject && (
+          {displaySubject && (
             <span className="flex items-center gap-1">
               <BookOpen size={10} />
-              <span className="font-semibold text-foreground truncate max-w-[120px]">{note.subject}</span>
-              {note.topic && <span className="truncate max-w-[80px]"> · {note.topic}</span>}
+              <span className="font-semibold text-foreground truncate max-w-[130px]">{displaySubject}</span>
+              {note.topic && <span className="truncate max-w-[90px]"> · {note.topic}</span>}
             </span>
           )}
           {note.attachments?.length > 0 && (
@@ -75,9 +88,9 @@ export default function NoteCard({ note, onEdit, onDelete }) {
             </span>
           )}
         </div>
-        <span className="flex items-center gap-1 shrink-0">
+        <span className="flex items-center gap-1 shrink-0 font-mono text-[10px]">
           <Calendar size={10} />
-          {fmtDate(note.updatedAt)}
+          {fmtDate(note.updatedAt || note.createdAt)}
         </span>
       </div>
     </article>

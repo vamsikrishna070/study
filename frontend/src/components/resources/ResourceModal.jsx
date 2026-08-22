@@ -7,9 +7,9 @@ import VoiceRecorder from '../shared/VoiceRecorder.jsx';
 import AttachmentCard from '../shared/AttachmentCard.jsx';
 
 const RESOURCE_TYPES = [
+  { value: 'file', label: 'PDF / Document / File' },
   { value: 'link', label: 'Web Link' },
   { value: 'youtube', label: 'YouTube Video' },
-  { value: 'file', label: 'File Upload' },
   { value: 'recording', label: 'Voice Recording' },
 ];
 
@@ -25,7 +25,7 @@ export default function ResourceModal({ onClose }) {
   const [form, setForm] = useState({
     title: '',
     url: '',
-    resourceType: 'link',
+    resourceType: 'file',
     subjectId: '',
     topic: '',
     description: '',
@@ -52,7 +52,9 @@ export default function ResourceModal({ onClose }) {
         size: file.size,
         originalName: data.originalName || file.name,
       });
-      if (!form.title) set('title', file.name.replace(/\.[^.]+$/, ''));
+      if (!form.title) {
+        set('title', file.name.replace(/\.[^.]+$/, ''));
+      }
     } catch {
       alert('Upload failed. Please try again.');
     } finally {
@@ -78,13 +80,13 @@ export default function ResourceModal({ onClose }) {
       const data = await uploadFile(file);
       setFileData({
         ...data,
-        mimeType: file.type,
+        mimeType: file.type || 'audio/webm',
         size: file.size,
-        originalName: title,
+        originalName: title || 'Voice Recording',
         duration,
       });
       setRecordingDuration(duration);
-      if (!form.title) set('title', title);
+      if (!form.title) set('title', title || 'Voice Recording');
     } catch {
       alert('Upload failed. Please try again.');
     } finally {
@@ -95,20 +97,25 @@ export default function ResourceModal({ onClose }) {
   const submit = (e) => {
     e.preventDefault();
     const data = {
-      ...form,
+      title: form.title.trim(),
+      url: isLinkType ? form.url.trim() : (fileData?.url || ''),
       resourceType: form.resourceType,
+      subjectId: form.subjectId || undefined,
+      topic: form.topic.trim(),
+      description: form.description.trim(),
       rating: Number(form.rating),
       watched: form.watched === 'true',
-      tags: form.tags.split(',').map(t => t.trim()).filter(Boolean),
+      tags: form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
       fileData: fileData ? {
         publicId: fileData.publicId,
+        url: fileData.url,
         originalName: fileData.originalName,
         mimeType: fileData.mimeType,
         size: fileData.size,
         duration: fileData.duration || recordingDuration || undefined,
       } : undefined,
-      url: isLinkType ? form.url : (fileData?.url || ''),
     };
+
     create.mutate({ data }, {
       onSuccess: () => {
         qc.invalidateQueries({ queryKey: getGetResourcesQueryKey() });
@@ -121,13 +128,13 @@ export default function ResourceModal({ onClose }) {
     isLinkType ? form.url : (isFileType || isRecordingType) ? fileData : false
   );
 
-  const urlLabel = form.resourceType === 'youtube' ? 'YouTube URL' : 'URL';
+  const urlLabel = form.resourceType === 'youtube' ? 'YouTube URL *' : 'URL *';
   const urlPlaceholder = form.resourceType === 'youtube' ? 'https://youtube.com/watch?v=...' : 'https://';
 
   return (
     <Modal
       title="Save a Resource"
-      eyebrow="Curate your edge"
+      eyebrow="Curate your study collection"
       onClose={onClose}
       onSubmit={submit}
       footer={
@@ -158,20 +165,33 @@ export default function ResourceModal({ onClose }) {
               ))}
             </select>
           </Field>
-          <Field label="Title">
-            <input required className={inputClass} value={form.title} onChange={e => set('title', e.target.value)} placeholder="Enter resource title" />
+          <Field label="Title *">
+            <input
+              required
+              className={inputClass}
+              value={form.title}
+              onChange={e => set('title', e.target.value)}
+              placeholder="Enter resource title"
+            />
           </Field>
         </div>
 
         {/* Row 2: Conditional input based on resource type */}
         {isLinkType && (
           <Field label={urlLabel}>
-            <input required type="url" className={inputClass} value={form.url} onChange={e => set('url', e.target.value)} placeholder="Paste resource link" />
+            <input
+              required
+              type="url"
+              className={inputClass}
+              value={form.url}
+              onChange={e => set('url', e.target.value)}
+              placeholder={urlPlaceholder}
+            />
           </Field>
         )}
 
         {isFileType && (
-          <Field label="File">
+          <Field label="File *">
             {fileData ? (
               <AttachmentCard
                 attachment={{
@@ -190,16 +210,22 @@ export default function ResourceModal({ onClose }) {
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
                 className={cx(
-                  'flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-10 text-center transition-colors',
+                  'flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed px-6 py-10 text-center transition-colors',
                   dragOver ? 'border-accent bg-accent/5' : 'border-border bg-muted/20 hover:border-accent/50 hover:bg-muted/40',
                   uploading && 'pointer-events-none opacity-50'
                 )}
               >
-                <input type="file" className="hidden" ref={fileInputRef} onChange={handleFileChange} />
+                <input
+                  type="file"
+                  className="hidden"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  accept="application/pdf,image/*,audio/*,video/*,.ppt,.pptx,.doc,.docx"
+                />
                 {uploading ? (
                   <div className="flex flex-col items-center gap-2">
                     <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
-                    <p className="text-sm font-semibold text-accent">Uploading…</p>
+                    <p className="text-sm font-semibold text-accent">Uploading file…</p>
                   </div>
                 ) : (
                   <>
@@ -207,7 +233,7 @@ export default function ResourceModal({ onClose }) {
                       <UploadCloud size={22} />
                     </div>
                     <p className="text-sm font-semibold">Drag & drop or browse files</p>
-                    <p className="mt-1 text-xs text-muted-foreground">PDF • PPT • PPTX • DOC • DOCX • Images • Audio • Video</p>
+                    <p className="mt-1 text-xs text-muted-foreground">PDF • PPT • DOC • Images • Audio • Video</p>
                   </>
                 )}
               </div>
@@ -216,7 +242,7 @@ export default function ResourceModal({ onClose }) {
         )}
 
         {isRecordingType && (
-          <Field label="Recording">
+          <Field label="Voice Recording *">
             {fileData ? (
               <AttachmentCard
                 attachment={{
@@ -235,20 +261,20 @@ export default function ResourceModal({ onClose }) {
                 <span className="text-sm font-semibold text-accent">Uploading recording…</span>
               </div>
             ) : (
-              <VoiceRecorder onSave={handleRecordingSave} onCancel={() => set('resourceType', 'link')} />
+              <VoiceRecorder onSave={handleRecordingSave} onCancel={() => set('resourceType', 'file')} />
             )}
           </Field>
         )}
 
         {/* Row 3: Subject + Topic */}
         <div className="grid gap-5 sm:grid-cols-2">
-          <Field label="Subject">
+          <Field label="Subject (optional)">
             <select className={inputClass} value={form.subjectId} onChange={e => set('subjectId', e.target.value)}>
-              <option value="">No specific subject</option>
-              {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              <option value="">No specific subject (General)</option>
+              {subjects.map(s => <option key={s.id || s._id} value={s.id || s._id}>{s.name}</option>)}
             </select>
           </Field>
-          <Field label="Topic">
+          <Field label="Topic (optional)">
             <input className={inputClass} value={form.topic} onChange={e => set('topic', e.target.value)} placeholder="Enter topic name" />
           </Field>
         </div>
@@ -274,12 +300,12 @@ export default function ResourceModal({ onClose }) {
         </div>
 
         {/* Row 5: Tags */}
-        <Field label="Tags" hint="Separate with commas">
+        <Field label="Tags (optional)" hint="Separate with commas">
           <input className={inputClass} value={form.tags} onChange={e => set('tags', e.target.value)} placeholder="Add tags" />
         </Field>
 
         {/* Row 6: Description */}
-        <Field label="Description">
+        <Field label="Description (optional)">
           <textarea className={cx(inputClass, 'min-h-[88px] resize-y')} value={form.description} onChange={e => set('description', e.target.value)} placeholder="Add resource description" />
         </Field>
       </div>

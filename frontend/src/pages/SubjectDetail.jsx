@@ -10,6 +10,9 @@ import {
   ChevronRight,
   Play,
   Wand2,
+  Download,
+  Share2,
+  Check,
 } from "lucide-react";
 import apiClient from "../services/apiClient.js";
 import {
@@ -277,6 +280,48 @@ export default function SubjectDetail() {
     }
   };
 
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  const handleDownload = async (url, filename) => {
+    if (!url) return;
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = filename || "syllabus.pdf";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch {
+      window.open(url, "_blank");
+    }
+  };
+
+  const handleShare = async (url) => {
+    if (!url) return;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `${subject?.name} Syllabus`,
+          url,
+        });
+        return;
+      } catch {
+        // clipboard fallback
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    } catch {
+      // ignore
+    }
+  };
+
   if (loading)
     return (
       <Shell>
@@ -408,22 +453,40 @@ export default function SubjectDetail() {
                       </div>
                       <div>
                         <p className="font-semibold text-sm">
-                          {subject.syllabusFile.originalName}
+                          {subject.syllabusFile.originalName || "Syllabus PDF"}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           PDF Document
                         </p>
                       </div>
                     </div>
-                    <a
-                      href={subject.syllabusFile.url}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <Button variant="outline" className="h-8">
-                        View PDF
+                    <div className="flex items-center gap-2">
+                      <a
+                        href={subject.syllabusFile.url}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <Button variant="outline" className="h-8 text-xs">
+                          View PDF
+                        </Button>
+                      </a>
+                      <Button
+                        variant="quiet"
+                        onClick={() => handleDownload(subject.syllabusFile.url, subject.syllabusFile.originalName)}
+                        className="h-8 w-8 rounded-full p-0 text-muted-foreground hover:text-foreground"
+                        title="Download PDF"
+                      >
+                        <Download size={14} />
                       </Button>
-                    </a>
+                      <Button
+                        variant="quiet"
+                        onClick={() => handleShare(subject.syllabusFile.url)}
+                        className="h-8 w-8 rounded-full p-0 text-muted-foreground hover:text-foreground"
+                        title="Share link"
+                      >
+                        {copiedLink ? <Check size={14} className="text-green-500" /> : <Share2 size={14} />}
+                      </Button>
+                    </div>
                   </div>
                 </section>
               )}

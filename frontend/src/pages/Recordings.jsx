@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Mic, Play, Pause, Trash2, StopCircle } from 'lucide-react';
 import { getGetRecordingsQueryKey, useGetRecordings, useDeleteRecording } from '../services/apiHooks.js';
@@ -14,17 +15,18 @@ export default function Recordings() {
 
   const remove = (rec) => {
     if (confirm(`Delete recording "${rec.title}"?`)) {
-      del.mutate({ id: rec.id }, {
+      del.mutate({ id: rec.id || rec._id }, {
         onSuccess: () => qc.invalidateQueries({ queryKey: getGetRecordingsQueryKey() })
       });
     }
   };
 
   const togglePlay = (rec) => {
-    if (playing === rec.id) {
+    const recId = rec.id || rec._id;
+    if (playing === recId) {
       setPlaying(null);
     } else {
-      setPlaying(rec.id);
+      setPlaying(recId);
     }
   };
 
@@ -35,9 +37,11 @@ export default function Recordings() {
         title="Recordings" 
         detail="Capture thoughts out loud before they slip away." 
         action={
-          <Button onClick={() => window.location.href='/study-session'}>
-            <Mic size={16} /> New Recording
-          </Button>
+          <Link to="/study-session">
+            <Button>
+              <Mic size={16} /> New Recording
+            </Button>
+          </Link>
         }
       />
 
@@ -49,10 +53,12 @@ export default function Recordings() {
            title="No recordings yet" 
            detail="Start a study session to record your voice notes." 
            action={
-             <Button onClick={() => window.location.href='/study-session'}>
-               <Mic size={16} /> Start session
-             </Button>
-           }
+            <Link to="/study-session">
+              <Button>
+                <Mic size={16} /> Start session
+              </Button>
+            </Link>
+          }
          />
        ) : (
          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
