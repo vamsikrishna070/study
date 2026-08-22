@@ -21,7 +21,6 @@ import {
   Clock,
   MapPin,
   FileText,
-  AlertCircle,
 } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { getExams, createExam, deleteExam } from '../../api/exams';

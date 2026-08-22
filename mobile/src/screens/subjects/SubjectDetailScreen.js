@@ -18,8 +18,7 @@ import {
   ChevronRight,
   ChevronDown,
   ArrowLeft,
-  UploadCloud,
-  CheckCircle2,
+  CircleCheck,
   Circle,
   FileText,
   Sparkles,
@@ -487,7 +486,7 @@ const SubjectDetailScreen = ({ route, navigation }) => {
                               >
                                 <View style={styles.checkboxContainer}>
                                   {isDone ? (
-                                    <CheckCircle2 size={20} color={accentColor} />
+                                    <CircleCheck size={20} color={accentColor} />
                                   ) : (
                                     <Circle size={20} color={colors.mutedForeground} />
                                   )}

@@ -25,7 +25,7 @@ import {
   X,
   Star,
   Mic,
-  UploadCloud,
+  CloudUpload,
 } from 'lucide-react-native';
 import { viewDocument } from '../../utils/documentViewer';
 import { getResources, createResource, deleteResource, updateResource } from '../../api/resources';
@@ -528,7 +528,7 @@ const ResourcesScreen = ({ route, navigation }) => {
                         disabled={uploadingFile}
                         activeOpacity={0.7}
                       >
-                        <UploadCloud size={20} color={colors.accent} />
+                        <CloudUpload size={20} color={colors.accent} />
                         <Text style={styles.uploadBoxText}>Pick Document (PDF/DOCX)</Text>
                       </TouchableOpacity>
                       <TouchableOpacity

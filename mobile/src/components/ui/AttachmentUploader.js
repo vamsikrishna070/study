@@ -6,7 +6,7 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
-import { UploadCloud, Image as ImageIcon, Plus, Link, Video } from 'lucide-react-native';
+import { CloudUpload, Image as ImageIcon, Plus, Link, Video } from 'lucide-react-native';
 import { useAppTheme, useStyles } from '../../theme/theme';
 import { useAppDialog } from './AppDialog';
 import { Input } from './Input';
@@ -92,7 +92,7 @@ export function AttachmentUploader({
             disabled={uploading}
             activeOpacity={0.7}
           >
-            <UploadCloud size={16} color={colors.accent} />
+            <CloudUpload size={16} color={colors.accent} />
             <Text style={styles.actionBtnText}>Document</Text>
           </TouchableOpacity>
         )}

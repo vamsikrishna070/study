@@ -14,10 +14,9 @@ import {
   Sparkles, 
   Clock, 
   BookOpen, 
-  Smile, 
-  Meh, 
-  Frown, 
-  CheckSquare, 
+  FaceSlightlySmiling, 
+  FaceNeutral, 
+  FaceSlightlyFrowning, 
   Save, 
   ChevronRight 
 } from 'lucide-react-native';
@@ -161,7 +160,7 @@ export default function EndSessionScreen({ navigation, route }) {
                 onPress={() => setProductivity('productive')}
                 activeOpacity={0.7}
               >
-                <Smile
+                <FaceSlightlySmiling
                   size={24}
                   color={productivity === 'productive' ? colors.accent : colors.mutedForeground}
                 />
@@ -183,7 +182,7 @@ export default function EndSessionScreen({ navigation, route }) {
                 onPress={() => setProductivity('average')}
                 activeOpacity={0.7}
               >
-                <Meh
+                <FaceNeutral
                   size={24}
                   color={productivity === 'average' ? colors.accent : colors.mutedForeground}
                 />
@@ -205,7 +204,7 @@ export default function EndSessionScreen({ navigation, route }) {
                 onPress={() => setProductivity('difficult')}
                 activeOpacity={0.7}
               >
-                <Frown
+                <FaceSlightlyFrowning
                   size={24}
                   color={productivity === 'difficult' ? colors.accent : colors.mutedForeground}
                 />

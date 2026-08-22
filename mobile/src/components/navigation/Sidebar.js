@@ -15,7 +15,7 @@ import {
   TrendingUp,
   Settings,
   Timer,
-  History
+  RotateCcwClock
 } from 'lucide-react-native';
 import { DrawerContentScrollView } from '@react-navigation/drawer';
 import { DrawerActions } from '@react-navigation/native';
@@ -31,7 +31,7 @@ const navItems = [
   { href: 'Resources', label: 'Resources', icon: Library },
   { href: 'TasksTab', label: 'Tasks', icon: ListChecks },
   { href: 'ExamsTab', label: 'Exams', icon: CalendarDays },
-  { href: 'StudyHistory', label: 'Study History', icon: History },
+  { href: 'StudyHistory', label: 'Study History', icon: RotateCcwClock },
   { href: 'Reminders', label: 'Reminders', icon: Bell },
   { href: 'Progress', label: 'Progress', icon: TrendingUp },
 ];

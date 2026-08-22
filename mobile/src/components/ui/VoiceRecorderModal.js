@@ -9,7 +9,7 @@ import {
   Alert,
   Platform,
 } from 'react-native';
-import { Mic, Square, Play, Pause, Trash2, UploadCloud, X } from 'lucide-react-native';
+import { Mic, Square, Play, Pause, Trash2, CloudUpload, X } from 'lucide-react-native';
 import { useAppTheme, useStyles } from '../../theme/theme';
 import { useAppDialog } from './AppDialog';
 import { Button } from './Button';
@@ -311,7 +311,7 @@ export function VoiceRecorderModal({
               disabled={recordingStatus !== 'stopped' || uploading}
               loading={uploading}
             >
-              <UploadCloud size={16} color={colors.primaryForeground} style={{ marginRight: 6 }} />
+              <CloudUpload size={16} color={colors.primaryForeground} style={{ marginRight: 6 }} />
               Save & Upload
             </Button>
           </View>

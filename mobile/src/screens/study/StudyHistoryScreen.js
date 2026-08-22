@@ -10,20 +10,20 @@ import {
   ScrollView,
 } from 'react-native';
 import {
-  History,
+  RotateCcwClock,
   Play,
   PenLine,
-  BarChart3,
+  ChartBar,
   BookOpen,
   Clock,
   Trash2,
   X,
   Target,
   Sparkles,
-  Smile,
-  Meh,
-  Frown,
-  CheckCircle2,
+  FaceSlightlySmiling,
+  FaceNeutral,
+  FaceSlightlyFrowning,
+  CircleCheck,
   CalendarDays,
 } from 'lucide-react-native';
 import { Header } from '../../components/ui/Header';
@@ -140,11 +140,11 @@ export default function StudyHistoryScreen({ navigation }) {
   const getProductivityBadge = (rating) => {
     switch (rating) {
       case 'productive':
-        return { label: 'Productive', color: colors.accent, icon: Smile };
+        return { label: 'Productive', color: colors.accent, icon: FaceSlightlySmiling };
       case 'average':
-        return { label: 'Average', color: colors.mutedForeground, icon: Meh };
+        return { label: 'Average', color: colors.mutedForeground, icon: FaceNeutral };
       case 'difficult':
-        return { label: 'Difficult', color: '#f59e0b', icon: Frown };
+        return { label: 'Difficult', color: '#f59e0b', icon: FaceSlightlyFrowning };
       default:
         return null;
     }
@@ -192,7 +192,7 @@ export default function StudyHistoryScreen({ navigation }) {
                     onPress={() => navigation.navigate('StudyAnalytics')}
                     activeOpacity={0.7}
                   >
-                    <BarChart3 size={18} color={colors.accent} />
+                    <ChartBar size={18} color={colors.accent} />
                   </TouchableOpacity>
                 </View>
               }
@@ -203,7 +203,7 @@ export default function StudyHistoryScreen({ navigation }) {
         ListEmptyComponent={
           !loading && !error ? (
             <EmptyState
-              icon={History}
+              icon={RotateCcwClock}
               title="No study sessions yet"
               detail="Start a focus timer session or log your hours to see your study record here."
               action={

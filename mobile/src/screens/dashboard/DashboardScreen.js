@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useContext } from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
-import { Bell, ListChecks, BookOpen, Play, Flame, Clock, History, ArrowRight, Sparkles } from 'lucide-react-native';
+import { Bell, ListChecks, BookOpen, Play, Flame, Clock, ArrowRight, Sparkles } from 'lucide-react-native';
 import { getReminders } from '../../api/reminders';
 import { getExams } from '../../api/exams';
 import { getTasks } from '../../api/tasks';

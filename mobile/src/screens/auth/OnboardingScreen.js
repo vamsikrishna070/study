@@ -1,6 +1,6 @@
 import React, { useState, useContext } from 'react';
 import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Text, TouchableOpacity, Alert } from 'react-native';
-import { Sparkles, GraduationCap, CheckCircle } from 'lucide-react-native';
+import { Sparkles, GraduationCap } from 'lucide-react-native';
 import { AuthContext } from '../../context/AuthContext';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';

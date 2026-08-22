@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import {
-  BarChart3,
+  ChartBar,
   Flame,
   Clock,
   BookOpen,
@@ -98,7 +98,7 @@ export default function StudyAnalyticsScreen({ navigation }) {
           </View>
         ) : !hasData ? (
           <EmptyState
-            icon={BarChart3}
+            icon={ChartBar}
             title="No study data yet"
             detail="Start your first study session to see your progress here."
             action={

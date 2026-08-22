@@ -40,8 +40,8 @@ export default function App() {
 
   if (!fontsLoaded) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" />
+      <View style={{ flex: 1, backgroundColor: '#f0ece3', justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#182031" />
       </View>
     );
   }

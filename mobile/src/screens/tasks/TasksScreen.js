@@ -21,7 +21,7 @@ import {
   Calendar as CalendarIcon,
   Clock,
   Circle,
-  CheckCircle2,
+  CircleCheck,
 } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { getTasks, createTask, updateTask, deleteTask } from '../../api/tasks';
@@ -300,7 +300,7 @@ const TasksScreen = ({ route, navigation }) => {
                   activeOpacity={0.7}
                 >
                   {isCompleted ? (
-                    <CheckCircle2 size={22} color={colors.accent} />
+                    <CircleCheck size={22} color={colors.accent} />
                   ) : (
                     <Circle size={22} color={colors.mutedForeground} />
                   )}

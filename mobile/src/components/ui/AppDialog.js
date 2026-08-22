@@ -12,12 +12,12 @@ import {
   Platform,
 } from 'react-native';
 import { 
-  AlertTriangle, 
+  TriangleAlert, 
   Trash2, 
-  CheckCircle2, 
+  CircleCheck, 
   Info, 
-  AlertCircle, 
-  HelpCircle,
+  CircleAlert, 
+  CircleQuestionMark,
   X
 } from 'lucide-react-native';
 import { Button } from './Button';
@@ -68,16 +68,16 @@ export function AppDialog({
 
   // Handle Android hardware back button
   useEffect(() => {
-    if (!visible) return;
-    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (loading) return true; // prevent dismiss during loading
-      if (onCancel) {
-        onCancel();
-      } else if (onClose) {
-        onClose();
+    const onBackPress = () => {
+      if (visible && !loading) {
+        if (onCancel) onCancel();
+        else if (onClose) onClose();
+        return true;
       }
-      return true;
-    });
+      return false;
+    };
+
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => backHandler.remove();
   }, [visible, loading, onCancel, onClose]);
 
@@ -116,12 +116,12 @@ export function AppDialog({
         iconBgColor = `${colors.destructive}18`;
         break;
       case 'warning':
-        IconComponent = AlertTriangle;
+        IconComponent = TriangleAlert;
         iconColor = '#F59E0B';
         iconBgColor = '#F59E0B18';
         break;
       case 'success':
-        IconComponent = CheckCircle2;
+        IconComponent = CircleCheck;
         iconColor = '#10B981';
         iconBgColor = '#10B98118';
         break;
@@ -131,7 +131,7 @@ export function AppDialog({
         iconBgColor = `${colors.primary}18`;
         break;
       default:
-        IconComponent = HelpCircle;
+        IconComponent = CircleQuestionMark;
         iconColor = colors.accent;
         iconBgColor = `${colors.accent}18`;
         break;

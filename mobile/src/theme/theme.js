@@ -88,8 +88,6 @@ export const ThemeProvider = ({ children }) => {
   // Update global reference for Proxy access
   currentGlobalTheme = { ...currentThemeData, toggleTheme };
 
-  if (!isLoaded) return null;
-
   return (
     <ThemeContext.Provider value={currentGlobalTheme}>
       {children}

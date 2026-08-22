@@ -11,14 +11,13 @@ import {
 } from 'react-native';
 import {
   BookOpen,
-  CheckCircle2,
+  CircleCheck,
   Circle,
   Upload,
   ChevronRight,
   ChevronDown,
   Sparkles,
   Layers,
-  UploadCloud,
 } from 'lucide-react-native';
 import {
   extractSyllabus,
@@ -459,7 +458,7 @@ const SyllabusScreen = ({ route, navigation }) => {
                                 >
                                   <View style={styles.checkboxContainer}>
                                     {isDone ? (
-                                      <CheckCircle2 size={20} color={subjectColor} />
+                                      <CircleCheck size={20} color={subjectColor} />
                                     ) : (
                                       <Circle size={20} color={colors.mutedForeground} />
                                     )}

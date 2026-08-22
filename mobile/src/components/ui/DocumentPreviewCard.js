@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
-import { FileText, Eye, Download, Share2, RefreshCw, Trash2, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react-native';
+import { FileText, Eye, Download, Share2, RefreshCw, Trash2, Sparkles, CircleCheck, CircleAlert } from 'lucide-react-native';
 import { useAppTheme, useStyles } from '../../theme/theme';
 import { useAppDialog } from './AppDialog';
 import { viewDocument, downloadDocument, shareDocument } from '../../utils/documentViewer';
@@ -96,14 +96,14 @@ export const DocumentPreviewCard = ({
           </View>
         ) : unitCount > 0 ? (
           <View style={[styles.statusBanner, { backgroundColor: `${colors.accent}14`, borderColor: `${colors.accent}35` }]}>
-            <CheckCircle2 size={16} color={colors.accent} style={{ marginRight: 8 }} />
+            <CircleCheck size={16} color={colors.accent} style={{ marginRight: 8 }} />
             <Text style={[styles.statusText, { color: colors.accent }]}>
               {unitCount} Units • {topicCount} Topics extracted
             </Text>
           </View>
         ) : extractionError ? (
           <View style={[styles.statusBanner, { backgroundColor: `${colors.destructive}12`, borderColor: `${colors.destructive}30` }]}>
-            <AlertCircle size={16} color={colors.destructive} style={{ marginRight: 8 }} />
+            <CircleAlert size={16} color={colors.destructive} style={{ marginRight: 8 }} />
             <Text style={[styles.statusText, { color: colors.destructive }]} numberOfLines={1}>
               {extractionError || 'Extraction failed.'}
             </Text>

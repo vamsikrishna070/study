@@ -11,7 +11,7 @@ import {
 import { 
   Pause, 
   Play, 
-  CheckCircle2, 
+  CircleCheck, 
   X, 
   BookOpen, 
   Target, 
@@ -182,7 +182,7 @@ export default function FocusSessionScreen({ navigation }) {
             onPress={handleEnd}
             activeOpacity={0.8}
           >
-            <CheckCircle2 size={22} color={colors.primaryForeground} />
+            <CircleCheck size={22} color={colors.primaryForeground} />
             <Text style={styles.endBtnText}>End Session</Text>
           </TouchableOpacity>
         </View>

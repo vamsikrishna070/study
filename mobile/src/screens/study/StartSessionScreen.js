@@ -13,9 +13,8 @@ import {
   Play, 
   BookOpen, 
   Sparkles, 
-  History, 
-  BarChart3, 
-  PlusCircle, 
+  RotateCcwClock, 
+  ChartBar, 
   Target, 
   ListChecks, 
   CalendarDays,
@@ -178,14 +177,14 @@ export default function StartSessionScreen({ navigation, route }) {
                   onPress={() => navigation.navigate('StudyHistory')}
                   activeOpacity={0.7}
                 >
-                  <History size={18} color={colors.foreground} />
+                  <RotateCcwClock size={18} color={colors.foreground} />
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.headerBtn}
                   onPress={() => navigation.navigate('StudyAnalytics')}
                   activeOpacity={0.7}
                 >
-                  <BarChart3 size={18} color={colors.accent} />
+                  <ChartBar size={18} color={colors.accent} />
                 </TouchableOpacity>
               </View>
             }

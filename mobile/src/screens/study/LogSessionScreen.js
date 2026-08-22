@@ -12,9 +12,9 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { 
   Calendar as CalendarIcon, 
   Clock, 
-  Smile, 
-  Meh, 
-  Frown, 
+  FaceSlightlySmiling, 
+  FaceNeutral, 
+  FaceSlightlyFrowning, 
   Save, 
   BookOpen, 
   PenLine 
@@ -197,7 +197,7 @@ export default function LogSessionScreen({ navigation }) {
                   onPress={() => setProductivity('productive')}
                   activeOpacity={0.7}
                 >
-                  <Smile
+                  <FaceSlightlySmiling
                     size={22}
                     color={productivity === 'productive' ? colors.accent : colors.mutedForeground}
                   />
@@ -219,7 +219,7 @@ export default function LogSessionScreen({ navigation }) {
                   onPress={() => setProductivity('average')}
                   activeOpacity={0.7}
                 >
-                  <Meh
+                  <FaceNeutral
                     size={22}
                     color={productivity === 'average' ? colors.accent : colors.mutedForeground}
                   />
@@ -241,7 +241,7 @@ export default function LogSessionScreen({ navigation }) {
                   onPress={() => setProductivity('difficult')}
                   activeOpacity={0.7}
                 >
-                  <Frown
+                  <FaceSlightlyFrowning
                     size={22}
                     color={productivity === 'difficult' ? colors.accent : colors.mutedForeground}
                   />

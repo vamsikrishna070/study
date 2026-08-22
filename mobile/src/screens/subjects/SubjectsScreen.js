@@ -17,13 +17,11 @@ import {
   BookOpen,
   Plus,
   X,
-  UploadCloud,
   FileText,
   Eye,
   ListOrdered,
   ChevronRight,
   Trash2,
-  Edit2,
   Sparkles,
 } from 'lucide-react-native';
 import { getSubjects, createSubject, updateSubject, deleteSubject } from '../../api/subjects';

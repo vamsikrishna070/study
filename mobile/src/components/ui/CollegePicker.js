@@ -20,8 +20,6 @@ import {
   MapPin, 
   Building2, 
   ChevronDown, 
-  Edit3, 
-  HelpCircle, 
   ArrowLeft 
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
