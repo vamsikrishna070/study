@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
+import { saveCustomAudio } from '../../services/documentService';
 import { 
   Bell, Plus, CalendarDays, Clock, Trash2, BellOff, ChevronRight, X, 
   Repeat, Music, Volume2, VolumeX, FileMusic, Check, CircleAlert 
@@ -230,30 +230,28 @@ const RemindersScreen = ({ navigation }) => {
   const handlePickCustomAudio = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: 'audio/*',
+        type: [
+          'audio/*',
+          'audio/mpeg',
+          'audio/mp3',
+          'audio/wav',
+          'audio/x-wav',
+          'audio/x-m4a',
+          'audio/m4a',
+          'audio/aac',
+          'audio/ogg',
+          '*/*',
+        ],
         copyToCacheDirectory: true,
       });
       if (result.canceled || !result.assets || result.assets.length === 0) return;
       const asset = result.assets[0];
 
-      // Copy permanently to internal app storage
-      const soundsDir = `${FileSystem.documentDirectory}custom_sounds/`;
-      const dirInfo = await FileSystem.getInfoAsync(soundsDir);
-      if (!dirInfo.exists) {
-        await FileSystem.makeDirectoryAsync(soundsDir, { intermediates: true });
-      }
-
-      const safeName = `${Date.now()}_${(asset.name || 'custom_sound.mp3').replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-      const destinationUri = `${soundsDir}${safeName}`;
-
-      await FileSystem.copyAsync({
-        from: asset.uri,
-        to: destinationUri,
-      });
+      const saved = await saveCustomAudio(asset);
 
       setSoundId('custom');
-      setSoundName(asset.name || 'Custom Audio');
-      setSoundUri(destinationUri);
+      setSoundName(saved.name || 'Custom Audio');
+      setSoundUri(saved.uri);
     } catch (e) {
       console.warn('Error selecting audio file:', e);
       showError('Audio Picker Error', 'Could not access the selected audio file. Please choose another audio file.');

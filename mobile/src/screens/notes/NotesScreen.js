@@ -130,8 +130,8 @@ const NotesScreen = ({ route, navigation }) => {
   }, [filterSubjectId]);
 
   const handleCreate = async () => {
-    if (!title.trim() || !content.trim()) {
-      showError('Validation Error', 'Please enter both title and note content.');
+    if (!title.trim()) {
+      showError('Validation Error', 'Please enter a note title.');
       return;
     }
     if (!subjectId) {
@@ -432,12 +432,12 @@ const NotesScreen = ({ route, navigation }) => {
             </View>
 
             <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled">
-              <Field label="Note Title">
-                <Input value={title} onChangeText={setTitle} placeholder="Enter note title" />
+              <Field label="Title *">
+                <Input value={title} onChangeText={setTitle} placeholder="Note title" />
               </Field>
 
               <View style={styles.gridRow}>
-                <Field label="Subject" style={{ flex: 1 }}>
+                <Field label="Subject *" style={{ flex: 1 }}>
                   <SelectPicker
                     value={subjectId}
                     onValueChange={setSubjectId}
@@ -454,7 +454,7 @@ const NotesScreen = ({ route, navigation }) => {
                 </Field>
               </View>
 
-              <Field label="Topic / Unit (Optional)">
+              <Field label="Topic / Unit (optional)">
                 <Input
                   value={topic}
                   onChangeText={setTopic}
@@ -462,19 +462,19 @@ const NotesScreen = ({ route, navigation }) => {
                 />
               </Field>
 
-              <Field label="Tags (Comma separated)">
+              <Field label="Tags (optional)">
                 <Input
                   value={tagsInput}
                   onChangeText={setTagsInput}
-                  placeholder="Add tags"
+                  placeholder="Add tags (optional)"
                 />
               </Field>
 
-              <Field label="Content">
+              <Field label="Content (optional)">
                 <Input
                   value={content}
                   onChangeText={setContent}
-                  placeholder="Write your notes..."
+                  placeholder="Write your notes here (optional)"
                   multiline
                   style={{ minHeight: 140, alignItems: 'flex-start' }}
                   textAlignVertical="top"
@@ -513,7 +513,7 @@ const NotesScreen = ({ route, navigation }) => {
                 style={styles.modalBtn}
                 onPress={handleCreate}
                 loading={submitting}
-                disabled={!title.trim() || !content.trim() || !subjectId || submitting}
+                disabled={!title.trim() || !subjectId || submitting}
               >
                 Save Note
               </Button>

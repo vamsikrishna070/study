@@ -3,12 +3,12 @@
 # Covers: Root, backend, frontend, mobile (Expo & Android native)
 # ==============================================================================
 
-# ─── Dependencies ─────────────────────────────────────────────────────────────
+# --- Dependencies ---
 node_modules/
 */node_modules/
 **/node_modules/
 
-# ─── Environment & Secrets ────────────────────────────────────────────────────
+# --- Environment & Secrets ---
 .env
 .env.*
 !.env.example
@@ -22,16 +22,16 @@ tokens.json
 google-services.json
 GoogleService-Info.plist
 
-# ─── Logs & Diagnostics ───────────────────────────────────────────────────────
+# --- Logs & Diagnostics ---
 *.log
 logs/
 */logs/
-npm-debug.*
-yarn-debug.*
-yarn-error.*
-pnpm-debug.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
-# ─── Build Outputs & Caches ───────────────────────────────────────────────────
+# --- Build Outputs & Caches ---
 dist/
 */dist/
 build/
@@ -45,7 +45,7 @@ out/
 .parcel-cache/
 .next/
 
-# ─── Expo & React Native ──────────────────────────────────────────────────────
+# --- Expo & React Native ---
 .expo/
 */.expo/
 .expo-shared/
@@ -58,7 +58,7 @@ expo-env.d.ts
 *.tgz
 *.tsbuildinfo
 
-# ─── Android Native & Gradle Caches ───────────────────────────────────────────
+# --- Android Native & Gradle Caches ---
 .gradle/
 **/.gradle/
 **/build/
@@ -73,7 +73,7 @@ local.properties
 *.class
 *.hprof
 
-# ─── Keystores & Signing Keys ─────────────────────────────────────────────────
+# --- Keystores & Signing Keys ---
 *.jks
 *.keystore
 *.p8
@@ -83,14 +83,24 @@ local.properties
 *.mobileprovision
 *.orig.*
 
-# ─── iOS Native (if generated) ────────────────────────────────────────────────
+# --- iOS Native (if generated) ---
 Pods/
 **/Pods/
 ios/build/
 *.xcworkspace/xcuserdata/
 *.xcuserstate
+DerivedData/
 
-# ─── IDE & Editors ────────────────────────────────────────────────────────────
+# --- Test, PDF & Temporary Extraction Artifacts ---
+backend/tests/fixtures/
+test-output/
+ocr-output/
+extracted/
+downloads/
+tmp/
+temp/
+
+# --- IDE & Editors ---
 .idea/
 **/.idea/
 .vscode/*
@@ -100,7 +110,7 @@ ios/build/
 *.sublime-project
 *.sublime-workspace
 
-# ─── OS-Specific ──────────────────────────────────────────────────────────────
+# --- OS-Specific ---
 .DS_Store
 .DS_Store?
 ._*
@@ -109,10 +119,12 @@ ios/build/
 ehthumbs.db
 Thumbs.db
 Desktop.ini
+desktop.ini
 
-# ─── Temporary & Scratch ──────────────────────────────────────────────────────
+# --- Temporary & Scratch ---
 *.tmp
 *.temp
+*.bak
 *.swp
 *.swo
 *~

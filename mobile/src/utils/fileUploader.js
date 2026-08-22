@@ -1,5 +1,6 @@
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
+import { validatePdfFile } from '../services/documentService';
 import client from '../api/client';
 
 /**
@@ -13,12 +14,18 @@ export const uploadFileToServer = async (file) => {
   }
 
   const formData = new FormData();
-  
-  // React Native requires uri, name, and type for FormData file upload
+
+  const fileName = file.name || file.originalName || `file_${Date.now()}`;
+  let mimeType = file.mimeType || file.type || 'application/octet-stream';
+
+  if (fileName.toLowerCase().endsWith('.pdf') && mimeType === 'application/octet-stream') {
+    mimeType = 'application/pdf';
+  }
+
   const fileObj = {
     uri: file.uri,
-    name: file.name || file.originalName || 'file_' + Date.now(),
-    type: file.mimeType || file.type || 'application/octet-stream',
+    name: fileName,
+    type: mimeType,
   };
 
   formData.append('file', fileObj);
@@ -29,12 +36,13 @@ export const uploadFileToServer = async (file) => {
 
 /**
  * Pick any document (PDF, DOCX, PPT, etc.) and upload it to the server
+ * Supports Adobe Acrobat, Google Drive, Downloads, and all Android document providers.
  * @param {Object} options DocumentPicker options
  * @returns {Promise<Object|null>} Uploaded file metadata or null if cancelled
  */
 export const pickAndUploadDocument = async (options = {}) => {
   const result = await DocumentPicker.getDocumentAsync({
-    type: options.type || '*/*',
+    type: options.type || ['application/pdf', '*/*'],
     copyToCacheDirectory: true,
     ...options,
   });
@@ -44,18 +52,34 @@ export const pickAndUploadDocument = async (options = {}) => {
   }
 
   const asset = result.assets[0];
+  if (!asset.uri) {
+    throw new Error('Could not access the selected document.');
+  }
+
+  const fileName = asset.name || 'document.pdf';
+  let mimeType = asset.mimeType || 'application/pdf';
+
+  // If selecting a PDF, perform post-selection validation
+  if (options.isPdf || fileName.toLowerCase().endsWith('.pdf')) {
+    const isPdfValid = await validatePdfFile(asset.uri);
+    if (!isPdfValid && !fileName.toLowerCase().endsWith('.pdf')) {
+      throw new Error('Selected file is not a valid PDF document.');
+    }
+    mimeType = 'application/pdf';
+  }
+
   const uploaded = await uploadFileToServer({
     uri: asset.uri,
-    name: asset.name,
-    mimeType: asset.mimeType || 'application/pdf',
-    size: asset.size,
+    name: fileName,
+    mimeType: mimeType,
+    size: asset.size || 0,
   });
 
   return {
     ...uploaded,
-    originalName: uploaded.originalName || asset.name,
-    mimeType: uploaded.mimeType || asset.mimeType,
-    size: uploaded.size || asset.size,
+    originalName: uploaded.originalName || fileName,
+    mimeType: uploaded.mimeType || mimeType,
+    size: uploaded.size || asset.size || 0,
   };
 };
 

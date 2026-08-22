@@ -1,9 +1,20 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
-import { FileText, Eye, Download, Share2, RefreshCw, Trash2, Sparkles, CircleCheck, CircleAlert } from 'lucide-react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import {
+  FileText,
+  Eye,
+  Download,
+  Share2,
+  RefreshCw,
+  Trash2,
+  Sparkles,
+  CircleCheck,
+  CircleAlert,
+  Check,
+} from 'lucide-react-native';
 import { useAppTheme, useStyles } from '../../theme/theme';
 import { useAppDialog } from './AppDialog';
-import { viewDocument, downloadDocument, shareDocument } from '../../utils/documentViewer';
+import { viewPdf, downloadPdf, sharePdf } from '../../services/documentService';
 
 const formatSize = (bytes) => {
   if (!bytes || bytes === 0) return '';
@@ -28,8 +39,10 @@ export const DocumentPreviewCard = ({
 }) => {
   const { colors, typography, spacing, radii } = useAppTheme();
   const styles = useStyles(createStyles);
-  const { showDeleteConfirm } = useAppDialog();
+  const { showError, showDeleteConfirm } = useAppDialog();
+  const [viewing, setViewing] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [downloadSuccess, setDownloadSuccess] = useState(false);
   const [sharing, setSharing] = useState(false);
 
   if (!file || !file.url) {
@@ -40,26 +53,49 @@ export const DocumentPreviewCard = ({
   const originalName = file.originalName || 'Syllabus.pdf';
   const sizeText = formatSize(file.size);
 
-  const handleView = () => {
-    viewDocument(file.url, originalName);
+  const handleView = async () => {
+    if (viewing) return;
+    setViewing(true);
+    try {
+      await viewPdf(file.url, originalName);
+    } catch (error) {
+      showError('Couldn’t open document', 'We couldn’t prepare this PDF right now. Please try again.');
+    } finally {
+      setViewing(false);
+    }
   };
 
   const handleDownload = async () => {
+    if (downloading) return;
     setDownloading(true);
-    await downloadDocument(file.url, originalName);
-    setDownloading(false);
+    try {
+      await downloadPdf(file.url, originalName);
+      setDownloadSuccess(true);
+      setTimeout(() => setDownloadSuccess(false), 3000);
+    } catch (error) {
+      showError('Download Failed', 'Could not download the document. Please check your connection.');
+    } finally {
+      setDownloading(false);
+    }
   };
 
   const handleShare = async () => {
+    if (sharing) return;
     setSharing(true);
-    await shareDocument(file.url, originalName);
-    setSharing(false);
+    try {
+      await sharePdf(file.url, originalName);
+    } catch (error) {
+      showError('Share Failed', 'Unable to share this document right now.');
+    } finally {
+      setSharing(false);
+    }
   };
 
   const handleConfirmRemove = () => {
     showDeleteConfirm({
       title: 'Remove Syllabus PDF?',
-      message: 'This will remove the attached syllabus document from this subject. You can upload a new syllabus at any time.',
+      message:
+        'This will remove the attached syllabus document from this subject. You can upload a new syllabus at any time.',
       confirmText: 'Remove',
       onConfirm: onRemove,
     });
@@ -88,28 +124,48 @@ export const DocumentPreviewCard = ({
       {/* Extraction Status Section */}
       <View style={styles.statusSection}>
         {isExtracting ? (
-          <View style={[styles.statusBanner, { backgroundColor: `${colors.primary}12`, borderColor: `${colors.primary}30` }]}>
+          <View
+            style={[
+              styles.statusBanner,
+              { backgroundColor: `${colors.primary}12`, borderColor: `${colors.primary}30` },
+            ]}
+          >
             <ActivityIndicator size="small" color={colors.primary} style={{ marginRight: 8 }} />
             <Text style={[styles.statusText, { color: colors.primary }]}>
               Extracting syllabus units & topics...
             </Text>
           </View>
         ) : unitCount > 0 ? (
-          <View style={[styles.statusBanner, { backgroundColor: `${colors.accent}14`, borderColor: `${colors.accent}35` }]}>
+          <View
+            style={[
+              styles.statusBanner,
+              { backgroundColor: `${colors.accent}14`, borderColor: `${colors.accent}35` },
+            ]}
+          >
             <CircleCheck size={16} color={colors.accent} style={{ marginRight: 8 }} />
             <Text style={[styles.statusText, { color: colors.accent }]}>
               {unitCount} Units • {topicCount} Topics extracted
             </Text>
           </View>
         ) : extractionError ? (
-          <View style={[styles.statusBanner, { backgroundColor: `${colors.destructive}12`, borderColor: `${colors.destructive}30` }]}>
+          <View
+            style={[
+              styles.statusBanner,
+              { backgroundColor: `${colors.destructive}12`, borderColor: `${colors.destructive}30` },
+            ]}
+          >
             <CircleAlert size={16} color={colors.destructive} style={{ marginRight: 8 }} />
             <Text style={[styles.statusText, { color: colors.destructive }]} numberOfLines={1}>
               {extractionError || 'Extraction failed.'}
             </Text>
           </View>
         ) : (
-          <View style={[styles.statusBanner, { backgroundColor: `${colors.muted}40`, borderColor: colors.cardBorder }]}>
+          <View
+            style={[
+              styles.statusBanner,
+              { backgroundColor: `${colors.muted}40`, borderColor: colors.cardBorder },
+            ]}
+          >
             <Sparkles size={16} color={colors.mutedForeground} style={{ marginRight: 8 }} />
             <Text style={[styles.statusText, { color: colors.mutedForeground }]}>
               Syllabus uploaded • Ready to extract
@@ -123,10 +179,15 @@ export const DocumentPreviewCard = ({
         <TouchableOpacity
           style={[styles.primaryActionBtn, { backgroundColor: themeAccent }]}
           onPress={handleView}
+          disabled={viewing}
           activeOpacity={0.8}
         >
-          <Eye size={16} color="#ffffff" style={{ marginRight: 6 }} />
-          <Text style={styles.primaryActionText}>View PDF</Text>
+          {viewing ? (
+            <ActivityIndicator size="small" color="#ffffff" style={{ marginRight: 6 }} />
+          ) : (
+            <Eye size={16} color="#ffffff" style={{ marginRight: 6 }} />
+          )}
+          <Text style={styles.primaryActionText}>{viewing ? 'Opening...' : 'View PDF'}</Text>
         </TouchableOpacity>
 
         {unitCount === 0 && onExtract && (
@@ -153,13 +214,15 @@ export const DocumentPreviewCard = ({
           activeOpacity={0.7}
         >
           {downloading ? (
-            <ActivityIndicator size="small" color={colors.foreground} />
+            <ActivityIndicator size="small" color={colors.foreground} style={{ marginRight: 4 }} />
+          ) : downloadSuccess ? (
+            <Check size={14} color={colors.accent} style={{ marginRight: 4 }} />
           ) : (
-            <>
-              <Download size={14} color={colors.foreground} style={{ marginRight: 4 }} />
-              <Text style={styles.auxBtnText}>Download</Text>
-            </>
+            <Download size={14} color={colors.foreground} style={{ marginRight: 4 }} />
           )}
+          <Text style={[styles.auxBtnText, downloadSuccess && { color: colors.accent }]}>
+            {downloading ? 'Saving...' : downloadSuccess ? 'Saved' : 'Download'}
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -169,21 +232,15 @@ export const DocumentPreviewCard = ({
           activeOpacity={0.7}
         >
           {sharing ? (
-            <ActivityIndicator size="small" color={colors.foreground} />
+            <ActivityIndicator size="small" color={colors.foreground} style={{ marginRight: 4 }} />
           ) : (
-            <>
-              <Share2 size={14} color={colors.foreground} style={{ marginRight: 4 }} />
-              <Text style={styles.auxBtnText}>Share</Text>
-            </>
+            <Share2 size={14} color={colors.foreground} style={{ marginRight: 4 }} />
           )}
+          <Text style={styles.auxBtnText}>{sharing ? 'Preparing...' : 'Share'}</Text>
         </TouchableOpacity>
 
         {onReplace && (
-          <TouchableOpacity
-            style={styles.auxBtn}
-            onPress={onReplace}
-            activeOpacity={0.7}
-          >
+          <TouchableOpacity style={styles.auxBtn} onPress={onReplace} activeOpacity={0.7}>
             <RefreshCw size={14} color={colors.foreground} style={{ marginRight: 4 }} />
             <Text style={styles.auxBtnText}>Replace</Text>
           </TouchableOpacity>

@@ -179,12 +179,12 @@ export async function getNotes(req, res) {
   res.json({ success: true, data });
 }
 export async function createNote(req, res) {
-  if (!required(req.body, ["title", "content", "subjectId"]))
+  if (!required(req.body, ["title", "subjectId"]))
     return res
       .status(400)
       .json({
         success: false,
-        message: "Title, content, and subject are required",
+        message: "Title and subject are required",
       });
   const subject = await owned(Subject, req.user._id, req.body.subjectId);
   if (!subject)

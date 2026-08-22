@@ -587,19 +587,19 @@ const ResourcesScreen = ({ route, navigation }) => {
                 </Field>
               </View>
 
-              <Field label="Topic / Concept (Optional)">
+              <Field label="Topic / Concept (optional)">
                 <Input value={topic} onChangeText={setTopic} placeholder="Enter topic" />
               </Field>
 
-              <Field label="Tags (Comma separated)">
-                <Input value={tagsInput} onChangeText={setTagsInput} placeholder="Add tags" />
+              <Field label="Tags (optional)">
+                <Input value={tagsInput} onChangeText={setTagsInput} placeholder="Add tags (optional)" />
               </Field>
 
-              <Field label="Description (Optional)">
+              <Field label="Description (optional)">
                 <Input
                   value={description}
                   onChangeText={setDescription}
-                  placeholder="Describe this resource"
+                  placeholder="Add description (optional)"
                   multiline
                   style={{ minHeight: 80, alignItems: 'flex-start' }}
                   textAlignVertical="top"

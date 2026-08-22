@@ -6,7 +6,7 @@ const noteSchema = new mongoose.Schema({
   unit: { type: mongoose.Schema.Types.ObjectId, ref: 'Unit', default: null },
   topic: { type: String, trim: true, default: '' },
   title: { type: String, required: true, trim: true, maxlength: 160 },
-  content: { type: String, required: true },
+  content: { type: String, default: '', trim: true },
   tags: [{ type: String, trim: true }],
   priority: { type: String, enum: ['low', 'medium', 'high', 'exam'], default: 'medium' },
   attachments: [{

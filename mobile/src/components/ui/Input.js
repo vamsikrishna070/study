@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { TextInput as RNTextInput, StyleSheet, View, TouchableOpacity } from 'react-native';
 import { Eye, EyeOff } from 'lucide-react-native';
-import { typography, radii, spacing, useAppTheme, useStyles } from '../../theme/theme';
+import { useAppTheme, useStyles } from '../../theme/theme';
 
 export function Input({ 
   secureTextEntry, 
@@ -9,11 +9,21 @@ export function Input({
   error,
   ...props 
 }) {
-  const { colors, typography, spacing, radii, theme } = useAppTheme();
+  const { colors, typography, spacing, radii } = useAppTheme();
   const styles = useStyles(createStyles);
 
   const [isFocused, setIsFocused] = useState(false);
-  const [isSecure, setIsSecure] = useState(secureTextEntry);
+  const [isSecure, setIsSecure] = useState(Boolean(secureTextEntry));
+
+  useEffect(() => {
+    if (secureTextEntry !== undefined) {
+      setIsSecure(Boolean(secureTextEntry));
+    }
+  }, [secureTextEntry]);
+
+  const toggleSecure = () => {
+    setIsSecure((prev) => !prev);
+  };
 
   return (
     <View style={[
@@ -23,7 +33,7 @@ export function Input({
       style
     ]}>
       <RNTextInput
-        style={[styles.input, secureTextEntry && { paddingRight: 40 }]}
+        style={[styles.input, secureTextEntry && { paddingRight: 44 }]}
         placeholderTextColor={colors.mutedForeground}
         secureTextEntry={isSecure}
         onFocus={() => setIsFocused(true)}
@@ -33,13 +43,16 @@ export function Input({
       {secureTextEntry && (
         <TouchableOpacity 
           style={styles.iconContainer} 
-          onPress={() => setIsSecure(!isSecure)}
+          onPress={toggleSecure}
           activeOpacity={0.7}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          accessibilityRole="button"
+          accessibilityLabel={isSecure ? "Show password" : "Hide password"}
         >
           {isSecure ? (
-            <EyeOff size={20} color={colors.mutedForeground} />
+            <EyeOff size={18} color={colors.mutedForeground} />
           ) : (
-            <Eye size={20} color={colors.mutedForeground} />
+            <Eye size={18} color={colors.primary} />
           )}
         </TouchableOpacity>
       )}
@@ -76,5 +89,6 @@ const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.crea
     right: 12,
     height: '100%',
     justifyContent: 'center',
+    alignItems: 'center',
   }
 });

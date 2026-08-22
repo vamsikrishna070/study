@@ -161,30 +161,16 @@ const RegisterScreen = ({ navigation }) => {
             </Field>
 
             <Field label="Password">
-              <View style={styles.passwordInputWrapper}>
-                <Input
-                  value={password}
-                  onChangeText={(text) => {
-                    setPassword(text);
-                    if (errorMsg) setErrorMsg('');
-                  }}
-                  secureTextEntry={!showPassword}
-                  placeholder="Create a strong password (8+ chars)"
-                  editable={!loading}
-                  style={styles.passwordInput}
-                />
-                <TouchableOpacity
-                  style={styles.visibilityToggle}
-                  onPress={() => setShowPassword(!showPassword)}
-                  activeOpacity={0.7}
-                >
-                  {showPassword ? (
-                    <EyeOff size={18} color={colors.mutedForeground} />
-                  ) : (
-                    <Eye size={18} color={colors.mutedForeground} />
-                  )}
-                </TouchableOpacity>
-              </View>
+              <Input
+                value={password}
+                onChangeText={(text) => {
+                  setPassword(text);
+                  if (errorMsg) setErrorMsg('');
+                }}
+                secureTextEntry
+                placeholder="Create a strong password (8+ chars)"
+                editable={!loading}
+              />
             </Field>
 
             {/* Password Strength Indicator */}
