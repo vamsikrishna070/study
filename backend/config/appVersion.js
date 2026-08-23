@@ -1,12 +1,12 @@
 export const appVersionConfig = {
-  latestVersion: '1.0.2',
-  latestVersionCode: 3,
+  latestVersion: '1.0.3',
+  latestVersionCode: 4,
 
   minimumSupportedVersionCode: 1,
 
   downloadUrl:
     process.env.APP_DOWNLOAD_URL ||
-    'https://github.com/vamsikrishna070/study/releases/download/v1.0.2/studyarena-1.0.2.apk',
+    'https://github.com/vamsikrishna070/study/releases/download/v1.0.3/studyarena-1.0.3.apk',
     
   releaseNotes: [
     'Complete voice notes & audio playback in Notes & Resources',
