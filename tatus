@@ -1,6 +1,0 @@
-warning: in the working copy of 'backend/controllers/studyController.js', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'backend/routes/subjectRoutes.js', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'frontend/src/components/shared/AttachmentCard.jsx', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'frontend/src/components/shared/DocumentPreviewCard.jsx', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'frontend/src/pages/SubjectDetail.jsx', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'frontend/src/pages/Syllabus.jsx', LF will be replaced by CRLF the next time Git touches it
