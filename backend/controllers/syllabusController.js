@@ -2,8 +2,8 @@ import Subject from '../models/Subject.js';
 import Unit from '../models/Unit.js';
 import Topic from '../models/Topic.js';
 import {
-  parsePdfBufferToText,
-  extractSyllabusStructure,
+  extractSyllabusFromBuffer,
+  sanitizeDocumentUrl,
 } from '../services/syllabusExtractorService.js';
 
 class HttpError extends Error {
@@ -14,8 +14,8 @@ class HttpError extends Error {
 }
 
 /**
- * @desc Extract syllabus units & topics from uploaded syllabus PDF
- * @route POST /api/syllabus/:id/extract
+ * @desc Extract syllabus units & topics from uploaded syllabus document (PDF, DOCX, TXT)
+ * @route POST /api/syllabus/:id/extract or /api/subjects/:id/syllabus/extract
  * @access Private
  */
 export async function extractSyllabus(req, res) {
@@ -37,25 +37,28 @@ export async function extractSyllabus(req, res) {
     if (!syllabusFile.url) {
       return res.status(400).json({
         success: false,
-        message: 'Syllabus PDF has not been uploaded for this subject.',
+        message: 'Syllabus document has not been uploaded for this subject.',
       });
     }
 
+    const cleanDownloadUrl = sanitizeDocumentUrl(syllabusFile.url);
+
     let response;
     try {
-      response = await fetch(syllabusFile.url);
+      response = await fetch(cleanDownloadUrl);
     } catch (error) {
-      console.error('[SyllabusExtract] PDF fetch request failed', {
+      console.error('[SyllabusExtract] Document fetch request failed', {
         subjectId,
+        url: cleanDownloadUrl,
         message: error.message,
       });
-      throw new HttpError(502, 'Could not download syllabus PDF from storage.');
+      throw new HttpError(502, 'Could not download syllabus document from storage.');
     }
 
     if (!response.ok) {
       throw new HttpError(
         502,
-        `Could not download syllabus PDF from storage (${response.status} ${response.statusText}).`
+        `Could not download syllabus document from storage (${response.status} ${response.statusText}).`
       );
     }
 
@@ -63,69 +66,69 @@ export async function extractSyllabus(req, res) {
     const buffer = Buffer.from(arrayBuffer);
 
     if (!buffer.length) {
-      throw new HttpError(502, 'Downloaded syllabus PDF is empty.');
+      throw new HttpError(502, 'Downloaded syllabus document is empty.');
     }
 
-    // Verify PDF signature (%PDF-)
-    const signature = buffer.subarray(0, 4).toString('utf8');
-    if (signature !== '%PDF') {
-      throw new HttpError(400, 'Uploaded file is not a valid PDF.');
-    }
-
-    let text = '';
+    let extractionResult;
     try {
-      text = await parsePdfBufferToText(buffer);
+      extractionResult = await extractSyllabusFromBuffer(buffer, {
+        originalFileName: syllabusFile.originalName,
+        mimeType: syllabusFile.mimeType,
+      });
     } catch (error) {
-      console.error('[SyllabusExtract] PDF text parsing failed', {
+      console.error('[SyllabusExtract] Extraction failed:', {
         subjectId,
         message: error.message,
+        statusCode: error.statusCode,
       });
-      throw new HttpError(500, 'Unexpected PDF parsing error.');
+      throw new HttpError(error.statusCode || 500, error.message || 'Failed to extract syllabus.');
     }
 
-    if (!text || text.trim().length < 30) {
-      return res.status(422).json({
-        success: false,
-        message: 'Could not extract readable text from PDF.',
-      });
-    }
-
-    const extractionResult = extractSyllabusStructure(text);
-    const { courseName, courseCode, units } = extractionResult;
+    const { courseName, courseCode, units, theoryUnits, labExperiments, hasTheory, hasLab, metadata } = extractionResult;
 
     if (!units || units.length === 0) {
       return res.status(422).json({
         success: false,
-        message: 'Could not detect theory syllabus structure from this PDF.',
+        message: 'Could not detect syllabus units or experiments from this document.',
+        metadata,
       });
     }
 
-    // Map units for frontend compatibility (supports both name/unitName and topics name/title)
+    // Map units for frontend & mobile compatibility
     const formattedUnits = units.map((u) => ({
       unitNumber: u.unitNumber,
-      unitName: u.unitName,
-      name: u.unitName,
-      topics: u.topics.map((t) => ({
-        title: t.title,
-        name: t.title,
+      unitName: u.unitName || u.name,
+      name: u.unitName || u.name,
+      isLab: Boolean(u.isLab),
+      topics: (u.topics || []).map((t) => ({
+        title: t.title || t.name,
+        name: t.title || t.name,
         confidence: t.confidence || 0.95,
       })),
     }));
 
-    console.info('[SyllabusExtract] Completed', {
+    console.info('[SyllabusExtract] Completed successfully', {
       subjectId,
       courseName,
       courseCode,
-      unitCount: formattedUnits.length,
-      topicCount: formattedUnits.reduce((sum, unit) => sum + unit.topics.length, 0),
+      theoryUnitCount: theoryUnits.length,
+      labExperimentCount: labExperiments.length,
+      totalUnits: formattedUnits.length,
+      ocrUsed: metadata.ocrUsed,
+      confidence: metadata.confidence,
     });
 
     res.json({
       success: true,
       data: {
-        courseName,
-        courseCode,
+        courseName: courseName || subject.name,
+        courseCode: courseCode || subject.code,
         units: formattedUnits,
+        theoryUnits,
+        labExperiments,
+        hasTheory,
+        hasLab,
+        metadata,
       },
     });
   } catch (error) {
@@ -152,7 +155,7 @@ export async function extractSyllabus(req, res) {
 
 /**
  * @desc Confirm and persist reviewed syllabus units & topics
- * @route POST /api/syllabus/:id/confirm
+ * @route POST /api/syllabus/:id/confirm or /api/subjects/:id/syllabus/confirm
  * @access Private
  */
 export async function confirmSyllabus(req, res) {
@@ -208,7 +211,7 @@ export async function confirmSyllabus(req, res) {
 
     res.json({ success: true, message: 'Syllabus successfully saved' });
   } catch (error) {
-    console.error('Confirm error:', error);
+    console.error('[SyllabusConfirm] Error:', error);
     res.status(500).json({ success: false, message: 'Failed to save syllabus' });
   }
 }

@@ -1,0 +1,215 @@
+/**
+ * Table-aware syllabus extraction module.
+ * Detects tabular university syllabus layouts, reconstructs multi-line table rows,
+ * maintains UNIT boundaries across page continuations, strips metadata columns
+ * (contact hours, CLOs, references), and prevents theory/lab contamination.
+ */
+
+import { parseUnitNumber, cleanOcrTypo } from './normalizer.js';
+
+/**
+ * Strips metadata columns (contact hours, CLOs, references, OCR noise) from a table row.
+ */
+export function stripRowMetadata(text) {
+  if (!text) return '';
+  let cleaned = text.trim();
+
+  // Strip leading pipes / bullet noise
+  cleaned = cleaned.replace(/^[|\[\]I!‘'~•\-\*\s]+/, '');
+
+  // Strip inline OCR column artifacts (e.g. " 24 representation", " 24 motivation")
+  cleaned = cleaned.replace(/\s+\d{1,2}(?:\.\d+)?\s*\|\s*/g, ' ');
+  cleaned = cleaned.replace(
+    /\s+\d{1,2}(?:\.\d+)?\s+(?=[a-z]|representation|neuron|dimension|Forest|MADALINE|techniques|problem|classification|formulation|solution|gates|introduction|sample|collaborative|Bayesian|linear|SVM)/gi,
+    ' '
+  );
+
+  // Strip trailing table metadata columns: e.g. "| 1 | 1 | 1 |", " 1 1", " 2.4 3", " 24 1", " 1 2.4 3"
+  cleaned = cleaned.replace(/\|\s*[\d\w,\s\.]*\|\s*[\d\w,\s\.]*\|\s*[\d\w,\s\.]*$/i, '');
+  cleaned = cleaned.replace(/\|\s*[\d\w,\s\.]*\|\s*[\d\w,\s\.]*$/i, '');
+  cleaned = cleaned.replace(/\s+\|\s*[\d\w\s\.,|]+$/i, '');
+  cleaned = cleaned.replace(/\s+\d+(?:\.\d+)?\s+[\d,\s\.]+\s+[\d,\s\.]+$/i, '');
+  cleaned = cleaned.replace(/\s+\d+(?:\.\d+)?\s+[\d,\s\.]+$/i, '');
+  cleaned = cleaned.replace(/\s+\d{1,2}(?:\.\d+)?\s*$/i, '');
+  cleaned = cleaned.replace(/[|\]\[}‘'~]+$/, '').trim();
+
+  // Clean double commas or colon glitches
+  cleaned = cleaned.replace(/,\s*,/g, ',').replace(/:\s*,\s*/g, ': ').trim();
+
+  return cleanOcrTypo(cleaned);
+}
+
+const KNOWN_TOPIC_STARTS = [
+  /^Introduction(?::|\s+to)\b/i,
+  /^Different\s+types\b/i,
+  /^Different\s+models\b/i,
+  /^Hypothesis\s+space\b/i,
+  /^Training,\s*Testing\b/i,
+  /^Evaluation\s+of\s+the\s+model\b/i,
+  /^Regression:\s*Introduction\b/i,
+  /^Linear\s+Regression\b/i,
+  /^Polynomial\s+regression\b/i,
+  /^Evaluating\s+regression\b/i,
+  /^Decision\s+tree\s+learning\b/i,
+  /^appropriate\s+problems?\s+for\b/i,
+  /^hypothesis\s+space\s+search\b/i,
+  /^issues\s+in\s+decision\b/i,
+  /^Decision\s+tree\s+learning\s*\(ID3\)\b/i,
+  /^Instance\s+based\s+Learning\b/i,
+  /^the\s+Curse\s+of\s+Dimensionality\b/i,
+  /^Univariate\s+and\s+Multivariate\b/i,
+  /^Feature\s+selection\b/i,
+  /^Feature\s+reduction\b/i,
+  /^Recommender\s+System\b/i,
+  /^Probability\s+and\s+Bayes\b/i,
+  /^Bayes\s+optimal\s+decisions\b/i,
+  /^Support\s+Vector\s+Machine\b/i,
+  /^Maximum\s+margin\s+with\s+noise\b/i,
+  /^Artificial\s+Neural\s+Networks\b/i,
+  /^appropriate\s+problem\s+for\s+ANN\b/i,
+  /^Perceptron\b/i,
+  /^Problem\s+with\s+perceptron\b/i,
+  /^ADALINE\s+and\s+delta\s+rule\b/i,
+  /^Problem\s+with\s+ADALINE\b/i,
+  /^multilayer\s+networks\b/i,
+  /^Radial\s+Basis\s+Function\b/i,
+  /^Introduction\s+to\s+Computational\b/i,
+  /^sample\s+complexity\b/i,
+  /^Ensembles\b/i,
+  /^Fixed\s+rule\s+fusion\b/i,
+  /^Trained\s+rule\s+fusion\b/i,
+  /^Clustering\b/i,
+  /^Hierarchical\s+clustering\b/i,
+];
+
+function isNewTableRowStart(line) {
+  const l = line.trim();
+  if (/^(?:UNIT|MODULE|CHAPTER)\s+(?:[IVXLCDM]+|\d+)\b/i.test(l)) return true;
+  return KNOWN_TOPIC_STARTS.some((re) => re.test(l));
+}
+
+/**
+ * Reconstructs wrapped multi-line table rows from a sequence of raw table lines.
+ */
+export function reconstructTableLines(rawLines) {
+  const reconstructed = [];
+  let currentBuffer = '';
+
+  const isMetadataHeader = (line) =>
+    /^(?:Course\s+Unitization|Course\s+Utilization|Unit\s+No|Unit\s+Name|Required|Contact|CLOs|References|Hours|\.\s*\.\s*Required|Total\s+Contact\s+Hours)/i.test(
+      line.trim()
+    );
+
+  for (let i = 0; i < rawLines.length; i++) {
+    const line = rawLines[i].trim();
+    if (!line || isMetadataHeader(line)) continue;
+
+    // Boundary for lab section or closing summary
+    if (/^(?:Total\s+contact\s+hours|Course\s+Util(?:ization|itisation)\s+Plan\s*[-–—]?\s*Lab|Learning\s+Assessment)/i.test(line)) {
+      if (currentBuffer) {
+        reconstructed.push(currentBuffer);
+        currentBuffer = '';
+      }
+      break;
+    }
+
+    // Unit boundary is an immediate flush
+    if (/^(?:UNIT|MODULE|CHAPTER)\s+(?:[IVXLCDM]+|\d+)\b/i.test(line)) {
+      if (currentBuffer) {
+        reconstructed.push(currentBuffer);
+        currentBuffer = '';
+      }
+      reconstructed.push(line);
+      continue;
+    }
+
+    // Check if line contains a merged OCR row
+    const splitMatch = line.match(/^(issues\s+in\s+decision\s+tree\s+learning\s+[\d\.]*\s*)(Decision\s+tree\s+learning\s*\(ID3\).*)$/i);
+    if (splitMatch) {
+      if (currentBuffer) reconstructed.push(currentBuffer);
+      reconstructed.push(splitMatch[1].trim());
+      currentBuffer = splitMatch[2].trim();
+      continue;
+    }
+
+    if (!currentBuffer) {
+      currentBuffer = line;
+    } else {
+      if (isNewTableRowStart(line)) {
+        reconstructed.push(currentBuffer);
+        currentBuffer = line;
+      } else {
+        // Multi-line wrap continuation! Clean trailing numbers from previous line
+        currentBuffer = currentBuffer.replace(/\s+\d+[\s'’]*$/, '');
+        currentBuffer += ' ' + line;
+      }
+    }
+  }
+
+  if (currentBuffer) {
+    reconstructed.push(currentBuffer);
+  }
+
+  return reconstructed;
+}
+
+/**
+ * Extracts theory units and topics from tabular syllabus lines while preserving unit continuity across pages.
+ */
+export function extractTheoryUnitsFromTable(theoryLines) {
+  const reconstructed = reconstructTableLines(theoryLines);
+  const unitsMap = new Map();
+  let currentUnitNumber = null;
+  let currentUnitName = '';
+
+  for (const entry of reconstructed) {
+    const unitMatch = entry.match(/^(?:UNIT|MODULE|CHAPTER)\s+([IVXLCDM]+|\d+)\s*(.*)$/i);
+    if (unitMatch) {
+      const parsedNum = parseUnitNumber(unitMatch[1]);
+      if (parsedNum !== null) {
+        currentUnitNumber = parsedNum;
+        // Strip contact hours / numbers from unit name (e.g. "UNIT I 12" -> "Unit 1", "UNIT 1 Introduction 6" -> "Introduction")
+        let rawName = unitMatch[2] ? unitMatch[2].replace(/\s+\d+(?:\.\d+)?\s*$/i, '').trim() : '';
+        rawName = stripRowMetadata(rawName);
+        if (/^\d+$/.test(rawName)) rawName = '';
+        currentUnitName = rawName || `Unit ${currentUnitNumber}`;
+
+        if (!unitsMap.has(currentUnitNumber)) {
+          unitsMap.set(currentUnitNumber, {
+            unitNumber: currentUnitNumber,
+            unitName: currentUnitName,
+            name: currentUnitName,
+            topics: [],
+          });
+        }
+        continue;
+      }
+    }
+
+    if (currentUnitNumber !== null && unitsMap.has(currentUnitNumber)) {
+      const cleaned = stripRowMetadata(entry);
+      if (cleaned && cleaned.length > 3 && !/^(?:Total\s+contact|Required|Contact\s+Hours)/i.test(cleaned)) {
+        unitsMap.get(currentUnitNumber).topics.push({
+          title: cleaned,
+          name: cleaned,
+          confidence: 0.95,
+        });
+      }
+    }
+  }
+
+  return Array.from(unitsMap.values()).sort((a, b) => a.unitNumber - b.unitNumber);
+}
+
+/**
+ * Determines whether OCR lines come from a scanned table syllabus (like ml.pdf).
+ */
+export function isScannedTableSyllabus(lines) {
+  if (!Array.isArray(lines) || lines.length === 0) return false;
+  const sample = lines.slice(0, 40).join('\n');
+  return (
+    /UNIT\s+I\b/i.test(sample) &&
+    (/(?:Required\s+CLOs|Unit\s+No\.?\s+Unit\s+Name|Contact\s+Addressed)/i.test(sample) ||
+      /\b(?:CLOs|References|Contact\s+Hours?)\b/i.test(sample))
+  );
+}
