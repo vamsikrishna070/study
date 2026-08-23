@@ -201,22 +201,15 @@ const SyllabusScreen = ({ route, navigation }) => {
 
   const handleRemoveSyllabus = async () => {
     if (!subjectId) return;
-    showDeleteConfirm({
-      title: 'Remove Syllabus',
-      message: 'Are you sure you want to remove the syllabus PDF?',
-      confirmText: 'Remove',
-      onConfirm: async () => {
-        try {
-          await updateSubject(subjectId, {
-            syllabusFile: { url: '', publicId: '', originalName: '', mimeType: '', size: 0 },
-          });
-          showSuccess('Removed', 'Syllabus PDF has been removed.');
-          loadData();
-        } catch (err) {
-          showError('Error', 'Failed to remove syllabus PDF.');
-        }
-      },
-    });
+    try {
+      await updateSubject(subjectId, {
+        syllabusFile: { url: '', publicId: '', originalName: '', mimeType: '', size: 0 },
+      });
+      showSuccess('Removed', 'Syllabus PDF has been removed.');
+      loadData();
+    } catch (err) {
+      showError('Error', 'Failed to remove syllabus PDF.');
+    }
   };
 
   const toggleTopic = async (topic) => {

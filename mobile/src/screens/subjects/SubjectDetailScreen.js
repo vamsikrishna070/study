@@ -215,29 +215,22 @@ const SubjectDetailScreen = ({ route, navigation }) => {
   };
 
   const handleRemoveSyllabus = async () => {
-    showDeleteConfirm({
-      title: 'Remove Syllabus',
-      message: 'Are you sure you want to detach the syllabus PDF from this subject?',
-      confirmText: 'Remove',
-      onConfirm: async () => {
-        try {
-          await updateSubject(subjectId, {
-            syllabusFile: {
-              url: '',
-              publicId: '',
-              originalName: '',
-              mimeType: '',
-              size: 0,
-            },
-          });
-          setSubject((prev) => ({ ...prev, syllabusFile: null }));
-          showSuccess('Syllabus Removed', 'Syllabus PDF has been detached from this subject.');
-          loadData();
-        } catch (err) {
-          showError('Error', 'Failed to remove syllabus.');
-        }
-      },
-    });
+    try {
+      await updateSubject(subjectId, {
+        syllabusFile: {
+          url: '',
+          publicId: '',
+          originalName: '',
+          mimeType: '',
+          size: 0,
+        },
+      });
+      setSubject((prev) => ({ ...prev, syllabusFile: null }));
+      showSuccess('Syllabus Removed', 'Syllabus PDF has been detached from this subject.');
+      loadData();
+    } catch (err) {
+      showError('Error', 'Failed to remove syllabus.');
+    }
   };
 
   // ─── Metrics ──────────────────────────────────────────────────────────────────

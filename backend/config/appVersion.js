@@ -1,12 +1,12 @@
 export const appVersionConfig = {
-  latestVersion: '1.0.3',
-  latestVersionCode: 4,
+  latestVersion: '1.0.4',
+  latestVersionCode: 5,
 
   minimumSupportedVersionCode: 1,
 
   downloadUrl:
     process.env.APP_DOWNLOAD_URL ||
-    'https://github.com/vamsikrishna070/study/releases/download/v1.0.3/studyarena-1.0.3.apk',
+    'https://github.com/vamsikrishna070/study/releases/download/v1.0.3/studyarena-1.0.4.apk',
     
   releaseNotes: [
     'Improved universal syllabus extraction (PDF, TXT, DOCX)',
