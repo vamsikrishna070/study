@@ -416,6 +416,34 @@ export function isReferenceOrJunk(line) {
 }
 
 /**
+ * Checks if a section header indicates the start of a Laboratory / Practical section
+ */
+export function isLabSectionHeader(line) {
+  if (!line || typeof line !== 'string') return false;
+  const trimmed = line.trim();
+  return (
+    /^(?:(?:Course\s+Unitization\s+Plan|Course\s+Utilization\s+Plan)\s*[:.\-–—]?\s*(?:\(Lab\)|\(Laboratory\)|[–-]\s*Lab|[–-]\s*Laboratory|Lab|Laboratory))$/i.test(trimmed) ||
+    /^(?:(?:PART|SECTION|MODULE)\s*[:.\-–—]?[A-Z0-9]*\s*[:.\-–—]?\s*(?:LABORATORY|LAB|PRACTICALS?|EXPERIMENTS?|PROGRAMS?))$/i.test(trimmed) ||
+    /^(?:LIST\s+OF\s+(?:EXPERIMENTS|PROGRAMS|PRACTICALS)|LABORATORY\s+EXPERIMENTS|LAB\s+EXPERIMENTS|PRACTICAL\s+EXPERIMENTS|PRACTICALS?|LABORATORY\s+COMPONENT|LAB\s+COMPONENT|PRACTICAL\s+COMPONENT|LAB\s+WORK|PRACTICAL\s+WORK|LABORATORY\s+EXERCISES|LAB\s+EXERCISES)\s*[:-]?$/i.test(trimmed) ||
+    /^(?:Laboratory|Lab|Practicals?)\s*[:-]$/i.test(trimmed) ||
+    /^(?:Exp\b\.?(?:\s*No\.?)?|No\.?\s*Experiment\s*Name|Experiment\s*Name|List\s+of\s+Experiments|List\s+of\s+Programs)$/i.test(trimmed)
+  );
+}
+
+/**
+ * Checks if a section header indicates the start of a Theory section
+ */
+export function isTheorySectionHeader(line) {
+  if (!line || typeof line !== 'string') return false;
+  const trimmed = line.trim();
+  return (
+    /^(?:(?:Course\s+Unitization\s+Plan|Course\s+Utilization\s+Plan)\s*[:.\-–—]?\s*(?:\(Theory\)|[–-]\s*Theory|Theory))$/i.test(trimmed) ||
+    /^(?:(?:PART|SECTION|MODULE)\s*[:.\-–—]?[A-Z0-9]*\s*[:.\-–—]?\s*THEORY)$/i.test(trimmed) ||
+    /^(?:THEORY\s+SYLLABUS|THEORY\s+COMPONENT|THEORY\s+COURSE|THEORY\s+TOPICS)\s*[:-]?$/i.test(trimmed)
+  );
+}
+
+/**
  * Checks if a section header indicates the end of theory syllabus
  */
 export function isNonTheorySectionHeader(line) {
@@ -424,7 +452,8 @@ export function isNonTheorySectionHeader(line) {
   return (
     /^(?:Text\s*Books?|Reference\s*Books?|References|Suggested\s*Readings?|Prescribed\s*Books?|Web\s*Resources?|Online\s*Resources?|MOOCs?|NPTEL|E-Books?|Self\s*Learning\s*Material)\s*[:-]?$/i.test(trimmed) ||
     /^(?:Course\s+Unitization\s+Plan\s*\(Lab\)|Course\s+Utilization\s+Plan\s*[–-]\s*Lab|PART\s*\d*:\s*ASM|LIST\s+OF\s+EXPERIMENTS|LABORATORY\s+EXPERIMENTS)/i.test(trimmed) ||
-    /^(?:Course\s+Outcomes?|Program\s+Outcomes?|CO-PO\s+Mapping|Bloom’s\s+Level\s+of\s+Cognitive\s+Task|Assessment\s+Pattern|Evaluation\s+Scheme|Question\s+Paper\s+Pattern|Marks\s+Distribution)/i.test(trimmed)
+    /^(?:Course\s+Outcomes?|Program\s+Outcomes?|CO-PO\s+Mapping|Bloom’s\s+Level\s+of\s+Cognitive\s+Task|Assessment\s+Pattern|Evaluation\s+Scheme|Question\s+Paper\s+Pattern|Marks\s+Distribution)/i.test(trimmed) ||
+    /^(?:Learning\s+Assessment(?:\s+\(Lab\)|\s+Theory)?|Continuous\s+Learning\s+Assessments?)/i.test(trimmed)
   );
 }
 
@@ -472,6 +501,24 @@ export function cleanTopicTitle(title) {
     .trim();
 
   return cleanOcrTypo(cleaned);
+}
+
+/**
+ * Cleans a laboratory experiment title from experiment numbering and trailing contact hours / references
+ */
+export function cleanExperimentTitle(title) {
+  if (!title || typeof title !== 'string') return '';
+  let clean = title
+    .replace(/^(?:Exp\b\.?\s*(?:No\.?)?\s*|Experiments?\b\s*(?:No\.?)?\s*|Programs?\b\s*(?:No\.?)?\s*|Practicals?\b\s*(?:No\.?)?\s*)?\d+[.:)]\s*/i, '')
+    .replace(/^(?:Exp\b\.?\s*(?:No\.?)?\s*|Experiments?\b\s*(?:No\.?)?\s*|Programs?\b\s*(?:No\.?)?\s*|Practicals?\b\s*(?:No\.?)?\s*)?\d+\s+/i, '')
+    .replace(/\bTotal\s+Contact\s+Hours.*$/i, '')
+    .replace(/\s+\d{1,2}(?:\.\d+)?(?:\s+(?:\d+|Internet\s+resources|Web\s+resources)(?:\s*,\s*\d+)*)*$/i, '')
+    .replace(/\s+(?:CLO|CO)\s*\d+(?:\s*,\s*\d+)*$/i, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
+  clean = cleanTopicTitle(clean);
+  return clean;
 }
 
 /**
@@ -563,23 +610,16 @@ export function splitCompositeTopic(text) {
   return [cleaned];
 }
 
+const UNIT_HEADER_REGEX = /^\[?\(?\s*(?:UNIT|Unit|MODULE|Module|CHAPTER|Chapter|SECTION|Section|PART|Part|BLOCK|Block)(?:\s*(?:NO\.?|NUMBER|#))?\s*[:.\-–—]?\s*([0-9IVXLCDM]+|[A-Za-z]+)[\]\)]?(?:[\s:.\-–—]+(.*))?$/i;
+const WORD_UNIT_HEADER_REGEX = /^\[?\(?\s*(FIRST|SECOND|THIRD|FOURTH|FIFTH|SIXTH|SEVENTH|EIGHTH|NINTH|TENTH)\s+(?:UNIT|Unit|MODULE|Module|CHAPTER|Chapter)[\]\)]?\s*[:.\-–—]?(?:[\s:.\-–—]+(.*))?$/i;
+const TABLE_HEADER_REGEX = /^(?:Unit\s*No\.?|Unit\s*Number|Unit\s*Name|Module\s*No\.?|Chapter\s*No\.?|Required|Contact\s*Hours?|CLOs?|Addressed|References?|Used|Referen\s*cesUsed|Experiment\s*Name|Exp\.?\s*No\.?|sl\.?\s*no\.?|s\.?\s*no\.?)$/i;
+const PAGE_NUMBER_REGEX = /^--\s*\d+\s*(?:of\s*\d+)?\s*--$|^Page\s+\d+(?:\s+of\s+\d+)?$/i;
+const BULLET_START_REGEX = /^[\u2022\u2023\u25E6\u2043\u2219\u25AA\u25AB\u25CF\u25CB\u27A2\u2713\-*•o–—]\s+|^\d+[.)\]]\s+|^[a-zA-Z][.)]\s+|^\(\d+\)\s+|^\([a-zA-Z]\)\s+/;
+
 /**
- * Structure-aware syllabus extractor supporting OBE tables, standard paragraphs, and bulleted syllabi
- * @param {string} rawText Raw extracted text from PDF, TXT, or DOCX
- * @returns {{ courseName: string, courseCode: string, units: Array<{ unitNumber: number, unitName: string, topics: Array<{ title: string, confidence: number }> }> }}
+ * Extracts course code and course name from the document header lines
  */
-export function extractSyllabusStructure(rawText) {
-  if (!rawText || typeof rawText !== 'string') {
-    return { courseName: '', courseCode: '', units: [] };
-  }
-
-  const lines = rawText
-    .replace(/\r/g, '\n')
-    .split('\n')
-    .map((l) => l.trim())
-    .filter(Boolean);
-
-  // 1. Extract Course Name and Course Code
+export function extractCourseMetadata(lines) {
   let courseName = '';
   let courseCode = '';
 
@@ -630,13 +670,17 @@ export function extractSyllabusStructure(rawText) {
     }
   }
 
-  // Matches: UNIT 1, UNIT I, UNIT - 1, UNIT - I, UNIT: 1, UNIT: I, FIRST UNIT, UNIT 01, MODULE 1, MODULE I, Unit No. 1, Module No. 1, [UNIT 1], (UNIT 1), etc.
-  const UNIT_HEADER_REGEX = /^\[?\(?\s*(?:UNIT|Unit|MODULE|Module|CHAPTER|Chapter|SECTION|Section|PART|Part|BLOCK|Block)(?:\s*(?:NO\.?|NUMBER|#))?\s*[:.\-–—]?\s*([0-9IVXLCDM]+|[A-Za-z]+)[\]\)]?(?:[\s:.\-–—]+(.*))?$/i;
-  const WORD_UNIT_HEADER_REGEX = /^\[?\(?\s*(FIRST|SECOND|THIRD|FOURTH|FIFTH|SIXTH|SEVENTH|EIGHTH|NINTH|TENTH)\s+(?:UNIT|Unit|MODULE|Module|CHAPTER|Chapter)[\]\)]?\s*[:.\-–—]?(?:[\s:.\-–—]+(.*))?$/i;
-  const TABLE_HEADER_REGEX = /^(?:Unit\s*No\.?|Unit\s*Number|Unit\s*Name|Module\s*No\.?|Chapter\s*No\.?|Required|Contact\s*Hours?|CLOs?|Addressed|References?|Used|Referen\s*cesUsed|Experiment\s*Name|Exp\.?\s*No\.?|sl\.?\s*no\.?|s\.?\s*no\.?)$/i;
-  const PAGE_NUMBER_REGEX = /^--\s*\d+\s*(?:of\s*\d+)?\s*--$|^Page\s+\d+(?:\s+of\s+\d+)?$/i;
-  const BULLET_START_REGEX = /^[\u2022\u2023\u25E6\u2043\u2219\u25AA\u25AB\u25CF\u25CB\u27A2\u2713\-*•o–—]\s+|^\d+[.)\]]\s+|^[a-zA-Z][.)]\s+|^\(\d+\)\s+|^\([a-zA-Z]\)\s+/;
+  return { courseName, courseCode };
+}
 
+/**
+ * Extracts theory units and topics from document lines
+ * @param {string[]} lines
+ * @param {string} courseName
+ * @param {boolean} hasLab
+ * @returns {Array<{ unitNumber: number, unitName: string, topics: Array<{ title: string, confidence: number }> }>}
+ */
+export function extractTheoryUnits(lines, courseName = '', hasLab = false) {
   let inTheory = false;
   const units = [];
   let currentUnit = null;
@@ -753,16 +797,17 @@ export function extractSyllabusStructure(rawText) {
 
     if (PAGE_NUMBER_REGEX.test(line)) continue;
 
-    // Check for section ending (e.g. Text Books, References, Lab section)
-    if (isNonTheorySectionHeader(line)) {
+    // Check for explicit Lab section or Non-Theory section headers -> close theory unit
+    if (isLabSectionHeader(line) || isNonTheorySectionHeader(line)) {
       if (inTheory) {
         processPendingLines();
         inTheory = false;
+        currentUnit = null;
       }
       continue;
     }
 
-    if (/Course\s+Unitization\s+Plan\s*\(?Theory\)?/i.test(line)) {
+    if (isTheorySectionHeader(line)) {
       inTheory = true;
       continue;
     }
@@ -801,6 +846,7 @@ export function extractSyllabusStructure(rawText) {
             !UNIT_HEADER_REGEX.test(candLine) &&
             !WORD_UNIT_HEADER_REGEX.test(candLine) &&
             !isNonTheorySectionHeader(candLine) &&
+            !isLabSectionHeader(candLine) &&
             !TABLE_HEADER_REGEX.test(candLine)
           ) {
             // If line is just hours/contact count (e.g. "(10 Hours)" or "9 Lectures"), skip to next line
@@ -844,96 +890,13 @@ export function extractSyllabusStructure(rawText) {
 
   let validUnits = units.filter((u) => u.topics.length > 0);
 
-  // Secondary fallback: Dedicated Laboratory / Practical Course Syllabus (e.g. SRM CSE-303-ML.pdf, Anna Univ Lab manuals)
-  if (validUnits.length === 0) {
-    const labTopics = [];
-    let inLabSection = false;
-    let labBuffer = '';
-
-    const flushLabBuffer = () => {
-      if (!labBuffer) return;
-      let clean = labBuffer
-        .replace(/^(?:Exp\.?\s*(?:No\.?)?\s*)?\d+[.:)]\s*/i, '')
-        .replace(/^(?:Exp\.?\s*(?:No\.?)?\s*)?\d+\s+/i, '')
-        .replace(/\s+\d{1,2}(?:\.\d+)?(?:\s+\d+(?:\s*,\s*\d+)*)*$/, '')
-        .replace(/\s{2,}/g, ' ')
-        .trim();
-
-      clean = cleanTopicTitle(clean);
-
-      if (
-        clean.length > 3 &&
-        !isReferenceOrJunk(clean) &&
-        !TABLE_HEADER_REGEX.test(clean) &&
-        !/^(?:Exp\.?\s*(?:No\.?)?|Experiment\s*Name|Required|Contact|Hours|CLOs?|Addressed|References?|Used)$/i.test(clean) &&
-        !labTopics.some((t) => t.title.toLowerCase() === clean.toLowerCase())
-      ) {
-        labTopics.push({
-          title: clean,
-          confidence: 0.95,
-        });
-      }
-      labBuffer = '';
-    };
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (!line || PAGE_NUMBER_REGEX.test(line)) continue;
-
-      if (
-        inLabSection &&
-        labTopics.length > 0 &&
-        /^(?:References?|Text\s*Books?|Reference\s*Books?|Suggested\s*Readings?|Prescribed\s*Books?|Web\s*Resources?|Online\s*Resources?|MOOCs?|NPTEL|E-Books?|Course\s+Outcomes?|Evaluation\s+Scheme|Assessment\s+Pattern)\s*[:-]?$/i.test(line)
-      ) {
-        flushLabBuffer();
-        inLabSection = false;
-        break;
-      }
-
-      if (!inLabSection) {
-        if (/^(?:Exp\b\.?|Experiments?\b|LIST\s+OF\s+EXPERIMENTS|LABORATORY\s+EXPERIMENTS|Course\s+Unitization\s+Plan\s*\(Lab\)|Practical\s+Experiments)/i.test(line)) {
-          inLabSection = true;
-        }
-        continue;
-      }
-
-      const isExpStart = /^(?:Exp\.?\s*(?:No\.?)?\s*)?\d+(?:[.)\s]|$)/i.test(line);
-      const isRowEnd = /\s+\d{1,2}(?:\.\d+)?(?:\s+\d+(?:\s*,\s*\d+)*)+$/.test(line);
-      const isStandaloneTableCell = /^\d{1,2}(?:\.\d+)?(?:\s+\d+(?:\s*,\s*\d+)*)*$/.test(line);
-
-      if (isExpStart) {
-        flushLabBuffer();
-        labBuffer = line;
-        if (isRowEnd) {
-          flushLabBuffer();
-        }
-      } else if (labBuffer) {
-        if (isStandaloneTableCell) {
-          flushLabBuffer();
-        } else {
-          labBuffer += ' ' + line;
-          if (isRowEnd) {
-            flushLabBuffer();
-          }
-        }
-      }
-    }
-    flushLabBuffer();
-
-    if (labTopics.length > 0) {
-      validUnits.push({
-        unitNumber: 1,
-        unitName: courseName ? `${courseName} - Laboratory Experiments` : 'Laboratory Experiments',
-        topics: labTopics,
-      });
-    }
-  }
-
-  // Tertiary fallback: Numbered or Roman-numeral sections (e.g. "1. Introduction", "2. Process Concepts", "I. Overview")
+  // Fallback 1: Numbered or Roman-numeral sections (e.g. "1. Introduction", "2. Process Concepts", "I. Overview")
+  // Only runs if no theory units detected from standard headers AND strictly ignores lines in lab sections
   if (validUnits.length === 0) {
     const NUMBERED_SECTION_REGEX = /^([1-9]|1[0-2]|[IVXLCDM]+)[.)]\s+([A-Za-z][A-Za-z0-9\s,&:\-–—/()]{3,90})$/i;
     let fallbackUnit = null;
     let fallbackPending = [];
+    let insideLab = false;
 
     const processFallbackPending = () => {
       if (!fallbackUnit || fallbackPending.length === 0) {
@@ -984,6 +947,23 @@ export function extractSyllabusStructure(rawText) {
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
+
+      if (isLabSectionHeader(line)) {
+        insideLab = true;
+        if (fallbackUnit) {
+          processFallbackPending();
+          fallbackUnit = null;
+        }
+        continue;
+      }
+
+      if (insideLab) {
+        if (isNonTheorySectionHeader(line) || isTheorySectionHeader(line)) {
+          insideLab = false;
+        }
+        continue;
+      }
+
       if (PAGE_NUMBER_REGEX.test(line) || isNonTheorySectionHeader(line)) {
         if (fallbackUnit) {
           processFallbackPending();
@@ -1013,11 +993,24 @@ export function extractSyllabusStructure(rawText) {
     validUnits = validUnits.filter((u) => u.topics.length > 0);
   }
 
-  // Quaternary fallback: If still no units, but document contains 2+ clear bulleted/numbered topics, create a "Syllabus Content" unit
-  if (validUnits.length === 0) {
+  // Fallback 2: If still no units, but document non-lab text contains 2+ clear bulleted/numbered topics, create a "Syllabus Content" unit
+  // Only execute this fallback if NO laboratory experiments were found in the document
+  if (validUnits.length === 0 && !hasLab) {
     const allTopics = [];
     let buffer = '';
+    let inLabZone = false;
+
     for (const rawLine of lines) {
+      if (isLabSectionHeader(rawLine)) {
+        inLabZone = true;
+        continue;
+      }
+      if (inLabZone) {
+        if (isTheorySectionHeader(rawLine)) {
+          inLabZone = false;
+        }
+        continue;
+      }
       if (isReferenceOrJunk(rawLine) || isNonTheorySectionHeader(rawLine) || PAGE_NUMBER_REGEX.test(rawLine)) continue;
       if (BULLET_START_REGEX.test(rawLine)) {
         if (buffer) {
@@ -1052,9 +1045,187 @@ export function extractSyllabusStructure(rawText) {
     }
   }
 
+  return validUnits;
+}
+
+/**
+ * Extracts laboratory experiments from document lines
+ * @param {string[]} lines
+ * @param {string} courseName
+ * @returns {Array<{ experimentNumber: number, title: string, confidence: number }>}
+ */
+export function extractLabExperiments(lines, courseName = '') {
+  const labExperiments = [];
+  let inLabSection = false;
+  let labBuffer = '';
+
+  const flushLabBuffer = () => {
+    if (!labBuffer) return;
+    const clean = cleanExperimentTitle(labBuffer);
+
+    if (
+      clean.length > 3 &&
+      !isReferenceOrJunk(clean) &&
+      !TABLE_HEADER_REGEX.test(clean) &&
+      !isLabSectionHeader(clean) &&
+      !/^(?:Exp\b\.?\s*(?:No\.?)?|Experiments?\b\s*(?:No\.?)?|Required|Contact|Hours|CLOs?|Addressed|References?|Used)$/i.test(clean) &&
+      !labExperiments.some((e) => e.title.toLowerCase() === clean.toLowerCase())
+    ) {
+      labExperiments.push({
+        experimentNumber: labExperiments.length + 1,
+        title: clean,
+        confidence: 0.95,
+      });
+    }
+    labBuffer = '';
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line || PAGE_NUMBER_REGEX.test(line)) continue;
+
+    // Check if line indicates start of Lab section
+    if (isLabSectionHeader(line)) {
+      flushLabBuffer();
+      inLabSection = true;
+      continue;
+    }
+
+    // Skip table column header rows BEFORE checking non-theory section headers
+    if (TABLE_HEADER_REGEX.test(line)) {
+      continue;
+    }
+
+    // If in lab section, check for terminating headers (Theory headers, References, Assessment)
+    if (inLabSection) {
+      if (
+        UNIT_HEADER_REGEX.test(line) ||
+        WORD_UNIT_HEADER_REGEX.test(line) ||
+        isTheorySectionHeader(line) ||
+        (labExperiments.length > 0 && isNonTheorySectionHeader(line)) ||
+        /^Total\s+Contact\s+Hours/i.test(line)
+      ) {
+        flushLabBuffer();
+        if (!/^Total\s+Contact\s+Hours/i.test(line)) {
+          inLabSection = false;
+        }
+        continue;
+      }
+    }
+
+    if (!inLabSection) {
+      continue;
+    }
+
+    const isExpStart = /^(?:Exp\b\.?\s*(?:No\.?)?\s*|Experiments?\b\s*(?:No\.?)?\s*|Programs?\b\s*(?:No\.?)?\s*|Practicals?\b\s*(?:No\.?)?\s*)?\d+(?:[.)\]:\s]|$)/i.test(line);
+    const isRowEnd = /\s+\d{1,2}(?:\.\d+)?(?:\s+(?:\d+|Internet\s+resources|Web\s+resources)(?:\s*,\s*\d+)*)*$/i.test(line);
+    const isStandaloneTableCell = /^\d{1,2}(?:\.\d+)?(?:\s+\d+(?:\s*,\s*\d+)*)*$/.test(line);
+
+    if (isExpStart) {
+      flushLabBuffer();
+      labBuffer = line;
+      if (isRowEnd) {
+        flushLabBuffer();
+      }
+    } else if (labBuffer) {
+      if (isStandaloneTableCell) {
+        flushLabBuffer();
+      } else {
+        labBuffer += ' ' + line;
+        if (isRowEnd) {
+          flushLabBuffer();
+        }
+      }
+    }
+  }
+
+  flushLabBuffer();
+  return labExperiments;
+}
+
+/**
+ * Structure-aware syllabus extractor separating Theory units and Laboratory experiments
+ * @param {string} rawText Raw extracted text from PDF, TXT, or DOCX
+ * @returns {{
+ *   courseName: string,
+ *   courseCode: string,
+ *   theoryUnits: Array<{ unitNumber: number, unitName: string, topics: Array<{ title: string, confidence: number }> }>,
+ *   labExperiments: Array<{ experimentNumber: number, title: string, confidence: number }>,
+ *   units: Array<{ unitNumber: number, unitName: string, name?: string, topics: Array<{ title: string, name?: string, confidence?: number }> }>,
+ *   hasTheory: boolean,
+ *   hasLab: boolean
+ * }}
+ */
+export function extractSyllabusStructure(rawText) {
+  if (!rawText || typeof rawText !== 'string') {
+    return {
+      courseName: '',
+      courseCode: '',
+      theoryUnits: [],
+      labExperiments: [],
+      units: [],
+      hasTheory: false,
+      hasLab: false,
+    };
+  }
+
+  const normalized = normalizePdfText(rawText);
+  const lines = normalized
+    .replace(/\r/g, '\n')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  // 1. Extract Course Metadata
+  const { courseName, courseCode } = extractCourseMetadata(lines);
+
+  // 2. Extract Laboratory Experiments
+  const labExperiments = extractLabExperiments(lines, courseName);
+
+  // 3. Extract Theory Units (passing hasLab to prevent false fallback on lab-only documents)
+  const theoryUnits = extractTheoryUnits(lines, courseName, labExperiments.length > 0);
+
+  // 4. Construct Backward-Compatible Unified Units Array
+  const combinedUnits = [];
+
+  theoryUnits.forEach((u, i) => {
+    combinedUnits.push({
+      unitNumber: u.unitNumber || (i + 1),
+      unitName: u.unitName,
+      name: u.unitName,
+      topics: u.topics.map((t) => ({
+        title: t.title,
+        name: t.title,
+        confidence: t.confidence || 0.95,
+      })),
+    });
+  });
+
+  // If lab experiments exist:
+  // If theory units exist: add Laboratory Experiments as an additional distinct unit (e.g. Unit 6)
+  // If no theory units exist: add Laboratory Experiments as Unit 1
+  if (labExperiments.length > 0) {
+    const labUnitNumber = combinedUnits.length + 1;
+    const labUnitTitle = 'Laboratory Experiments';
+    combinedUnits.push({
+      unitNumber: labUnitNumber,
+      unitName: labUnitTitle,
+      name: labUnitTitle,
+      topics: labExperiments.map((e) => ({
+        title: e.title,
+        name: e.title,
+        confidence: e.confidence || 0.95,
+      })),
+    });
+  }
+
   return {
     courseName,
     courseCode,
-    units: validUnits,
+    theoryUnits,
+    labExperiments,
+    units: combinedUnits,
+    hasTheory: theoryUnits.length > 0,
+    hasLab: labExperiments.length > 0,
   };
 }

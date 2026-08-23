@@ -89,10 +89,22 @@ export function SyllabusReviewModal({
         <View style={styles.sheetContainer}>
           {/* Header */}
           <View style={styles.header}>
-            <View>
+            <View style={{ flex: 1, paddingRight: 8 }}>
               <Text style={styles.title}>Review Extracted Syllabus</Text>
               <Text style={styles.subtitle}>
-                Verify or edit units & topics before saving
+                {(() => {
+                  const theoryUnits = units.filter(u => !u.name?.toLowerCase().includes('laboratory'));
+                  const labUnits = units.filter(u => u.name?.toLowerCase().includes('laboratory'));
+                  const labExpCount = labUnits.reduce((acc, u) => acc + (u.topics?.length || 0), 0);
+                  const totalTopics = units.reduce((acc, u) => acc + (u.topics?.length || 0), 0);
+                  if (theoryUnits.length > 0 && labUnits.length > 0) {
+                    return `Extracted ${theoryUnits.length} theory units and ${labExpCount} lab experiments`;
+                  }
+                  if (theoryUnits.length === 0 && labUnits.length > 0) {
+                    return `Extracted ${labExpCount} lab experiments`;
+                  }
+                  return `Extracted ${units.length} units and ${totalTopics} topics`;
+                })()}
               </Text>
             </View>
             <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
@@ -108,51 +120,58 @@ export function SyllabusReviewModal({
                 <Text style={styles.emptyText}>No units extracted from PDF.</Text>
               </View>
             ) : (
-              units.map((unit, uIdx) => (
-                <View key={uIdx} style={styles.unitCard}>
-                  {/* Unit Name Row */}
-                  <View style={styles.unitHeaderRow}>
-                    <Text style={styles.unitIndexBadge}>U{uIdx + 1}</Text>
-                    <Input
-                      value={unit.name}
-                      onChangeText={(val) => handleUnitNameChange(uIdx, val)}
-                      placeholder="Unit title"
-                      style={styles.unitInput}
-                    />
-                    <TouchableOpacity
-                      onPress={() => removeUnit(uIdx)}
-                      style={styles.deleteBtn}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
-                      <Trash2 size={16} color={colors.destructive} />
-                    </TouchableOpacity>
-                  </View>
+              units.map((unit, uIdx) => {
+                const isLab = unit.name?.toLowerCase().includes('laboratory');
+                return (
+                  <View key={uIdx} style={[styles.unitCard, isLab && { borderColor: colors.primary, borderWidth: 1.5 }]}>
+                    {/* Unit Name Row */}
+                    <View style={styles.unitHeaderRow}>
+                      <Text style={[styles.unitIndexBadge, isLab && { backgroundColor: colors.primary, color: colors.primaryForeground, paddingHorizontal: 6 }]}>
+                        {isLab ? 'LAB' : `U${uIdx + 1}`}
+                      </Text>
+                      <Input
+                        value={unit.name}
+                        onChangeText={(val) => handleUnitNameChange(uIdx, val)}
+                        placeholder={isLab ? 'Laboratory section title' : 'Unit title'}
+                        style={styles.unitInput}
+                      />
+                      <TouchableOpacity
+                        onPress={() => removeUnit(uIdx)}
+                        style={styles.deleteBtn}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Trash2 size={16} color={colors.destructive} />
+                      </TouchableOpacity>
+                    </View>
 
-                  {/* Topics List */}
-                  <View style={styles.topicsBox}>
-                    {(unit.topics || []).map((topic, tIdx) => (
-                      <View key={tIdx} style={styles.topicRow}>
-                        <Text style={styles.topicIndexText}>{tIdx + 1}.</Text>
-                        <Input
-                          value={topic.name}
-                          onChangeText={(val) => handleTopicNameChange(uIdx, tIdx, val)}
-                          placeholder="Topic title"
-                          style={styles.topicInput}
-                        />
-                        <TouchableOpacity
-                          onPress={() => removeTopic(uIdx, tIdx)}
-                          style={styles.deleteTopicBtn}
-                        >
-                          <Trash2 size={14} color={colors.mutedForeground} />
-                        </TouchableOpacity>
-                      </View>
-                    ))}
-                    {(!unit.topics || unit.topics.length === 0) && (
-                      <Text style={styles.noTopicsText}>No topics in this unit</Text>
-                    )}
+                    {/* Topics List */}
+                    <View style={styles.topicsBox}>
+                      {(unit.topics || []).map((topic, tIdx) => (
+                        <View key={tIdx} style={styles.topicRow}>
+                          <Text style={styles.topicIndexText}>{tIdx + 1}.</Text>
+                          <Input
+                            value={topic.name}
+                            onChangeText={(val) => handleTopicNameChange(uIdx, tIdx, val)}
+                            placeholder={isLab ? 'Experiment description' : 'Topic title'}
+                            style={styles.topicInput}
+                          />
+                          <TouchableOpacity
+                            onPress={() => removeTopic(uIdx, tIdx)}
+                            style={styles.deleteTopicBtn}
+                          >
+                            <Trash2 size={14} color={colors.mutedForeground} />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                      {(!unit.topics || unit.topics.length === 0) && (
+                        <Text style={styles.noTopicsText}>
+                          {isLab ? 'No experiments in this section' : 'No topics in this unit'}
+                        </Text>
+                      )}
+                    </View>
                   </View>
-                </View>
-              ))
+                );
+              })
             )}
           </ScrollView>
 

@@ -325,13 +325,14 @@ Course Utilization Plan – Lab
   const osResult = extractSyllabusStructure(sampleOsText);
   assert(osResult.courseName === 'Operating Systems', `OS Course Name extracted: "${osResult.courseName}"`);
   assert(osResult.courseCode === 'CSE 302', `OS Course Code extracted: "${osResult.courseCode}"`);
-  assert(osResult.units.length === 5, `OS Units detected: ${osResult.units.length} (Expected: 5)`);
+  assert(osResult.theoryUnits.length === 5, `OS Theory Units detected: ${osResult.theoryUnits.length} (Expected: 5)`);
+  assert(osResult.units.length === 6, `OS Unified Units detected: ${osResult.units.length} (Expected: 6)`);
   assert(
     osResult.units[2].topics.some((t) => t.title.includes('mutual exclusion')),
     'OS multiline topic correctly joined'
   );
   assert(
-    !osResult.units.some((u) => u.topics.some((t) => t.title.toLowerCase().includes('shell programming'))),
+    !osResult.theoryUnits.some((u) => u.topics.some((t) => t.title.toLowerCase().includes('shell programming'))),
     'OS Lab experiments excluded from theory units'
   );
 
@@ -779,13 +780,288 @@ References:
 1. Aurélien Géron, Hands-On Machine Learning, O'Reilly.
 `;
   const labResult = extractSyllabusStructure(labSyllabusText);
-  assert(labResult.units.length === 1, `Lab Syllabus: 1 unit detected (got ${labResult.units.length})`);
+  assert(labResult.hasTheory === false, 'Lab-only Syllabus: hasTheory is false');
+  assert(labResult.hasLab === true, 'Lab-only Syllabus: hasLab is true');
+  assert(labResult.theoryUnits.length === 0, `Lab-only Syllabus: 0 theory units (got ${labResult.theoryUnits.length})`);
+  assert(labResult.labExperiments.length === 15, `Lab-only Syllabus: 15 lab experiments extracted (got ${labResult.labExperiments.length})`);
+  assert(labResult.units.length === 1, `Lab-only Syllabus: 1 unified unit detected (got ${labResult.units.length})`);
   assert(labResult.units[0].unitName === 'Laboratory Experiments', `Lab Unit Name: "${labResult.units[0].unitName}"`);
-  assert(labResult.units[0].topics.length === 15, `Lab Syllabus: 15 experiments extracted (got ${labResult.units[0].topics.length})`);
-  assert(labResult.units[0].topics[0].title === 'Introduction to Python basics', `Lab Topic 1: "${labResult.units[0].topics[0].title}"`);
-  assert(labResult.units[0].topics[14].title === 'Implementation of hierarchical clustering using python', `Lab Topic 15: "${labResult.units[0].topics[14].title}"`);
+  assert(labResult.units[0].topics.length === 15, `Lab Unit: 15 experiments mapped as topics`);
+  assert(labResult.labExperiments[0].title === 'Introduction to Python basics', `Lab Exp 1: "${labResult.labExperiments[0].title}"`);
+  assert(labResult.labExperiments[14].title === 'Implementation of hierarchical clustering using python', `Lab Exp 15: "${labResult.labExperiments[14].title}"`);
 
-  // 18. Check Local PDFs if present
+  // 18. Theory + Lab Combined Document Regression (Operating Systems with 5 Theory units and 8 Lab experiments)
+  const fullOsTheoryLabText = `
+SRM University AP, Andhra Pradesh
+Operating Systems
+Course Code CSE 302 Course Category CC L T P C
+3 0 1 4
+Course Unitization Plan Theory
+Unit No. Unit Name Required Contact Hours CLOs Addressed References Used
+UNIT 1 Introduction 6
+Operating system overview-objectives and functions 1 1 1,2
+Evolution of Operating System 1 1 1,2
+Computer System Organization 1 1 1,2
+Operating System Structure and Operations 1 1 1,2
+System Programs 1 1 1,2
+Generation and System Boot 1 1 1,2
+UNIT 2 Process Management 9
+Process Concepts 1 3 1,2
+Various types of scheduling 1 3 1,2
+Operations on Processes 1 3 1,2
+Inter process Communication 2 3 1,2
+CPU Scheduling Algorithms 3 3 1,2
+OS – examples 1 3 1,2
+UNIT 3 Process Synchronization and Deadlocks 9
+Threads- Overview. 1 4 1,3
+Multithreading Models. 1 4 1,3
+Process Synchronization: Critical section problem and mutual
+exclusion. 1 4 1,3
+Mutex Locks. 1 4 1,3
+Semaphores. 1 4 1,3
+Monitors 1 4 1,3
+Deadlocks 2 4 1,3
+OS examples. 1 4 1,3
+UNIT 4 Storage Management 10
+Main Memory Management. 1 5 1,2
+Contiguous Memory Allocation. 1 5 1,2
+Segmentation 1 5 1,2
+Virtual Memory 1 5 1,2
+Paging 1 5 1,2
+Demand Paging. 1 5 1,2
+Page Replacement Algorithms. 1 5 1,2
+Frame Allocation Techniques 1 5 1,2
+Thrashing 1 5 1,2
+OS examples. 1 5 1,3
+UNIT 5 I/O Systems and File Management 11
+Mass Storage Structure- Overview. 1 6 1,3
+Disk Scheduling and Management. 1 6 1,3
+File System Storage. 1 6 1,3
+File Concepts. 1 6 1,3
+Directory and Disk Structure. 1 6 1,3
+Sharing and Protection. 1 6 1,3
+File System Implementation. 1 6 1,3
+File System Structure, Directory Structure. 1 6 1,3
+Allocation Methods. 1 6 1,3
+Free Space Management. 1 6 1,3
+OS examples. 1 6 1,3
+Total Contact Hours 45
+
+-- 2 of 3 --
+
+Course Utilization Plan – Lab
+Experi
+ment
+No.
+Experiment Name
+Required
+Contact
+Hours
+CLOs
+Addressed
+References
+Used
+1 Shell Programming exercises 4 1, 2 5
+2 Implementing Linux system commands using system calls. 4 1, 2 6
+3 CPU Scheduling Algorithms. 4 3 1
+4
+Implement producer, consumer problem using
+semaphores. Computing page faults for various page replacement
+algorithms.
+4 4 1
+5 Implement deadlock avoidance and detections algorithms. 4 4 1
+6 Computing page faults for various page replacement algorithms. 4 5 1
+7 Simulation of Demand Paging System. 4 5 1
+8 Project Development. 2 6 Internet
+resources
+Total Contact Hours 30
+Learning Assessment Theory
+`;
+  const osComboResult = extractSyllabusStructure(fullOsTheoryLabText);
+  assert(osComboResult.hasTheory === true, 'OS Theory + Lab: hasTheory is true');
+  assert(osComboResult.hasLab === true, 'OS Theory + Lab: hasLab is true');
+  assert(osComboResult.theoryUnits.length === 5, `OS Theory Units: 5 units (got ${osComboResult.theoryUnits.length})`);
+  assert(osComboResult.labExperiments.length === 8, `OS Lab Experiments: 8 experiments (got ${osComboResult.labExperiments.length})`);
+  assert(osComboResult.units.length === 6, `OS Total Combined Units: 6 (got ${osComboResult.units.length})`);
+  assert(osComboResult.theoryUnits[0].unitName === 'Introduction', `OS Unit 1: "${osComboResult.theoryUnits[0].unitName}"`);
+  assert(osComboResult.theoryUnits[4].unitName === 'I/O Systems and File Management', `OS Unit 5: "${osComboResult.theoryUnits[4].unitName}"`);
+  assert(
+    !osComboResult.theoryUnits.some(u => u.topics.some(t => t.title.toLowerCase().includes('shell programming'))),
+    'OS Theory Units strictly exclude Lab Experiments'
+  );
+  assert(
+    !osComboResult.theoryUnits[4].topics.some(t => t.title.toLowerCase().includes('shell programming')),
+    'OS Unit V strictly excludes Lab Experiments'
+  );
+  assert(osComboResult.labExperiments[0].title === 'Shell Programming exercises', `OS Lab Exp 1: "${osComboResult.labExperiments[0].title}"`);
+  assert(osComboResult.labExperiments[7].title === 'Project Development', `OS Lab Exp 8: "${osComboResult.labExperiments[7].title}"`);
+
+  // 19. Theory + Lab Full 5 Units + 15 Experiments (CSE 303 Machine Learning Style)
+  const fullMlTheoryLabText = `
+SRM University AP, Andhra Pradesh
+Machine Learning
+Course Code CSE 303 Course Category Core Course (CC)
+Course Unitization Plan Theory
+Unit No. Unit Name Required Contact Hours CLOs Addressed References Used
+UNIT 1 Introduction to Machine Learning 8
+Introduction to Machine Learning, Supervised and Unsupervised Learning 2 1 1
+Hypothesis space and Inductive Bias, Evaluation Metrics 2 1 1
+Overfitting and Underfitting, Bias-Variance Tradeoff 2 1 1
+Data Preprocessing, Feature Scaling and Selection 2 1 1
+UNIT 2 Supervised Learning and Regression 9
+Linear Regression with Single and Multiple Variables 2 2 1
+Cost Function and Gradient Descent Algorithm 2 2 1
+Polynomial Regression and Regularization: Ridge and Lasso 3 2 1
+Logistic Regression for Binary and Multi-class Classification 2 2 1
+UNIT 3 Decision Trees and Instance Based Learning 9
+Decision Trees: ID3 and C4.5 Algorithms, Information Gain 3 3 1
+Gini Impurity, Tree Pruning and Handling Missing Attributes 2 3 1
+k-Nearest Neighbor Algorithm: Distance Metrics and Choice of k 2 3 1
+Naive Bayes Classifier: Bayes Theorem, Maximum Likelihood 2 3 1
+UNIT 4 Neural Networks and Support Vector Machines 10
+Support Vector Machines: Optimal Hyperplane, Margin 2 4 1
+Kernel Trick: Linear, RBF and Polynomial Kernels 2 4 1
+Perceptron Model, Multi-layer Perceptrons and Activation Functions 3 4 1
+Backpropagation Algorithm and Error Calculation 3 4 1
+UNIT 5 Unsupervised Learning and Ensemble Methods 9
+K-Means Clustering: Algorithm and Convergence 2 5 1
+Hierarchical Clustering: Agglomerative and Divisive Methods 2 5 1
+Principal Component Analysis (PCA) for Dimensionality Reduction 3 5 1
+Ensemble Learning: Bagging, Boosting and Random Forests 2 5 1
+Total Contact Hours 45
+
+-- 2 of 4 --
+
+Course Unitization Plan (Lab)
+Exp.
+No. Experiment Name
+Required
+Contact
+Hours
+CLOs
+Addressed
+References
+Used
+1 Introduction to Python basics 2 4 4
+2 Machine Learning packages in Python 2 4 4
+3 Implement different types of regression using python 2 4 4
+4
+Write a program that provides an option to compute different
+distance measures between two points in the N dimensional
+feature space. Consider some sample datasets for computing
+distances among sample points
+2 4 4
+5
+Implement k-Nearest Neighbour algorithm to classify the iris
+data set. Print both correct and wrong predictions. Python
+ML library classes can be used for this problem.
+2 4 4
+6
+Implement ID3 algorithm to construct a decision tree. Use an
+appropriate data set for building the decision tree and apply
+this knowledge to classify a new sample
+2 4 4
+7
+Given a dataset. Write a program to compute the
+Covariance, Correlation between a pair of attributes. Extend
+the program to compute the Covariance Matrix and
+Correlation Matrix
+2 4 4
+8 Write a program to implement feature reduction using
+Principal Component Analysis 2 4 4
+9
+Write a program to implement the naïve Bayesian classifier
+for a sample training data set. Compute the accuracy of the
+classifier, considering few test data sets.
+2 4 4
+10
+Given a dataset for classification task. Write a program to
+implement Support Vector Machine and estimate its test
+performance.
+2 4 4
+11 Write a program to implement perceptron for different
+learning tasks. 2 4 2
+12 Write programs to implement ADALINE and MADALINE for a
+given learning task. 2 4 2
+13
+Build an Artificial Neural Network by implementing the Back
+propagation algorithm and test the same using appropriate
+data sets
+2 4 2
+14
+Write a program to implement the K-means clustering
+algorithm. Select your own dataset to test the program.
+Demonstrate the nature of output with varying value of K
+2 4 4
+15 Implementation of hierarchical clustering using python 2 4 5
+30
+
+-- 3 of 4 --
+References:
+1. Tom Mitchell, Machine Learning, McGraw Hill.
+`;
+  const mlComboResult = extractSyllabusStructure(fullMlTheoryLabText);
+  assert(mlComboResult.hasTheory === true, 'ML Theory + Lab: hasTheory is true');
+  assert(mlComboResult.hasLab === true, 'ML Theory + Lab: hasLab is true');
+  assert(mlComboResult.theoryUnits.length === 5, `ML Theory Units: 5 units (got ${mlComboResult.theoryUnits.length})`);
+  assert(mlComboResult.labExperiments.length === 15, `ML Lab Experiments: 15 experiments (got ${mlComboResult.labExperiments.length})`);
+  assert(mlComboResult.units.length === 6, `ML Combined Units: 6 (got ${mlComboResult.units.length})`);
+  assert(mlComboResult.theoryUnits[0].unitName === 'Introduction to Machine Learning', `ML Unit 1 Name: "${mlComboResult.theoryUnits[0].unitName}"`);
+  assert(mlComboResult.theoryUnits[4].unitName === 'Unsupervised Learning and Ensemble Methods', `ML Unit 5 Name: "${mlComboResult.theoryUnits[4].unitName}"`);
+  assert(
+    !mlComboResult.theoryUnits.some(u => u.topics.some(t => t.title.toLowerCase().includes('python basics'))),
+    'ML Theory Units strictly exclude Lab Experiments'
+  );
+  assert(
+    !mlComboResult.theoryUnits[4].topics.some(t => t.title.toLowerCase().includes('python basics')),
+    'ML Unit V strictly excludes Lab Experiments'
+  );
+  assert(mlComboResult.labExperiments[0].title === 'Introduction to Python basics', `ML Lab Exp 1: "${mlComboResult.labExperiments[0].title}"`);
+  assert(mlComboResult.labExperiments[14].title === 'Implementation of hierarchical clustering using python', `ML Lab Exp 15: "${mlComboResult.labExperiments[14].title}"`);
+
+  // 20. Lab Section Followed by Theory Section (Lab First, Theory Second)
+  const labFirstText = `
+Course Title: Embedded Systems
+Course Code: EC-401
+
+LIST OF EXPERIMENTS
+1. LED Interfacing and Blinking with Timer
+2. Seven Segment Display Multiplexing
+3. ADC and Sensor Interfacing
+4. PWM Motor Speed Control
+5. UART Serial Communication
+
+THEORY SYLLABUS
+
+UNIT I: EMBEDDED SYSTEM ARCHITECTURE
+- Microcontroller vs Microprocessor architecture
+- Memory organization, registers, and bus interfaces
+- Interrupt handling and vector tables
+
+UNIT II: INTERFACING AND PROTOCOLS
+- GPIO configuration and electrical characteristics
+- I2C, SPI, and CAN communication protocols
+- Timer/Counter modes and capture compare units
+
+UNIT III: REAL-TIME OPERATING SYSTEMS
+- Real-time kernel concepts, task states, and scheduling
+- Semaphore, mutex, and message queue primitives
+- Priority inversion problem and priority inheritance protocol
+
+Text Books:
+1. Raj Kamal, Embedded Systems Architecture, McGraw Hill.
+`;
+  const labFirstResult = extractSyllabusStructure(labFirstText);
+  assert(labFirstResult.hasTheory === true, 'Lab-First Syllabus: hasTheory is true');
+  assert(labFirstResult.hasLab === true, 'Lab-First Syllabus: hasLab is true');
+  assert(labFirstResult.theoryUnits.length === 3, `Lab-First Syllabus: 3 theory units (got ${labFirstResult.theoryUnits.length})`);
+  assert(labFirstResult.labExperiments.length === 5, `Lab-First Syllabus: 5 lab experiments (got ${labFirstResult.labExperiments.length})`);
+  assert(labFirstResult.units.length === 4, `Lab-First Combined Units: 4 (got ${labFirstResult.units.length})`);
+  assert(labFirstResult.theoryUnits[0].unitName === 'EMBEDDED SYSTEM ARCHITECTURE', `Lab-First Unit 1: "${labFirstResult.theoryUnits[0].unitName}"`);
+  assert(labFirstResult.labExperiments[0].title === 'LED Interfacing and Blinking with Timer', `Lab-First Exp 1: "${labFirstResult.labExperiments[0].title}"`);
+  assert(labFirstResult.labExperiments[4].title === 'UART Serial Communication', `Lab-First Exp 5: "${labFirstResult.labExperiments[4].title}"`);
+
+  // 21. Check Local PDFs if present
   const fixturesDir = path.join(__dirname, 'fixtures', 'syllabi');
   const fixturePdfNames = ['os.pdf', 'coa.pdf', 'cse309_obe.pdf', 'ml.pdf'];
   const presentPdfs = fixturePdfNames.filter((name) => fs.existsSync(path.join(fixturesDir, name)));
@@ -798,11 +1074,11 @@ References:
       const pdfText = await parsePdfBufferToText(pdfBuffer);
       const syllabus = extractSyllabusStructure(pdfText);
       if (name === 'os.pdf') {
-        assert(syllabus.units.length === 5, 'Local binary os.pdf: 5 theory units extracted');
+        assert(syllabus.theoryUnits.length === 5, 'Local binary os.pdf: 5 theory units extracted');
       } else if (name === 'coa.pdf') {
-        assert(syllabus.units.length === 5, 'Local binary coa.pdf: 5 theory units extracted');
+        assert(syllabus.theoryUnits.length === 5, 'Local binary coa.pdf: 5 theory units extracted');
       } else if (name === 'cse309_obe.pdf') {
-        assert(syllabus.units.length === 5, 'Local binary cse309_obe.pdf: 5 theory units extracted');
+        assert(syllabus.theoryUnits.length === 5, 'Local binary cse309_obe.pdf: 5 theory units extracted');
       } else if (name === 'ml.pdf') {
         assert(syllabus.units.length === 1 && syllabus.units[0].topics.length === 15, 'Local binary ml.pdf: 1 lab unit with 15 experiments extracted');
       }

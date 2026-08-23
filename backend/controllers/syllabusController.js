@@ -135,12 +135,16 @@ export async function extractSyllabus(req, res) {
     }
 
     const extractionResult = extractSyllabusStructure(text);
-    const { courseName, courseCode, units } = extractionResult;
+    const { courseName, courseCode, theoryUnits, labExperiments, units, hasTheory, hasLab } = extractionResult;
 
     console.info('[SYLLABUS] extractor result:', {
       courseName,
       courseCode,
-      unitCount: units?.length || 0,
+      hasTheory,
+      hasLab,
+      theoryUnitCount: theoryUnits?.length || 0,
+      labExperimentCount: labExperiments?.length || 0,
+      totalUnits: units?.length || 0,
       topicCount: units?.reduce((sum, u) => sum + (u.topics?.length || 0), 0) || 0,
     });
 
@@ -148,9 +152,27 @@ export async function extractSyllabus(req, res) {
       console.warn('[SYLLABUS] returning 422 because: 0 units detected by structural extractor');
       return res.status(422).json({
         success: false,
-        message: 'Could not detect theory syllabus units from this document. Please ensure the document contains numbered units or modules.',
+        message: 'Could not detect syllabus units or laboratory experiments from this document. Please ensure the document contains numbered units, modules, or experiment sections.',
       });
     }
+
+    const formattedTheoryUnits = (theoryUnits || []).map((u) => ({
+      unitNumber: u.unitNumber,
+      unitName: u.unitName,
+      name: u.unitName,
+      topics: u.topics.map((t) => ({
+        title: t.title,
+        name: t.title,
+        confidence: t.confidence || 0.95,
+      })),
+    }));
+
+    const formattedLabExperiments = (labExperiments || []).map((e) => ({
+      experimentNumber: e.experimentNumber,
+      title: e.title,
+      name: e.title,
+      confidence: e.confidence || 0.95,
+    }));
 
     // Map units for frontend compatibility (supports both name/unitName and topics name/title)
     const formattedUnits = units.map((u) => ({
@@ -169,7 +191,11 @@ export async function extractSyllabus(req, res) {
       docType,
       courseName,
       courseCode,
-      unitCount: formattedUnits.length,
+      hasTheory,
+      hasLab,
+      theoryUnitCount: formattedTheoryUnits.length,
+      labExperimentCount: formattedLabExperiments.length,
+      totalUnits: formattedUnits.length,
       topicCount: formattedUnits.reduce((sum, unit) => sum + unit.topics.length, 0),
     });
 
@@ -178,6 +204,10 @@ export async function extractSyllabus(req, res) {
       data: {
         courseName,
         courseCode,
+        hasTheory,
+        hasLab,
+        theoryUnits: formattedTheoryUnits,
+        labExperiments: formattedLabExperiments,
         units: formattedUnits,
       },
     });
