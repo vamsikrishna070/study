@@ -22,55 +22,78 @@ class HttpError extends Error {
  * @access Private
  */
 export async function extractSyllabus(req, res) {
+  const subjectId = req.params.id;
+  const userId = req.user?._id?.toString();
+
+  console.info('[SYLLABUS] Request received', { subjectId, userId });
+
   try {
-    const subjectId = req.params.id;
-    const userId = req.user?._id?.toString();
-
-    console.info('[SyllabusExtract] Started', { subjectId, userId });
-
     const subject = await Subject.findOne({
       _id: subjectId,
       user: req.user._id,
     });
     if (!subject) {
+      console.warn('[SYLLABUS] returning 404 because: Subject not found', { subjectId });
       return res.status(404).json({ success: false, message: 'Subject not found' });
     }
 
     const syllabusFile = subject.syllabusFile || {};
     if (!syllabusFile.url) {
+      console.warn('[SYLLABUS] returning 400 because: No syllabus file URL on subject', { subjectId });
       return res.status(400).json({
         success: false,
         message: 'Syllabus document has not been uploaded for this subject.',
       });
     }
 
+    console.info('[SYLLABUS] file/url:', syllabusFile.url);
+    console.info('[SYLLABUS] mime:', syllabusFile.mimeType || 'unknown');
+    console.info('[SYLLABUS] originalName:', syllabusFile.originalName || 'unknown');
+
     let response;
     try {
       response = await fetch(syllabusFile.url);
     } catch (error) {
-      console.error('[SyllabusExtract] Document fetch request failed', {
+      console.error('[SYLLABUS] Document fetch request failed', {
         subjectId,
+        url: syllabusFile.url,
         message: error.message,
       });
       throw new HttpError(502, 'Could not download syllabus document from storage.');
     }
 
     if (!response.ok) {
+      console.error('[SYLLABUS] Storage response not OK', {
+        status: response.status,
+        statusText: response.statusText,
+      });
       throw new HttpError(
         502,
         `Could not download syllabus document from storage (${response.status} ${response.statusText}).`
       );
     }
 
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('text/html')) {
+      console.error('[SYLLABUS] Storage returned HTML error page instead of document', { contentType });
+      throw new HttpError(502, 'Storage returned an invalid response instead of the document file.');
+    }
+
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
+    console.info('[SYLLABUS] PDF buffer size:', buffer.length, 'bytes');
+
     if (!buffer.length) {
+      console.warn('[SYLLABUS] returning 502 because: Downloaded document is empty');
       throw new HttpError(502, 'Downloaded syllabus document is empty.');
     }
 
     const docType = detectDocumentType(buffer, syllabusFile.originalName, syllabusFile.mimeType);
+    console.info('[SYLLABUS] document type:', docType);
+
     if (docType === 'unsupported') {
+      console.warn('[SYLLABUS] returning 400 because: Unsupported document format');
       throw new HttpError(400, 'Please upload a PDF, TXT, or DOCX syllabus file.');
     }
 
@@ -84,34 +107,48 @@ export async function extractSyllabus(req, res) {
         text = parseTxtBufferToText(buffer);
       }
     } catch (error) {
-      console.error('[SyllabusExtract] Document text parsing failed', {
+      console.error('[SYLLABUS] Document text parsing failed', {
         subjectId,
         docType,
         message: error.message,
       });
       if (docType === 'docx') {
-        throw new HttpError(422, 'Could not read the DOCX syllabus.');
+        throw new HttpError(422, 'Could not read the DOCX syllabus file format.');
       } else if (docType === 'txt') {
-        throw new HttpError(422, 'Could not read the TXT syllabus.');
+        throw new HttpError(422, 'Could not read the TXT syllabus file encoding.');
       } else {
         throw new HttpError(422, 'Could not extract readable text from PDF.');
       }
     }
 
+    console.info('[SYLLABUS] extracted text length:', text.length);
+    if (text.length > 0) {
+      console.info('[SYLLABUS] sample text preview:', text.substring(0, 200).replace(/\s+/g, ' '));
+    }
+
     if (!text || text.trim().length < 20) {
+      console.warn('[SYLLABUS] returning 422 because: Extracted text length < 20 characters (empty or scanned/image-only PDF)');
       return res.status(422).json({
         success: false,
-        message: 'Could not extract readable syllabus content from this file.',
+        message: 'Could not extract readable text from this document. If this is a scanned image PDF, please provide a text-based document.',
       });
     }
 
     const extractionResult = extractSyllabusStructure(text);
     const { courseName, courseCode, units } = extractionResult;
 
+    console.info('[SYLLABUS] extractor result:', {
+      courseName,
+      courseCode,
+      unitCount: units?.length || 0,
+      topicCount: units?.reduce((sum, u) => sum + (u.topics?.length || 0), 0) || 0,
+    });
+
     if (!units || units.length === 0) {
+      console.warn('[SYLLABUS] returning 422 because: 0 units detected by structural extractor');
       return res.status(422).json({
         success: false,
-        message: 'Could not detect theory syllabus structure from this document.',
+        message: 'Could not detect theory syllabus units from this document. Please ensure the document contains numbered units or modules.',
       });
     }
 
@@ -127,7 +164,7 @@ export async function extractSyllabus(req, res) {
       })),
     }));
 
-    console.info('[SyllabusExtract] Completed', {
+    console.info('[SYLLABUS] Completed successfully', {
       subjectId,
       docType,
       courseName,
@@ -146,7 +183,7 @@ export async function extractSyllabus(req, res) {
     });
   } catch (error) {
     if (error instanceof HttpError) {
-      console.error('[SyllabusExtract] Handled failure', {
+      console.error('[SYLLABUS] Handled failure', {
         statusCode: error.statusCode,
         message: error.message,
       });
@@ -155,7 +192,7 @@ export async function extractSyllabus(req, res) {
         .json({ success: false, message: error.message });
     }
 
-    console.error('[SyllabusExtract] Unexpected failure', {
+    console.error('[SYLLABUS] Unexpected failure', {
       message: error.message,
       stack: error.stack,
     });

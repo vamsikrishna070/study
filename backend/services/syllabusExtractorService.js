@@ -842,9 +842,219 @@ export function extractSyllabusStructure(rawText) {
 
   processPendingLines();
 
+  let validUnits = units.filter((u) => u.topics.length > 0);
+
+  // Secondary fallback: Dedicated Laboratory / Practical Course Syllabus (e.g. SRM CSE-303-ML.pdf, Anna Univ Lab manuals)
+  if (validUnits.length === 0) {
+    const labTopics = [];
+    let inLabSection = false;
+    let labBuffer = '';
+
+    const flushLabBuffer = () => {
+      if (!labBuffer) return;
+      let clean = labBuffer
+        .replace(/^(?:Exp\.?\s*(?:No\.?)?\s*)?\d+[.:)]\s*/i, '')
+        .replace(/^(?:Exp\.?\s*(?:No\.?)?\s*)?\d+\s+/i, '')
+        .replace(/\s+\d{1,2}(?:\.\d+)?(?:\s+\d+(?:\s*,\s*\d+)*)*$/, '')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+
+      clean = cleanTopicTitle(clean);
+
+      if (
+        clean.length > 3 &&
+        !isReferenceOrJunk(clean) &&
+        !TABLE_HEADER_REGEX.test(clean) &&
+        !/^(?:Exp\.?\s*(?:No\.?)?|Experiment\s*Name|Required|Contact|Hours|CLOs?|Addressed|References?|Used)$/i.test(clean) &&
+        !labTopics.some((t) => t.title.toLowerCase() === clean.toLowerCase())
+      ) {
+        labTopics.push({
+          title: clean,
+          confidence: 0.95,
+        });
+      }
+      labBuffer = '';
+    };
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line || PAGE_NUMBER_REGEX.test(line)) continue;
+
+      if (
+        inLabSection &&
+        labTopics.length > 0 &&
+        /^(?:References?|Text\s*Books?|Reference\s*Books?|Suggested\s*Readings?|Prescribed\s*Books?|Web\s*Resources?|Online\s*Resources?|MOOCs?|NPTEL|E-Books?|Course\s+Outcomes?|Evaluation\s+Scheme|Assessment\s+Pattern)\s*[:-]?$/i.test(line)
+      ) {
+        flushLabBuffer();
+        inLabSection = false;
+        break;
+      }
+
+      if (!inLabSection) {
+        if (/^(?:Exp\b\.?|Experiments?\b|LIST\s+OF\s+EXPERIMENTS|LABORATORY\s+EXPERIMENTS|Course\s+Unitization\s+Plan\s*\(Lab\)|Practical\s+Experiments)/i.test(line)) {
+          inLabSection = true;
+        }
+        continue;
+      }
+
+      const isExpStart = /^(?:Exp\.?\s*(?:No\.?)?\s*)?\d+(?:[.)\s]|$)/i.test(line);
+      const isRowEnd = /\s+\d{1,2}(?:\.\d+)?(?:\s+\d+(?:\s*,\s*\d+)*)+$/.test(line);
+      const isStandaloneTableCell = /^\d{1,2}(?:\.\d+)?(?:\s+\d+(?:\s*,\s*\d+)*)*$/.test(line);
+
+      if (isExpStart) {
+        flushLabBuffer();
+        labBuffer = line;
+        if (isRowEnd) {
+          flushLabBuffer();
+        }
+      } else if (labBuffer) {
+        if (isStandaloneTableCell) {
+          flushLabBuffer();
+        } else {
+          labBuffer += ' ' + line;
+          if (isRowEnd) {
+            flushLabBuffer();
+          }
+        }
+      }
+    }
+    flushLabBuffer();
+
+    if (labTopics.length > 0) {
+      validUnits.push({
+        unitNumber: 1,
+        unitName: courseName ? `${courseName} - Laboratory Experiments` : 'Laboratory Experiments',
+        topics: labTopics,
+      });
+    }
+  }
+
+  // Tertiary fallback: Numbered or Roman-numeral sections (e.g. "1. Introduction", "2. Process Concepts", "I. Overview")
+  if (validUnits.length === 0) {
+    const NUMBERED_SECTION_REGEX = /^([1-9]|1[0-2]|[IVXLCDM]+)[.)]\s+([A-Za-z][A-Za-z0-9\s,&:\-–—/()]{3,90})$/i;
+    let fallbackUnit = null;
+    let fallbackPending = [];
+
+    const processFallbackPending = () => {
+      if (!fallbackUnit || fallbackPending.length === 0) {
+        fallbackPending = [];
+        return;
+      }
+      let buffer = '';
+      for (const rawLine of fallbackPending) {
+        if (isReferenceOrJunk(rawLine) || PAGE_NUMBER_REGEX.test(rawLine)) continue;
+        const isBulletOrNum = BULLET_START_REGEX.test(rawLine);
+        if (isBulletOrNum) {
+          if (buffer) {
+            splitCompositeTopic(buffer).forEach((t) => {
+              const clean = cleanTopicTitle(t);
+              if (clean.length > 2 && !isReferenceOrJunk(clean) && !fallbackUnit.topics.some((et) => et.title.toLowerCase() === clean.toLowerCase())) {
+                fallbackUnit.topics.push({ title: clean, confidence: 0.9 });
+              }
+            });
+            buffer = '';
+          }
+          buffer = rawLine;
+        } else {
+          if (buffer && /[.;:]$/.test(buffer)) {
+            splitCompositeTopic(buffer).forEach((t) => {
+              const clean = cleanTopicTitle(t);
+              if (clean.length > 2 && !isReferenceOrJunk(clean) && !fallbackUnit.topics.some((et) => et.title.toLowerCase() === clean.toLowerCase())) {
+                fallbackUnit.topics.push({ title: clean, confidence: 0.9 });
+              }
+            });
+            buffer = rawLine;
+          } else if (buffer) {
+            buffer += ' ' + rawLine;
+          } else {
+            buffer = rawLine;
+          }
+        }
+      }
+      if (buffer) {
+        splitCompositeTopic(buffer).forEach((t) => {
+          const clean = cleanTopicTitle(t);
+          if (clean.length > 2 && !isReferenceOrJunk(clean) && !fallbackUnit.topics.some((et) => et.title.toLowerCase() === clean.toLowerCase())) {
+            fallbackUnit.topics.push({ title: clean, confidence: 0.9 });
+          }
+        });
+      }
+      fallbackPending = [];
+    };
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (PAGE_NUMBER_REGEX.test(line) || isNonTheorySectionHeader(line)) {
+        if (fallbackUnit) {
+          processFallbackPending();
+        }
+        continue;
+      }
+
+      const numMatch = line.match(NUMBERED_SECTION_REGEX);
+      if (numMatch && !isReferenceOrJunk(numMatch[2])) {
+        processFallbackPending();
+        const numVal = parseUnitNumber(numMatch[1], validUnits.length + 1);
+        const titleVal = cleanTopicTitle(numMatch[2]);
+        fallbackUnit = {
+          unitNumber: numVal,
+          unitName: titleVal || `Unit ${numVal}`,
+          topics: [],
+        };
+        validUnits.push(fallbackUnit);
+        continue;
+      }
+
+      if (fallbackUnit) {
+        fallbackPending.push(line);
+      }
+    }
+    processFallbackPending();
+    validUnits = validUnits.filter((u) => u.topics.length > 0);
+  }
+
+  // Quaternary fallback: If still no units, but document contains 2+ clear bulleted/numbered topics, create a "Syllabus Content" unit
+  if (validUnits.length === 0) {
+    const allTopics = [];
+    let buffer = '';
+    for (const rawLine of lines) {
+      if (isReferenceOrJunk(rawLine) || isNonTheorySectionHeader(rawLine) || PAGE_NUMBER_REGEX.test(rawLine)) continue;
+      if (BULLET_START_REGEX.test(rawLine)) {
+        if (buffer) {
+          splitCompositeTopic(buffer).forEach((t) => {
+            const clean = cleanTopicTitle(t);
+            if (clean.length > 2 && !isReferenceOrJunk(clean) && !allTopics.some((et) => et.title.toLowerCase() === clean.toLowerCase())) {
+              allTopics.push({ title: clean, confidence: 0.85 });
+            }
+          });
+          buffer = '';
+        }
+        buffer = rawLine;
+      } else if (buffer) {
+        buffer += ' ' + rawLine;
+      }
+    }
+    if (buffer) {
+      splitCompositeTopic(buffer).forEach((t) => {
+        const clean = cleanTopicTitle(t);
+        if (clean.length > 2 && !isReferenceOrJunk(clean) && !allTopics.some((et) => et.title.toLowerCase() === clean.toLowerCase())) {
+          allTopics.push({ title: clean, confidence: 0.85 });
+        }
+      });
+    }
+
+    if (allTopics.length >= 2) {
+      validUnits.push({
+        unitNumber: 1,
+        unitName: courseName ? `${courseName} - Core Topics` : 'Syllabus Content',
+        topics: allTopics,
+      });
+    }
+  }
+
   return {
     courseName,
     courseCode,
-    units: units.filter((u) => u.topics.length > 0),
+    units: validUnits,
   };
 }

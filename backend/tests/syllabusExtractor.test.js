@@ -647,6 +647,144 @@ UNIT 2
   assert(dashExtractedTopics[0] === 'Introduction to Compilers', `Dash topic 1: "${dashExtractedTopics[0]}"`);
   assert(dashExtractedTopics[3] === 'Symbol Table Overview', `Dash topic 4: "${dashExtractedTopics[3]}"`);
 
+  // H. Top-Level Numbered Sections Fallback (without UNIT/MODULE keyword)
+  const numberedSectionSyllabus = `
+Course Title: Data Analytics
+Course Code: DA-301
+
+1. Exploratory Data Analysis
+- Data Cleaning and Preprocessing
+- Statistical Summaries and Outliers
+- Data Visualization Principles
+
+2. Predictive Modeling and Regression
+- Multiple Linear Regression
+- Model Evaluation Metrics (RMSE, R-squared)
+- Cross-validation Strategies
+
+3. Classification and Clustering
+- Logistic Classification
+- K-Means and Hierarchical Clustering
+- ROC and AUC Analysis
+`;
+  const numberedSecResult = extractSyllabusStructure(numberedSectionSyllabus);
+  assert(numberedSecResult.units.length === 3, `Numbered Sections Fallback: 3 units detected (got ${numberedSecResult.units.length})`);
+  assert(numberedSecResult.units[0].unitNumber === 1, 'Numbered Section 1 mapped to unitNumber 1');
+  assert(numberedSecResult.units[0].unitName === 'Exploratory Data Analysis', `Numbered Section 1 Name: "${numberedSecResult.units[0].unitName}"`);
+  assert(numberedSecResult.units[0].topics.length === 3, 'Numbered Section 1 extracted 3 topics');
+
+  // I. Roman Numeral Sections Fallback (without UNIT/MODULE keyword)
+  const romanSectionSyllabus = `
+Course Title: Artificial Intelligence
+Course Code: AI-401
+
+I. Foundations of AI
+- Problem Spaces and Search
+- Heuristic Search Techniques
+- Adversarial Search and Minimax
+
+II. Knowledge Representation and Logic
+- Propositional and First-Order Logic
+- Forward and Backward Chaining
+- Ontological Engineering
+
+III. Planning and Decision Making
+- Classical Planning and STRIPS
+- Markov Decision Processes
+- Reinforcement Learning Basics
+`;
+  const romanSecResult = extractSyllabusStructure(romanSectionSyllabus);
+  assert(romanSecResult.units.length === 3, `Roman Numeral Sections Fallback: 3 units detected (got ${romanSecResult.units.length})`);
+  assert(romanSecResult.units[0].unitNumber === 1, 'Roman Section I mapped to unitNumber 1');
+  assert(romanSecResult.units[1].unitNumber === 2, 'Roman Section II mapped to unitNumber 2');
+  assert(romanSecResult.units[2].unitNumber === 3, 'Roman Section III mapped to unitNumber 3');
+
+  // J. Dedicated Laboratory / Practical Course Syllabus (e.g. SRM CSE-303-ML.pdf)
+  const labSyllabusText = `
+SRM University AP, Andhra Pradesh
+Neerukonda, Mangalagiri Mandal,
+Guntur District, Mangalagiri, Andhra Pradesh 522240.
+CLOs
+Program Learning Outcomes (PLO)
+
+-- 1 of 4 --
+
+-- 2 of 4 --
+
+Exp.
+No. Experiment Name
+Required
+Contact
+Hours
+CLOs
+Addressed
+References
+Used
+1 \tIntroduction to Python basics \t2 \t4 \t4
+2 \tMachine Learning packages in Python \t2 \t4 \t4
+3 \tImplement different types of regression using python \t2 \t4 \t4
+4
+Write a program that provides an option to compute different
+distance measures between two points in the N dimensional
+feature space. Consider some sample datasets for computing
+distances among sample points
+2 \t4 \t4
+5
+Implement k-Nearest Neighbour algorithm to classify the iris
+data set. Print both correct and wrong predictions. Python
+ML library classes can be used for this problem.
+2 \t4 \t4
+6
+Implement ID3 algorithm to construct a decision tree. Use an
+appropriate data set for building the decision tree and apply
+this knowledge to classify a new sample
+2 \t4 \t4
+7
+Given a dataset. Write a program to compute the
+Covariance, Correlation between a pair of attributes. Extend
+the program to compute the Covariance Matrix and
+Correlation Matrix
+2 \t4 \t4
+8 Write a program to implement feature reduction using
+Principal Component Analysis 2 \t4 \t4
+9
+Write a program to implement the naïve Bayesian classifier
+for a sample training data set. Compute the accuracy of the
+classifier, considering few test data sets.
+2 \t4 \t4
+10
+Given a dataset for classification task. Write a program to
+implement Support Vector Machine and estimate its test
+performance.
+2 \t4 \t4
+11 Write a program to implement perceptron for different
+learning tasks. 2 \t4 \t2
+12 Write programs to implement ADALINE and MADALINE for a
+given learning task. 2 \t4 \t2
+13
+Build an Artificial Neural Network by implementing the Back
+propagation algorithm and test the same using appropriate
+data sets
+2 \t4 \t2
+14
+Write a program to implement the K-means clustering
+algorithm. Select your own dataset to test the program.
+Demonstrate the nature of output with varying value of K
+2 \t4 \t4
+15 Implementation of hierarchical clustering using python \t2 \t4 \t5
+30
+
+-- 3 of 4 --
+References:
+1. Aurélien Géron, Hands-On Machine Learning, O'Reilly.
+`;
+  const labResult = extractSyllabusStructure(labSyllabusText);
+  assert(labResult.units.length === 1, `Lab Syllabus: 1 unit detected (got ${labResult.units.length})`);
+  assert(labResult.units[0].unitName === 'Laboratory Experiments', `Lab Unit Name: "${labResult.units[0].unitName}"`);
+  assert(labResult.units[0].topics.length === 15, `Lab Syllabus: 15 experiments extracted (got ${labResult.units[0].topics.length})`);
+  assert(labResult.units[0].topics[0].title === 'Introduction to Python basics', `Lab Topic 1: "${labResult.units[0].topics[0].title}"`);
+  assert(labResult.units[0].topics[14].title === 'Implementation of hierarchical clustering using python', `Lab Topic 15: "${labResult.units[0].topics[14].title}"`);
+
   // 18. Check Local PDFs if present
   const fixturesDir = path.join(__dirname, 'fixtures', 'syllabi');
   const fixturePdfNames = ['os.pdf', 'coa.pdf', 'cse309_obe.pdf', 'ml.pdf'];
@@ -666,7 +804,7 @@ UNIT 2
       } else if (name === 'cse309_obe.pdf') {
         assert(syllabus.units.length === 5, 'Local binary cse309_obe.pdf: 5 theory units extracted');
       } else if (name === 'ml.pdf') {
-        assert(syllabus.units.length === 0, 'Local binary ml.pdf: 0 theory units extracted (lab excluded)');
+        assert(syllabus.units.length === 1 && syllabus.units[0].topics.length === 15, 'Local binary ml.pdf: 1 lab unit with 15 experiments extracted');
       }
     }
   } else {
