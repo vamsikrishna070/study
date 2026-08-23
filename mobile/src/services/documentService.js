@@ -246,7 +246,88 @@ export async function sharePdf(urlOrUri, originalName = 'document.pdf') {
   });
 }
 
-// ─── Custom Audio Persistent Storage ──────────────────────────────────────────
+// ─── Custom Audio Persistent Storage & Validation ─────────────────────────────
+
+export const ALLOWED_AUDIO_EXTENSIONS = ['.mp3', '.wav', '.m4a', '.aac', '.ogg', '.flac', '.3gp', '.opus', '.oga'];
+
+export const DISALLOWED_EXTENSIONS = [
+  '.pdf', '.txt', '.doc', '.docx', '.jpg', '.jpeg', '.png', '.gif',
+  '.webp', '.svg', '.bmp', '.zip', '.rar', '.7z', '.tar', '.gz',
+  '.apk', '.exe', '.json', '.xml', '.csv', '.xlsx', '.xls', '.pptx',
+  '.ppt', '.mp4', '.mkv', '.avi', '.mov', '.webm', '.html', '.htm',
+];
+
+export const AUDIO_VALIDATION_ERROR_MSG = 'Please select an audio file (MP3, WAV, M4A, AAC, or OGG).';
+
+/**
+ * Validates whether an asset is a valid, supported audio file.
+ * Multi-level check:
+ * 1. MIME type validation (rejects application/pdf, text/*, image/*, video/*, etc.)
+ * 2. File extension validation (rejects .pdf, .txt, .docx, etc. and ensures allowed audio extension)
+ * 3. File existence validation
+ * 4. File size > 0 validation
+ * @param {{ uri: string, name?: string, filename?: string, mimeType?: string, size?: number }} asset
+ * @returns {Promise<{ valid: boolean, error?: string }>}
+ */
+export async function validateAudioFile(asset) {
+  if (!asset || !asset.uri) {
+    return { valid: false, error: AUDIO_VALIDATION_ERROR_MSG };
+  }
+
+  const rawName = (asset.name || asset.filename || '').trim();
+  const mime = (asset.mimeType || '').toLowerCase().trim();
+
+  // 1. Check MIME type where available
+  const rejectedMimePrefixes = [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats',
+    'text/',
+    'image/',
+    'video/',
+    'application/zip',
+    'application/x-zip',
+    'application/x-rar',
+  ];
+  if (rejectedMimePrefixes.some((prefix) => mime.startsWith(prefix) || mime.includes(prefix))) {
+    return { valid: false, error: AUDIO_VALIDATION_ERROR_MSG };
+  }
+
+  // Extract file extension
+  const cleanName = rawName.split('?')[0].split('#')[0];
+  const dotIndex = cleanName.lastIndexOf('.');
+  const ext = dotIndex !== -1 ? cleanName.substring(dotIndex).toLowerCase() : '';
+
+  // 2. Check extension
+  if (ext) {
+    if (DISALLOWED_EXTENSIONS.includes(ext) || !ALLOWED_AUDIO_EXTENSIONS.includes(ext)) {
+      return { valid: false, error: AUDIO_VALIDATION_ERROR_MSG };
+    }
+  } else {
+    // If no extension in filename, MIME type MUST be audio/
+    if (!mime.startsWith('audio/')) {
+      return { valid: false, error: AUDIO_VALIDATION_ERROR_MSG };
+    }
+  }
+
+  // 3. Check file exists and size > 0
+  try {
+    const file = new File(asset.uri);
+    if (!file.exists) {
+      return { valid: false, error: 'Selected audio file could not be found.' };
+    }
+    if (file.size === 0) {
+      return { valid: false, error: 'Selected audio file is empty.' };
+    }
+  } catch (e) {
+    // If File check fails on certain content:// URIs, fallback to asset.size
+    if (asset.size !== undefined && asset.size === 0) {
+      return { valid: false, error: 'Selected audio file is empty.' };
+    }
+  }
+
+  return { valid: true };
+}
 
 /**
  * Copies a selected audio file (content:// or file://) to persistent app storage (Paths.document/audio/)
@@ -254,8 +335,9 @@ export async function sharePdf(urlOrUri, originalName = 'document.pdf') {
  * @returns {Promise<{ uri: string, name: string, size: number }>}
  */
 export async function saveCustomAudio(asset) {
-  if (!asset || !asset.uri) {
-    throw new Error('No audio file selected.');
+  const validation = await validateAudioFile(asset);
+  if (!validation.valid) {
+    throw new Error(validation.error || AUDIO_VALIDATION_ERROR_MSG);
   }
 
   const sourceUri = asset.uri;
@@ -278,6 +360,11 @@ export async function saveCustomAudio(asset) {
     else ext = '.mp3';
   } else {
     ext = '.mp3';
+  }
+
+  // Final sanity check on extension
+  if (!ALLOWED_AUDIO_EXTENSIONS.includes(ext)) {
+    throw new Error(AUDIO_VALIDATION_ERROR_MSG);
   }
 
   const baseName = rawName && rawName.includes('.') ? rawName.substring(0, rawName.lastIndexOf('.')) : (rawName || 'custom_sound');

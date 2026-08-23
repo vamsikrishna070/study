@@ -27,27 +27,61 @@ try {
 }
 
 /**
+ * Normalizes raw extracted text from PDF, handling font ligatures, line-break hyphenation, form-feeds, and whitespace
+ */
+export function normalizePdfText(text) {
+  if (!text || typeof text !== 'string') return '';
+  return text
+    // 1. Unicode Ligatures
+    .replace(/\uFB00/g, 'ff')
+    .replace(/\uFB01/g, 'fi')
+    .replace(/\uFB02/g, 'fl')
+    .replace(/\uFB03/g, 'ffi')
+    .replace(/\uFB04/g, 'ffl')
+    .replace(/\uFB05/g, 'ft')
+    .replace(/\uFB06/g, 'st')
+    // 2. Line breaks and whitespace
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .replace(/\f/g, '\n')
+    .replace(/\u00A0/g, ' ')
+    .replace(/\u202F/g, ' ')
+    .replace(/\u2009/g, ' ')
+    .replace(/\u200B/g, '')
+    .replace(/\uFEFF/g, '')
+    .replace(/\u0000/g, '')
+    .replace(/\u00AD/g, '') // Soft hyphen
+    // 3. De-hyphenate words broken across line breaks (e.g. "Synchroniza-\ntion" -> "Synchronization")
+    .replace(/([a-zA-Z]{2,})-\s*\n\s*([a-zA-Z]{2,})/g, '$1$2')
+    // 4. Quotes & dashes normalization
+    .replace(/[\u2018\u2019\u201B\u2032]/g, "'")
+    .replace(/[\u201C\u201D\u201F\u2033]/g, '"')
+    .trim();
+}
+
+/**
  * Parses raw text from PDF buffer using the appropriate pdf-parse instance
  */
 export async function parsePdfBufferToText(buffer) {
+  let rawText = '';
   if (typeof pdfParseLegacy === 'function') {
     const parsed = await pdfParseLegacy(buffer);
-    return parsed?.text || '';
-  }
-
-  if (typeof PDFParseClass === 'function') {
+    rawText = parsed?.text || '';
+  } else if (typeof PDFParseClass === 'function') {
     const parser = new PDFParseClass({ data: buffer });
     try {
       const parsed = await parser.getText();
-      return parsed?.text || '';
+      rawText = parsed?.text || '';
     } finally {
       if (typeof parser.destroy === 'function') {
         await parser.destroy();
       }
     }
+  } else {
+    throw new Error('No compatible PDF parser available.');
   }
 
-  throw new Error('No compatible PDF parser available.');
+  return normalizePdfText(rawText);
 }
 
 /**
@@ -159,8 +193,9 @@ export async function parseDocxBufferToText(buffer) {
  * @returns {'pdf' | 'docx' | 'txt' | 'unsupported'}
  */
 export function detectDocumentType(buffer, originalName = '', mimeType = '') {
-  const ext = (originalName.split('.').pop() || '').toLowerCase();
-  const mime = (mimeType || '').toLowerCase();
+  const cleanOriginalName = (originalName || '').split('?')[0].split('#')[0];
+  const ext = (cleanOriginalName.split('.').pop() || '').toLowerCase();
+  const mime = (mimeType || '').toLowerCase().trim();
 
   // Explicit rejections for unsupported media and archives
   const rejectedExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'tiff', 'mp3', 'wav', 'm4a', 'aac', 'ogg', 'mp4', 'mov', 'avi', 'mkv', 'zip', 'rar', '7z', 'tar', 'gz', 'exe', 'apk', 'doc'];
@@ -178,10 +213,13 @@ export function detectDocumentType(buffer, originalName = '', mimeType = '') {
 
   // 1. Buffer Magic Number Checks
   if (buffer && buffer.length >= 4) {
-    const magic4 = buffer.subarray(0, 4);
-    if (magic4.toString('utf8') === '%PDF') {
+    // Check first 1024 bytes for %PDF magic bytes (supports offset headers & BOMs per PDF spec ISO 32000-1)
+    const headerSample = buffer.subarray(0, Math.min(buffer.length, 1024));
+    if (headerSample.includes(Buffer.from('%PDF'))) {
       return 'pdf';
     }
+
+    const magic4 = buffer.subarray(0, 4);
     // Zip signature for DOCX: PK\x03\x04 (0x50, 0x4B, 0x03, 0x04)
     if (magic4[0] === 0x50 && magic4[1] === 0x4B && magic4[2] === 0x03 && magic4[3] === 0x04) {
       if (ext === 'docx' || mime.includes('wordprocessingml') || mime.includes('officedocument') || ext === '') {
@@ -303,7 +341,10 @@ export function wordToNumber(word) {
  */
 export function parseUnitNumber(str, defaultNum = 1) {
   if (!str) return defaultNum;
-  const clean = str.replace(/^(?:unit|module|chapter|section|part|block)\s*[:.\-–—]?\s*/i, '').trim();
+  const clean = str
+    .replace(/^\[?\(?\s*(?:unit|module|chapter|section|part|block)(?:\s*(?:no\.?|number|#))?\s*[:.\-–—]?\s*/i, '')
+    .replace(/[\]\)]$/, '')
+    .trim();
   const num = parseInt(clean, 10);
   if (!isNaN(num) && num > 0) return num;
   const roman = romanToArabic(clean);
@@ -424,9 +465,9 @@ export function cleanTopicTitle(title) {
   let cleaned = title
     .replace(/\s+(?:CLO|CO)\s*\d+(?:\s*,\s*\d+)*$/i, '')
     .replace(/\s+\d{1,2}(?:\.\d+)?(?:\s+\d+(?:\s*,\s*\d+)*)*$/, '')
-    .replace(/^(?:\d+(?:\.\d+)*[.)\]:]?|[-*•o–—]|\([a-zA-Z0-9]+\)|[a-zA-Z][.)\]])\s+/, '')
-    .replace(/^[-*•o–—.)\]:\s]+/, '')
-    .replace(/[-*•o–—,;:\s.]+$/, '')
+    .replace(/^(?:\d+(?:\.\d+)*[.)\]:]?|[\u2022\u2023\u25E6\u2043\u2219\u25AA\u25AB\u25CF\u25CB\u27A2\u2713\-*•o–—]|\([a-zA-Z0-9]+\)|[a-zA-Z][.)\]])\s+/, '')
+    .replace(/^[\u2022\u2023\u25E6\u2043\u2219\u25AA\u25AB\u25CF\u25CB\u27A2\u2713\-*•o–—.)\]:\s]+/, '')
+    .replace(/[\u2022\u2023\u25E6\u2043\u2219\u25AA\u25AB\u25CF\u25CB\u27A2\u2713\-*•o–—,;:\s.]+$/, '')
     .replace(/\s{2,}/g, ' ')
     .trim();
 
@@ -434,7 +475,7 @@ export function cleanTopicTitle(title) {
 }
 
 /**
- * Splits a composite topic text (delimited by semicolons, commas, dashes, or sub-numberings) into atomic topic items
+ * Splits a composite topic text (delimited by semicolons, dashes, commas, or sub-numberings) into atomic topic items
  */
 export function splitCompositeTopic(text) {
   if (!text || typeof text !== 'string') return [];
@@ -473,6 +514,17 @@ export function splitCompositeTopic(text) {
       .map(cleanTopicTitle)
       .filter((p) => p.length > 2 && !isReferenceOrJunk(p));
     if (parts.length > 1) {
+      return parts;
+    }
+  }
+
+  // Check if text has multiple topics separated by dashes (e.g. "Topic 1 - Topic 2 - Topic 3")
+  const dashParts = cleaned.split(/\s+[-–—]\s+/);
+  if (dashParts.length >= 2 && cleaned.length > 25) {
+    const parts = dashParts
+      .map(cleanTopicTitle)
+      .filter((p) => p.length > 2 && !isReferenceOrJunk(p));
+    if (parts.length >= 2) {
       return parts;
     }
   }
@@ -539,7 +591,7 @@ export function extractSyllabusStructure(rawText) {
     if (inlineMatch && !courseCode && !courseName && !/^(?:UNIT|MODULE|CHAPTER|PART|SECTION)\b/i.test(inlineMatch[1])) {
       const codeCand = inlineMatch[1].replace(/\s+/g, ' ').trim();
       const nameCand = inlineMatch[2]
-        .replace(/^(?:Course\s+Title|Subject\s+Name|Title\s+of\s+(?:the\s+)?Course|Course|Subject)\s*[:.\-–—]\s*/i, '')
+        .replace(/^(?:Course\s+Title|Course\s+Name|Subject\s+Name|Title\s+of\s+(?:the\s+)?Course|Course|Subject)\s*[:.\-–—]\s*/i, '')
         .replace(/\s{2,}/g, ' ')
         .trim();
       if (nameCand.length > 3 && !isReferenceOrJunk(nameCand)) {
@@ -563,7 +615,7 @@ export function extractSyllabusStructure(rawText) {
           !isReferenceOrJunk(prev)
         ) {
           courseName = prev
-            .replace(/^(?:Course\s+Title|Subject\s+Name|Title\s+of\s+(?:the\s+)?Course|Course|Subject)\s*[:.\-–—]\s*/i, '')
+            .replace(/^(?:Course\s+Title|Course\s+Name|Subject\s+Name|Title\s+of\s+(?:the\s+)?Course|Course|Subject)\s*[:.\-–—]\s*/i, '')
             .replace(/\s{2,}/g, ' ')
             .trim();
           break;
@@ -572,17 +624,18 @@ export function extractSyllabusStructure(rawText) {
     }
 
     // Pattern 3: Direct "Course Title" / "Subject Name" matching
-    const nameMatch = line.match(/(?:Course\s+Title|Subject\s+Name|Title\s+of\s+(?:the\s+)?Course)\s*[:.\-–—]?\s*(.+)$/i);
+    const nameMatch = line.match(/(?:Course\s+Title|Course\s+Name|Subject\s+Name|Title\s+of\s+(?:the\s+)?Course)\s*[:.\-–—]?\s*(.+)$/i);
     if (nameMatch && !courseName) {
       courseName = nameMatch[1].replace(/\s{2,}/g, ' ').trim();
     }
   }
 
-  // Matches: UNIT 1, UNIT I, UNIT - 1, UNIT - I, UNIT: 1, UNIT: I, FIRST UNIT, UNIT 01, MODULE 1, MODULE I, CHAPTER 1, SECTION 1, etc.
-  const UNIT_HEADER_REGEX = /^(?:UNIT|Unit|MODULE|Module|CHAPTER|Chapter|SECTION|Section|PART|Part|BLOCK|Block)\s*[:.\-–—]?\s*([0-9IVXLCDM]+|[A-Za-z]+)(?:[\s:.\-–—]+(.*))?$/i;
-  const WORD_UNIT_HEADER_REGEX = /^(FIRST|SECOND|THIRD|FOURTH|FIFTH|SIXTH|SEVENTH|EIGHTH|NINTH|TENTH)\s+(?:UNIT|Unit|MODULE|Module|CHAPTER|Chapter)\s*[:.\-–—]?(?:[\s:.\-–—]+(.*))?$/i;
+  // Matches: UNIT 1, UNIT I, UNIT - 1, UNIT - I, UNIT: 1, UNIT: I, FIRST UNIT, UNIT 01, MODULE 1, MODULE I, Unit No. 1, Module No. 1, [UNIT 1], (UNIT 1), etc.
+  const UNIT_HEADER_REGEX = /^\[?\(?\s*(?:UNIT|Unit|MODULE|Module|CHAPTER|Chapter|SECTION|Section|PART|Part|BLOCK|Block)(?:\s*(?:NO\.?|NUMBER|#))?\s*[:.\-–—]?\s*([0-9IVXLCDM]+|[A-Za-z]+)[\]\)]?(?:[\s:.\-–—]+(.*))?$/i;
+  const WORD_UNIT_HEADER_REGEX = /^\[?\(?\s*(FIRST|SECOND|THIRD|FOURTH|FIFTH|SIXTH|SEVENTH|EIGHTH|NINTH|TENTH)\s+(?:UNIT|Unit|MODULE|Module|CHAPTER|Chapter)[\]\)]?\s*[:.\-–—]?(?:[\s:.\-–—]+(.*))?$/i;
   const TABLE_HEADER_REGEX = /^(?:Unit\s*No\.?|Unit\s*Number|Unit\s*Name|Module\s*No\.?|Chapter\s*No\.?|Required|Contact\s*Hours?|CLOs?|Addressed|References?|Used|Referen\s*cesUsed|Experiment\s*Name|Exp\.?\s*No\.?|sl\.?\s*no\.?|s\.?\s*no\.?)$/i;
   const PAGE_NUMBER_REGEX = /^--\s*\d+\s*(?:of\s*\d+)?\s*--$|^Page\s+\d+(?:\s+of\s+\d+)?$/i;
+  const BULLET_START_REGEX = /^[\u2022\u2023\u25E6\u2043\u2219\u25AA\u25AB\u25CF\u25CB\u27A2\u2713\-*•o–—]\s+|^\d+[.)\]]\s+|^[a-zA-Z][.)]\s+|^\(\d+\)\s+|^\([a-zA-Z]\)\s+/;
 
   let inTheory = false;
   const units = [];
@@ -663,7 +716,7 @@ export function extractSyllabusStructure(rawText) {
         }
 
         // Bullet point or numbered topic start
-        const isBulletOrNum = /^[-*•o–—]\s+|^\d+[.)\]]\s+|^[a-zA-Z][.)]\s+|^\(\d+\)\s+|^\([a-zA-Z]\)\s+/.test(rawLine);
+        const isBulletOrNum = BULLET_START_REGEX.test(rawLine);
 
         if (isBulletOrNum) {
           if (buffer) {
@@ -755,7 +808,9 @@ export function extractSyllabusStructure(rawText) {
               peekIdx++;
               continue;
             }
-            if (candLine.length < 90 && !/^\d+$/.test(candLine)) {
+            // Do not consume a line as unit title if it is actually a bullet/numbered topic
+            const isBulletLine = BULLET_START_REGEX.test(candLine);
+            if (!isBulletLine && candLine.length < 90 && !/^\d+$/.test(candLine)) {
               rawTitle = candLine;
               i = peekIdx; // Consume up to this line
               break;

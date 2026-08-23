@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as DocumentPicker from 'expo-document-picker';
-import { saveCustomAudio } from '../../services/documentService';
+import { saveCustomAudio, validateAudioFile } from '../../services/documentService';
 import { 
   Bell, Plus, CalendarDays, Clock, Trash2, BellOff, ChevronRight, X, 
   Repeat, Music, Volume2, VolumeX, FileMusic, Check, CircleAlert 
@@ -241,7 +241,6 @@ const RemindersScreen = ({ navigation }) => {
           'audio/aac',
           'audio/ogg',
           'audio/flac',
-          '*/*',
         ],
         copyToCacheDirectory: true,
         multiple: false,
@@ -250,6 +249,13 @@ const RemindersScreen = ({ navigation }) => {
       if (result.canceled || !result.assets || result.assets.length === 0) return;
       const asset = result.assets[0];
 
+      // Multi-level validation before attempting to copy or save
+      const validation = await validateAudioFile(asset);
+      if (!validation.valid) {
+        showError('Invalid Audio File', validation.error || 'Please select an audio file (MP3, WAV, M4A, AAC, or OGG).');
+        return;
+      }
+
       const saved = await saveCustomAudio(asset);
 
       setSoundId('custom');
@@ -257,7 +263,7 @@ const RemindersScreen = ({ navigation }) => {
       setSoundUri(saved.uri);
     } catch (e) {
       console.error('[AUDIO PICK ERROR] in RemindersScreen:', e);
-      showError('Audio Picker Error', e?.message || 'Could not access the selected audio file. Please choose another audio file.');
+      showError('Invalid Audio File', e?.message || 'Please select an audio file (MP3, WAV, M4A, AAC, or OGG).');
     }
   };
 

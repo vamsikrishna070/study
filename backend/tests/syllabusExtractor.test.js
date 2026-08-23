@@ -16,6 +16,7 @@ import {
   splitRespectingParentheses,
   splitCompositeTopic,
   cleanTopicTitle,
+  normalizePdfText,
 } from '../services/syllabusExtractorService.js';
 import { buildSyntheticDocx } from './test_docx_builder.js';
 
@@ -553,7 +554,100 @@ Topic C2
     'Unit 3 contains strictly Topic C items'
   );
 
-  // 17. Check Local PDFs if present
+  // 17. Enhanced Normalization, Offset Header, and Structural Edge Cases Regression
+  // A. Offset PDF magic byte detection (e.g. leading comment or BOM)
+  const offsetPdfBuf = Buffer.concat([Buffer.from('% Leading comment or metadata\n', 'utf8'), Buffer.from('%PDF-1.7\n', 'utf8')]);
+  assert(detectDocumentType(offsetPdfBuf, 'raw_file_without_ext') === 'pdf', 'Format detector: Offset %PDF magic bytes detected');
+
+  // B. PDF Text Normalization (Unicode Ligatures & Line-break De-hyphenation)
+  const ligatureText = 'Speciﬁc deﬁnitions of multi-\nthreading and efﬁcient soft\u00ADware.';
+  const normalizedText = normalizePdfText(ligatureText);
+  assert(normalizedText.includes('Specific definitions'), 'Text normalizer: Ligatures fi -> fi normalized');
+  assert(normalizedText.includes('multithreading'), 'Text normalizer: Line-break hyphenation joined');
+  assert(normalizedText.includes('efficient'), 'Text normalizer: Ligature ffi -> ffi normalized');
+  assert(!normalizedText.includes('\u00AD'), 'Text normalizer: Soft hyphen removed');
+
+  // C. Extended Unit Number Parsing (Unit No. 1, Module No: 5, [UNIT 1], (UNIT 3))
+  assert(parseUnitNumber('Unit No. 1') === 1, 'Extended unit number: "Unit No. 1" -> 1');
+  assert(parseUnitNumber('Module No: 5') === 5, 'Extended unit number: "Module No: 5" -> 5');
+  assert(parseUnitNumber('[UNIT 1]') === 1, 'Extended unit number: "[UNIT 1]" -> 1');
+  assert(parseUnitNumber('(UNIT 3)') === 3, 'Extended unit number: "(UNIT 3)" -> 3');
+
+  // D. Unit No. & Bracketed Header Syllabus Extraction
+  const unitNoSyllabus = `
+Course Name: Software Engineering
+Course Code: CS-402
+
+Unit No. 1: Introduction to Software Engineering
+- Software Process Models: Waterfall, Spiral, Agile
+- Requirement Engineering: Functional and Non-functional requirements
+
+Unit No. 2: System Design and Architecture
+- Architectural Styles: Layered, Client-Server, Microservices
+- Object Oriented Design: UML Class diagrams, Sequence diagrams
+
+[UNIT 3] Software Testing and Quality
+- Testing Strategies: Unit testing, Integration testing, System testing
+- Quality Assurance: CMMI, ISO standards
+`;
+  const unitNoResult = extractSyllabusStructure(unitNoSyllabus);
+  assert(unitNoResult.courseName === 'Software Engineering', `Unit No Course Name: "${unitNoResult.courseName}"`);
+  assert(unitNoResult.courseCode === 'CS-402', `Unit No Course Code: "${unitNoResult.courseCode}"`);
+  assert(unitNoResult.units.length === 3, `Unit No Units detected: ${unitNoResult.units.length} (Expected: 3)`);
+  assert(unitNoResult.units[0].unitNumber === 1, 'Unit No. 1 mapped to unitNumber 1');
+  assert(unitNoResult.units[0].unitName === 'Introduction to Software Engineering', `Unit 1 Name: "${unitNoResult.units[0].unitName}"`);
+  assert(unitNoResult.units[2].unitNumber === 3, '[UNIT 3] mapped to unitNumber 3');
+
+  // E. Unicode Bullet Character Topics Extraction
+  const unicodeBulletSyllabus = `
+Course Title: Machine Learning
+Course Code: CS-501
+
+UNIT 1: SUPERVISED LEARNING
+\u2022 Linear Regression: Cost function, Gradient descent
+\u25CF Logistic Regression: Classification, Decision boundary
+\u25AA Support Vector Machines: Linear and Non-linear SVM
+\u27A2 Decision Trees: Information gain, Gini impurity
+
+UNIT 2: UNSUPERVISED LEARNING
+\u25E6 K-Means Clustering: Algorithm and convergence
+\u2219 Hierarchical Clustering: Agglomerative and Divisive
+\u2713 Principal Component Analysis: Dimensionality reduction
+`;
+  const unicodeResult = extractSyllabusStructure(unicodeBulletSyllabus);
+  assert(unicodeResult.units.length === 2, `Unicode Bullet Units detected: ${unicodeResult.units.length} (Expected: 2)`);
+  assert(unicodeResult.units[0].topics.some(t => t.title.includes('Linear Regression')), 'Extracted topic with bullet \u2022');
+  assert(unicodeResult.units[0].topics.some(t => t.title.includes('Logistic Regression')), 'Extracted topic with bullet \u25CF');
+  assert(unicodeResult.units[0].topics.some(t => t.title.includes('Support Vector Machines')), 'Extracted topic with bullet \u25AA');
+  assert(unicodeResult.units[0].topics.some(t => t.title.includes('Decision Trees')), 'Extracted topic with bullet \u27A2');
+  assert(unicodeResult.units[1].topics.some(t => t.title.includes('K-Means Clustering')), 'Extracted topic with bullet \u25E6');
+  assert(unicodeResult.units[1].topics.some(t => t.title.includes('Principal Component Analysis')), 'Extracted topic with bullet \u2713');
+
+  // F. Unit Title Peek Safety (Unit without inline title followed immediately by bulleted topic)
+  const peekSafetySyllabus = `
+Course Title: Compiler Design
+Course Code: CS-601
+
+UNIT 1
+- Lexical Analysis: Role of lexical analyzer, Regular expressions, Lex
+- Syntax Analysis: Context free grammars, Top-down parsing, LL(1)
+
+UNIT 2
+- Intermediate Code Generation: Three address code, Quadruples, Triples
+`;
+  const peekResult = extractSyllabusStructure(peekSafetySyllabus);
+  assert(peekResult.units.length === 2, `Peek Safety Units detected: ${peekResult.units.length} (Expected: 2)`);
+  assert(peekResult.units[0].unitName === 'Unit 1', `Unit 1 Name safely defaulted without stealing first topic: "${peekResult.units[0].unitName}"`);
+  assert(peekResult.units[0].topics.some(t => t.title.includes('Lexical Analysis')), 'Unit 1 preserved first topic as a topic');
+
+  // G. Dash-Delimited Composite Topic Splitting
+  const dashCompositeStr = 'Introduction to Compilers - Phases of a Compiler - Compiler Construction Tools - Symbol Table Overview';
+  const dashExtractedTopics = splitCompositeTopic(dashCompositeStr);
+  assert(dashExtractedTopics.length === 4, `Dash composite topic split: 4 topics extracted (got ${dashExtractedTopics.length})`);
+  assert(dashExtractedTopics[0] === 'Introduction to Compilers', `Dash topic 1: "${dashExtractedTopics[0]}"`);
+  assert(dashExtractedTopics[3] === 'Symbol Table Overview', `Dash topic 4: "${dashExtractedTopics[3]}"`);
+
+  // 18. Check Local PDFs if present
   const fixturesDir = path.join(__dirname, 'fixtures', 'syllabi');
   const fixturePdfNames = ['os.pdf', 'coa.pdf', 'cse309_obe.pdf', 'ml.pdf'];
   const presentPdfs = fixturePdfNames.filter((name) => fs.existsSync(path.join(fixturesDir, name)));
