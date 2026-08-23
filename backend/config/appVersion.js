@@ -9,10 +9,11 @@ export const appVersionConfig = {
     'https://github.com/vamsikrishna070/study/releases/download/v1.0.3/studyarena-1.0.3.apk',
     
   releaseNotes: [
-    'Complete voice notes & audio playback in Notes & Resources',
-    'Dedicated native PDF viewer without triggering system share sheet',
-    'Password visibility toggle alignment & state fixes',
-    'Responsive update dialog & authoritative version comparison',
+    'Improved universal syllabus extraction (PDF, TXT, DOCX)',
+    'Improved OCR handling for scanned/hybrid PDFs',
+    'Improved theory and laboratory syllabus separation',
+    'Improved document preview and PDF viewing',
+    'Improved custom audio file validation',
     'Bug fixes and performance improvements'
   ],
 
