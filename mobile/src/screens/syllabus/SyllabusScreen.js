@@ -429,7 +429,7 @@ const SyllabusScreen = ({ route, navigation }) => {
                       >
                         <View style={[styles.unitBadge, { backgroundColor: `${subjectColor}1A` }]}>
                           <Text style={[styles.unitBadgeText, { color: subjectColor }]}>
-                            U{index + 1}
+                            {(unit.title || unit.name || '').toLowerCase().includes('laboratory') ? 'LAB' : `U${index + 1}`}
                           </Text>
                         </View>
                         <View style={styles.unitHeaderTextContainer}>

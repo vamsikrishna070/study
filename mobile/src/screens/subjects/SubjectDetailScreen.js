@@ -449,7 +449,7 @@ const SubjectDetailScreen = ({ route, navigation }) => {
                     >
                       <View style={[styles.unitBadge, { backgroundColor: `${accentColor}1A` }]}>
                         <Text style={[styles.unitBadgeText, { color: accentColor }]}>
-                          U{uIdx + 1}
+                          {(unit.title || unit.name || '').toLowerCase().includes('laboratory') ? 'LAB' : `U${uIdx + 1}`}
                         </Text>
                       </View>
 

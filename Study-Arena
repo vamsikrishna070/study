@@ -1,0 +1,9 @@
+warning: in the working copy of 'frontend/src/pages/SubjectDetail.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/pages/Syllabus.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/src/screens/subjects/SubjectDetailScreen.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/src/screens/syllabus/SyllabusScreen.js', LF will be replaced by CRLF the next time Git touches it
+ frontend/src/pages/SubjectDetail.jsx               | 4 [32m+++[m[31m-[m
+ frontend/src/pages/Syllabus.jsx                    | 2 [32m+[m[31m-[m
+ mobile/src/screens/subjects/SubjectDetailScreen.js | 2 [32m+[m[31m-[m
+ mobile/src/screens/syllabus/SyllabusScreen.js      | 2 [32m+[m[31m-[m
+ 4 files changed, 6 insertions(+), 4 deletions(-)

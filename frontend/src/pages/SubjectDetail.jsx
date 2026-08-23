@@ -548,7 +548,9 @@ export default function SubjectDetail() {
                       >
                         <div className="p-5 border-b border-border/50 bg-secondary/30">
                           <h3 className="font-display text-lg mb-1">
-                            Unit {idx + 1}: {unit.title}
+                            {unit.title?.toLowerCase().includes('laboratory') || unit.title?.toLowerCase().startsWith('unit') || unit.title?.toLowerCase().startsWith('module')
+                              ? unit.title
+                              : `Unit ${idx + 1}: ${unit.title}`}
                           </h3>
                           <div className="flex items-center gap-3">
                             <div className="flex-1 h-1.5 overflow-hidden rounded-full bg-border">
