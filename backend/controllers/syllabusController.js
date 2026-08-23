@@ -3,9 +3,6 @@ import Unit from '../models/Unit.js';
 import Topic from '../models/Topic.js';
 import {
   parsePdfBufferToText,
-  parseTxtBufferToText,
-  parseDocxBufferToText,
-  detectDocumentType,
   extractSyllabusStructure,
 } from '../services/syllabusExtractorService.js';
 
@@ -17,162 +14,91 @@ class HttpError extends Error {
 }
 
 /**
- * @desc Extract syllabus units & topics from uploaded syllabus PDF, TXT, or DOCX document
+ * @desc Extract syllabus units & topics from uploaded syllabus PDF
  * @route POST /api/syllabus/:id/extract
  * @access Private
  */
 export async function extractSyllabus(req, res) {
-  const subjectId = req.params.id;
-  const userId = req.user?._id?.toString();
-
-  console.info('[SYLLABUS] Request received', { subjectId, userId });
-
   try {
+    const subjectId = req.params.id;
+    const userId = req.user?._id?.toString();
+
+    console.info('[SyllabusExtract] Started', { subjectId, userId });
+
     const subject = await Subject.findOne({
       _id: subjectId,
       user: req.user._id,
     });
     if (!subject) {
-      console.warn('[SYLLABUS] returning 404 because: Subject not found', { subjectId });
       return res.status(404).json({ success: false, message: 'Subject not found' });
     }
 
     const syllabusFile = subject.syllabusFile || {};
     if (!syllabusFile.url) {
-      console.warn('[SYLLABUS] returning 400 because: No syllabus file URL on subject', { subjectId });
       return res.status(400).json({
         success: false,
-        message: 'Syllabus document has not been uploaded for this subject.',
+        message: 'Syllabus PDF has not been uploaded for this subject.',
       });
     }
-
-    console.info('[SYLLABUS] file/url:', syllabusFile.url);
-    console.info('[SYLLABUS] mime:', syllabusFile.mimeType || 'unknown');
-    console.info('[SYLLABUS] originalName:', syllabusFile.originalName || 'unknown');
 
     let response;
     try {
       response = await fetch(syllabusFile.url);
     } catch (error) {
-      console.error('[SYLLABUS] Document fetch request failed', {
+      console.error('[SyllabusExtract] PDF fetch request failed', {
         subjectId,
-        url: syllabusFile.url,
         message: error.message,
       });
-      throw new HttpError(502, 'Could not download syllabus document from storage.');
+      throw new HttpError(502, 'Could not download syllabus PDF from storage.');
     }
 
     if (!response.ok) {
-      console.error('[SYLLABUS] Storage response not OK', {
-        status: response.status,
-        statusText: response.statusText,
-      });
       throw new HttpError(
         502,
-        `Could not download syllabus document from storage (${response.status} ${response.statusText}).`
+        `Could not download syllabus PDF from storage (${response.status} ${response.statusText}).`
       );
-    }
-
-    const contentType = response.headers.get('content-type') || '';
-    if (contentType.includes('text/html')) {
-      console.error('[SYLLABUS] Storage returned HTML error page instead of document', { contentType });
-      throw new HttpError(502, 'Storage returned an invalid response instead of the document file.');
     }
 
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    console.info('[SYLLABUS] PDF buffer size:', buffer.length, 'bytes');
-
     if (!buffer.length) {
-      console.warn('[SYLLABUS] returning 502 because: Downloaded document is empty');
-      throw new HttpError(502, 'Downloaded syllabus document is empty.');
+      throw new HttpError(502, 'Downloaded syllabus PDF is empty.');
     }
 
-    const docType = detectDocumentType(buffer, syllabusFile.originalName, syllabusFile.mimeType);
-    console.info('[SYLLABUS] document type:', docType);
-
-    if (docType === 'unsupported') {
-      console.warn('[SYLLABUS] returning 400 because: Unsupported document format');
-      throw new HttpError(400, 'Please upload a PDF, TXT, or DOCX syllabus file.');
+    // Verify PDF signature (%PDF-)
+    const signature = buffer.subarray(0, 4).toString('utf8');
+    if (signature !== '%PDF') {
+      throw new HttpError(400, 'Uploaded file is not a valid PDF.');
     }
 
     let text = '';
     try {
-      if (docType === 'pdf') {
-        text = await parsePdfBufferToText(buffer);
-      } else if (docType === 'docx') {
-        text = await parseDocxBufferToText(buffer);
-      } else if (docType === 'txt') {
-        text = parseTxtBufferToText(buffer);
-      }
+      text = await parsePdfBufferToText(buffer);
     } catch (error) {
-      console.error('[SYLLABUS] Document text parsing failed', {
+      console.error('[SyllabusExtract] PDF text parsing failed', {
         subjectId,
-        docType,
         message: error.message,
       });
-      if (docType === 'docx') {
-        throw new HttpError(422, 'Could not read the DOCX syllabus file format.');
-      } else if (docType === 'txt') {
-        throw new HttpError(422, 'Could not read the TXT syllabus file encoding.');
-      } else {
-        throw new HttpError(422, 'Could not extract readable text from PDF.');
-      }
+      throw new HttpError(500, 'Unexpected PDF parsing error.');
     }
 
-    console.info('[SYLLABUS] extracted text length:', text.length);
-    if (text.length > 0) {
-      console.info('[SYLLABUS] sample text preview:', text.substring(0, 200).replace(/\s+/g, ' '));
-    }
-
-    if (!text || text.trim().length < 20) {
-      console.warn('[SYLLABUS] returning 422 because: Extracted text length < 20 characters (empty or scanned/image-only PDF)');
+    if (!text || text.trim().length < 30) {
       return res.status(422).json({
         success: false,
-        message: 'Could not extract readable text from this document. If this is a scanned image PDF, please provide a text-based document.',
+        message: 'Could not extract readable text from PDF.',
       });
     }
 
     const extractionResult = extractSyllabusStructure(text);
-    const { courseName, courseCode, theoryUnits, labExperiments, units, hasTheory, hasLab } = extractionResult;
-
-    console.info('[SYLLABUS] extractor result:', {
-      courseName,
-      courseCode,
-      hasTheory,
-      hasLab,
-      theoryUnitCount: theoryUnits?.length || 0,
-      labExperimentCount: labExperiments?.length || 0,
-      totalUnits: units?.length || 0,
-      topicCount: units?.reduce((sum, u) => sum + (u.topics?.length || 0), 0) || 0,
-    });
+    const { courseName, courseCode, units } = extractionResult;
 
     if (!units || units.length === 0) {
-      console.warn('[SYLLABUS] returning 422 because: 0 units detected by structural extractor');
       return res.status(422).json({
         success: false,
-        message: 'Could not detect syllabus units or laboratory experiments from this document. Please ensure the document contains numbered units, modules, or experiment sections.',
+        message: 'Could not detect theory syllabus structure from this PDF.',
       });
     }
-
-    const formattedTheoryUnits = (theoryUnits || []).map((u) => ({
-      unitNumber: u.unitNumber,
-      unitName: u.unitName,
-      name: u.unitName,
-      topics: u.topics.map((t) => ({
-        title: t.title,
-        name: t.title,
-        confidence: t.confidence || 0.95,
-      })),
-    }));
-
-    const formattedLabExperiments = (labExperiments || []).map((e) => ({
-      experimentNumber: e.experimentNumber,
-      title: e.title,
-      name: e.title,
-      confidence: e.confidence || 0.95,
-    }));
 
     // Map units for frontend compatibility (supports both name/unitName and topics name/title)
     const formattedUnits = units.map((u) => ({
@@ -186,16 +112,11 @@ export async function extractSyllabus(req, res) {
       })),
     }));
 
-    console.info('[SYLLABUS] Completed successfully', {
+    console.info('[SyllabusExtract] Completed', {
       subjectId,
-      docType,
       courseName,
       courseCode,
-      hasTheory,
-      hasLab,
-      theoryUnitCount: formattedTheoryUnits.length,
-      labExperimentCount: formattedLabExperiments.length,
-      totalUnits: formattedUnits.length,
+      unitCount: formattedUnits.length,
       topicCount: formattedUnits.reduce((sum, unit) => sum + unit.topics.length, 0),
     });
 
@@ -204,16 +125,12 @@ export async function extractSyllabus(req, res) {
       data: {
         courseName,
         courseCode,
-        hasTheory,
-        hasLab,
-        theoryUnits: formattedTheoryUnits,
-        labExperiments: formattedLabExperiments,
         units: formattedUnits,
       },
     });
   } catch (error) {
     if (error instanceof HttpError) {
-      console.error('[SYLLABUS] Handled failure', {
+      console.error('[SyllabusExtract] Handled failure', {
         statusCode: error.statusCode,
         message: error.message,
       });
@@ -222,7 +139,7 @@ export async function extractSyllabus(req, res) {
         .json({ success: false, message: error.message });
     }
 
-    console.error('[SYLLABUS] Unexpected failure', {
+    console.error('[SyllabusExtract] Unexpected failure', {
       message: error.message,
       stack: error.stack,
     });

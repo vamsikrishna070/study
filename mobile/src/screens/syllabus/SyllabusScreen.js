@@ -125,12 +125,7 @@ const SyllabusScreen = ({ route, navigation }) => {
     try {
       setUploadingPdf(true);
       const uploaded = await pickAndUploadDocument({
-        type: [
-          'application/pdf',
-          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-          'application/docx',
-          'text/plain',
-        ],
+        type: 'application/pdf',
       });
 
       if (!uploaded || !uploaded.url) return;
@@ -162,7 +157,7 @@ const SyllabusScreen = ({ route, navigation }) => {
         showDialog({
           type: 'info',
           title: 'Syllabus Uploaded',
-          message: 'Syllabus document was uploaded successfully. Text extraction could not detect units automatically, but the document is saved.',
+          message: 'Syllabus PDF was uploaded successfully. Text extraction could not detect units automatically, but the document is saved.',
           confirmText: 'OK',
         });
       }
@@ -342,7 +337,7 @@ const SyllabusScreen = ({ route, navigation }) => {
             {currentSubject?.syllabusFile?.url ? (
               <DocumentPreviewCard
                 file={currentSubject.syllabusFile}
-                title="Syllabus Document"
+                title="Syllabus PDF"
                 unitCount={units.length}
                 topicCount={totalTopics}
                 isExtracting={extracting}
@@ -361,7 +356,7 @@ const SyllabusScreen = ({ route, navigation }) => {
                 <CloudUpload size={24} color={subjectColor} style={{ marginBottom: 6 }} />
                 <Text style={styles.uploadPromptTitle}>Attach Syllabus Document</Text>
                 <Text style={styles.uploadPromptSub}>
-                  Upload PDF, DOCX, or TXT to extract units & topics
+                  Upload PDF to automatically extract units and topics
                 </Text>
               </TouchableOpacity>
             )}
@@ -396,8 +391,8 @@ const SyllabusScreen = ({ route, navigation }) => {
                 <Text style={styles.emptyUnitsTitle}>No Units Extracted</Text>
                 <Text style={styles.emptyUnitsDetail}>
                   {currentSubject?.syllabusFile?.url
-                    ? 'Extract units and topics from your attached syllabus document.'
-                    : 'Upload a PDF, DOCX, or TXT syllabus to track each unit and topic.'}
+                    ? 'Extract units and topics from your attached syllabus PDF.'
+                    : 'Upload a PDF syllabus to track each unit and topic.'}
                 </Text>
                 {currentSubject?.syllabusFile?.url && (
                   <Button
@@ -406,7 +401,7 @@ const SyllabusScreen = ({ route, navigation }) => {
                     style={{ marginTop: spacing.md }}
                   >
                     <Sparkles size={16} color={colors.primaryForeground} style={{ marginRight: 6 }} />
-                    Extract Topics from Document
+                    Extract Topics from PDF
                   </Button>
                 )}
               </View>
@@ -429,7 +424,7 @@ const SyllabusScreen = ({ route, navigation }) => {
                       >
                         <View style={[styles.unitBadge, { backgroundColor: `${subjectColor}1A` }]}>
                           <Text style={[styles.unitBadgeText, { color: subjectColor }]}>
-                            {(unit.title || unit.name || '').toLowerCase().includes('laboratory') ? 'LAB' : `U${index + 1}`}
+                            U{index + 1}
                           </Text>
                         </View>
                         <View style={styles.unitHeaderTextContainer}>

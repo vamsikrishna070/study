@@ -50,9 +50,7 @@ export const DocumentPreviewCard = ({
   }
 
   const themeAccent = accentColor || colors.primary;
-  const originalName = file.originalName || 'Syllabus';
-  const ext = originalName.includes('.') ? originalName.substring(originalName.lastIndexOf('.')).toLowerCase() : '';
-  const fileTypeLabel = ext === '.docx' ? 'Word Document' : ext === '.txt' ? 'Text Document' : 'PDF Document';
+  const originalName = file.originalName || 'Syllabus.pdf';
   const sizeText = formatSize(file.size);
 
   const handleView = async () => {
@@ -61,7 +59,7 @@ export const DocumentPreviewCard = ({
     try {
       await viewPdf(file.url, originalName);
     } catch (error) {
-      showError('Couldn’t open document', 'We couldn’t prepare this document right now. Please try again.');
+      showError('Couldn’t open document', 'We couldn’t prepare this PDF right now. Please try again.');
     } finally {
       setViewing(false);
     }
@@ -95,7 +93,7 @@ export const DocumentPreviewCard = ({
 
   const handleConfirmRemove = () => {
     showDeleteConfirm({
-      title: 'Remove Syllabus Document?',
+      title: 'Remove Syllabus PDF?',
       message:
         'This will remove the attached syllabus document from this subject. You can upload a new syllabus at any time.',
       confirmText: 'Remove',
@@ -116,7 +114,7 @@ export const DocumentPreviewCard = ({
             {originalName}
           </Text>
           <View style={styles.metaRow}>
-            <Text style={styles.fileType}>{fileTypeLabel}</Text>
+            <Text style={styles.fileType}>PDF Document</Text>
             {!!sizeText && <Text style={styles.metaDot}>•</Text>}
             {!!sizeText && <Text style={styles.fileSize}>{sizeText}</Text>}
           </View>
@@ -189,7 +187,7 @@ export const DocumentPreviewCard = ({
           ) : (
             <Eye size={16} color="#ffffff" style={{ marginRight: 6 }} />
           )}
-          <Text style={styles.primaryActionText}>{viewing ? 'Opening...' : ext === '.pdf' ? 'View PDF' : 'View Document'}</Text>
+          <Text style={styles.primaryActionText}>{viewing ? 'Opening...' : 'View PDF'}</Text>
         </TouchableOpacity>
 
         {unitCount === 0 && onExtract && (
