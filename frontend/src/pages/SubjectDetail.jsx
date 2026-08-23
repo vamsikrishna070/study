@@ -548,7 +548,7 @@ export default function SubjectDetail() {
                       >
                         <div className="p-5 border-b border-border/50 bg-secondary/30">
                           <h3 className="font-display text-lg mb-1">
-                            Unit {idx + 1}: {unit.title}
+                            {unit.title}
                           </h3>
                           <div className="flex items-center gap-3">
                             <div className="flex-1 h-1.5 overflow-hidden rounded-full bg-border">
@@ -599,7 +599,7 @@ export default function SubjectDetail() {
                                           "text-muted-foreground line-through opacity-70",
                                       )}
                                     >
-                                      {topic.name}
+                                      {topic.title || topic.name}
                                     </span>
                                   </button>
                                   <Link

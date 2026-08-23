@@ -13,6 +13,7 @@ import {
   Loader2 
 } from 'lucide-react';
 import { Button, cx } from '../shared.jsx';
+import { viewDocument, getDownloadUrl } from '../../utils/documentViewer';
 
 function formatSize(bytes) {
   if (!bytes || bytes === 0) return '';
@@ -51,7 +52,7 @@ export function DocumentPreviewCard({
   const handleView = () => {
     setViewing(true);
     try {
-      window.open(file.url, '_blank', 'noopener,noreferrer');
+      viewDocument(file.url);
     } finally {
       setTimeout(() => setViewing(false), 500);
     }
@@ -62,7 +63,8 @@ export function DocumentPreviewCard({
     setDownloading(true);
     try {
       // Use fetch + blob for reliable cross-origin browser downloads
-      const res = await fetch(file.url);
+      const downloadUrl = getDownloadUrl(file.url);
+      const res = await fetch(downloadUrl);
       const blob = await res.blob();
       const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -77,8 +79,9 @@ export function DocumentPreviewCard({
       setTimeout(() => setDownloadSuccess(false), 3000);
     } catch (err) {
       // Fallback direct link download
+      const downloadUrl = getDownloadUrl(file.url);
       const link = document.createElement('a');
-      link.href = file.url;
+      link.href = downloadUrl;
       link.target = '_blank';
       link.download = originalName;
       document.body.appendChild(link);

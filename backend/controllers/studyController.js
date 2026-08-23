@@ -60,6 +60,11 @@ export async function getSubjects(req, res) {
   });
   res.json({ success: true, data: items.map(serialize) });
 }
+export async function getSubject(req, res) {
+  const item = await owned(Subject, req.user._id, req.params.id);
+  if (!item) return res.status(404).json({ success: false, message: "Subject not found" });
+  res.json({ success: true, data: serialize(item) });
+}
 export async function createSubject(req, res) {
   if (!required(req.body, ["name", "code", "credits"]))
     return res
@@ -94,7 +99,7 @@ export async function deleteSubject(req, res) {
 export async function getUnits(req, res) {
   const filter = { user: req.user._id };
   if (req.query.subjectId) filter.subject = req.query.subjectId;
-  const items = await populateItems(Unit, filter);
+  const items = await Unit.find(filter).populate("subject", "name code color").sort({ order: 1, createdAt: 1 });
   res.json({ success: true, data: items.map(serialize) });
 }
 export async function createUnit(req, res) {
@@ -132,7 +137,7 @@ export async function getTopics(req, res) {
   const filter = { user: req.user._id };
   if (req.query.subjectId) filter.subject = req.query.subjectId;
   if (req.query.unitId) filter.unit = req.query.unitId;
-  const items = await populateItems(Topic, filter);
+  const items = await Topic.find(filter).populate("subject", "name code color").sort({ createdAt: 1 });
   res.json({ success: true, data: items.map(serialize) });
 }
 export async function createTopic(req, res) {

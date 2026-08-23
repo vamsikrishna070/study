@@ -454,11 +454,11 @@ export default function Syllabus() {
                         className="mr-3.5 flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-xs font-bold font-mono"
                         style={{ backgroundColor: `${subjectColor}1A`, color: subjectColor }}
                       >
-                        U{index + 1}
+                        {String(unit.title || unit.name || '').toLowerCase().includes('lab') ? 'L' : 'U'}
                       </div>
                       <div className="min-w-0 flex-1">
                         <h4 className="truncate font-display text-base font-bold text-foreground">
-                          {unit.title || unit.name || `Unit ${index + 1}`}
+                          {unit.title || unit.name}
                         </h4>
                         <p className="mt-0.5 text-xs text-muted-foreground">
                           {completedInUnit} / {unitTopics.length} completed

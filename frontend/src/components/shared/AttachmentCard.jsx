@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { Mic, FileText, Image as ImageIcon, File, Film, Music, X, Play, Pause, ExternalLink, Download, Share2, Check } from 'lucide-react';
 import { Button } from '../shared.jsx';
+import { viewDocument, getDownloadUrl } from '../../utils/documentViewer';
 
 export default function AttachmentCard({ attachment, onRemove, readonly }) {
   const isRecording = attachment.type === 'recording' || attachment.mimeType?.includes('audio');
@@ -41,7 +42,7 @@ export default function AttachmentCard({ attachment, onRemove, readonly }) {
   const handleView = (e) => {
     e.stopPropagation();
     if (attachment.url) {
-      window.open(attachment.url, '_blank', 'noopener,noreferrer');
+      viewDocument(attachment.url);
     }
   };
 
@@ -49,7 +50,8 @@ export default function AttachmentCard({ attachment, onRemove, readonly }) {
     e.stopPropagation();
     if (!attachment.url) return;
     try {
-      const response = await fetch(attachment.url);
+      const downloadUrl = getDownloadUrl(attachment.url);
+      const response = await fetch(downloadUrl);
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -60,7 +62,7 @@ export default function AttachmentCard({ attachment, onRemove, readonly }) {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
     } catch {
-      window.open(attachment.url, '_blank');
+      window.open(getDownloadUrl(attachment.url), '_blank');
     }
   };
 
