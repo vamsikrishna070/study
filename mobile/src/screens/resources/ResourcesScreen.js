@@ -185,7 +185,7 @@ const ResourcesScreen = ({ route, navigation }) => {
   const styles = useStyles(createStyles);
   const insets = useSafeAreaInsets();
   const { logout } = useContext(AuthContext);
-  const { showError, showDeleteConfirm } = useAppDialog();
+  const { showError, showDeleteConfirm, showSuccess } = useAppDialog();
 
   const paramSubjectId = route?.params?.subjectId || null;
   const paramOpenCreate = route?.params?.openCreate || false;
@@ -208,6 +208,7 @@ const ResourcesScreen = ({ route, navigation }) => {
   const [watched, setWatched] = useState('false');
   const [tagsInput, setTagsInput] = useState('');
   const [fileData, setFileData] = useState(null);
+  const [attachments, setAttachments] = useState([]);
   const [recordingDuration, setRecordingDuration] = useState(0);
 
   const [uploadingFile, setUploadingFile] = useState(false);
@@ -255,16 +256,30 @@ const ResourcesScreen = ({ route, navigation }) => {
     loadData();
   }, [paramSubjectId]);
 
+  const addAttachment = (item) => {
+    const newAtt = {
+      id: Date.now().toString() + '_' + Math.random().toString(36).substr(2, 4),
+      publicId: item.publicId,
+      url: item.url,
+      originalName: item.originalName || item.name,
+      name: item.originalName || item.name,
+      mimeType: item.mimeType,
+      type: item.mimeType?.startsWith('image/') ? 'image' : item.mimeType?.startsWith('audio/') ? 'audio' : 'file',
+      size: item.size,
+      duration: item.duration,
+    };
+    setAttachments((prev) => [...prev, newAtt]);
+    setFileData(newAtt);
+    if (!title.trim()) {
+      setTitle(item.originalName?.replace(/\.[^.]+$/, '') || 'Resource File');
+    }
+  };
+
   const handlePickDocument = async () => {
     try {
       setUploadingFile(true);
       const uploaded = await pickAndUploadDocument();
-      if (uploaded) {
-        setFileData(uploaded);
-        if (!title.trim()) {
-          setTitle(uploaded.originalName?.replace(/\.[^.]+$/, '') || 'Resource File');
-        }
-      }
+      if (uploaded) addAttachment(uploaded);
     } catch (err) {
       showError('Upload Failed', err.message || 'Could not upload file.');
     } finally {
@@ -276,12 +291,7 @@ const ResourcesScreen = ({ route, navigation }) => {
     try {
       setUploadingFile(true);
       const uploaded = await pickAndUploadImage();
-      if (uploaded) {
-        setFileData(uploaded);
-        if (!title.trim()) {
-          setTitle(uploaded.originalName?.replace(/\.[^.]+$/, '') || 'Resource Image');
-        }
-      }
+      if (uploaded) addAttachment(uploaded);
     } catch (err) {
       showError('Upload Failed', err.message || 'Could not upload image.');
     } finally {
@@ -290,11 +300,16 @@ const ResourcesScreen = ({ route, navigation }) => {
   };
 
   const handleVoiceSave = (recording) => {
-    setFileData(recording);
+    addAttachment({
+      ...recording,
+      mimeType: recording.mimeType || 'audio/m4a',
+      originalName: recording.originalName || 'Voice Recording',
+    });
     setRecordingDuration(recording.duration || 0);
-    if (!title.trim()) {
-      setTitle(recording.originalName || 'Voice Recording');
-    }
+  };
+
+  const removeAttachment = (idx) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== idx));
   };
 
   const handleCreate = async () => {
@@ -308,8 +323,11 @@ const ResourcesScreen = ({ route, navigation }) => {
       showError('Validation Error', 'URL is required for web / video links.');
       return;
     }
-    if ((resourceType === 'file' || resourceType === 'recording') && !fileData) {
-      showError('Validation Error', 'Please upload or record a file for this resource.');
+
+    const finalAttachments = attachments.length > 0 ? attachments : fileData ? [fileData] : [];
+
+    if ((resourceType === 'file' || resourceType === 'recording') && finalAttachments.length === 0) {
+      showError('Validation Error', 'Please upload or record at least one file for this resource.');
       return;
     }
 
@@ -323,21 +341,22 @@ const ResourcesScreen = ({ route, navigation }) => {
       const payload = {
         title: title.trim(),
         resourceType,
-        url: isLinkType ? url.trim() : (fileData?.url || ''),
+        url: isLinkType ? url.trim() : (finalAttachments[0]?.url || ''),
         subjectId: subjectId || null,
         topic: topic.trim(),
         description: description.trim(),
         rating: Number(rating) || 0,
         watched: watched === 'true',
         tags: parsedTags,
-        fileData: fileData
+        attachments: finalAttachments,
+        fileData: finalAttachments[0]
           ? {
-              url: fileData.url,
-              publicId: fileData.publicId,
-              originalName: fileData.originalName,
-              mimeType: fileData.mimeType,
-              size: fileData.size,
-              duration: fileData.duration || recordingDuration || undefined,
+              url: finalAttachments[0].url,
+              publicId: finalAttachments[0].publicId,
+              originalName: finalAttachments[0].originalName || finalAttachments[0].name,
+              mimeType: finalAttachments[0].mimeType,
+              size: finalAttachments[0].size,
+              duration: finalAttachments[0].duration || recordingDuration || undefined,
             }
           : undefined,
       };
@@ -352,6 +371,7 @@ const ResourcesScreen = ({ route, navigation }) => {
       setWatched('false');
       setTagsInput('');
       setFileData(null);
+      setAttachments([]);
       setRecordingDuration(0);
 
       if (res.data) {
@@ -465,13 +485,38 @@ const ResourcesScreen = ({ route, navigation }) => {
         }
         renderItem={({ item }) => {
           const resId = item._id || item.id;
-          const isFile = !!item.fileData;
-          const targetUrl = isFile ? item.fileData?.url : item.url;
-          const isImg = item.fileData?.mimeType?.startsWith('image/') || /\.(jpg|jpeg|png|webp)$/i.test(targetUrl || '');
-          const isAudio =
-            item.resourceType === 'recording' ||
-            item.fileData?.mimeType?.startsWith('audio/') ||
-            /\.(mp3|wav|m4a|aac|ogg)$/i.test(targetUrl || '');
+          const attList = (item.attachments && item.attachments.length > 0)
+            ? item.attachments
+            : (item.fileData?.url || item.url)
+            ? [{
+                id: item.fileData?.publicId || 'legacy',
+                name: item.fileData?.originalName || item.title,
+                url: item.fileData?.url || item.url,
+                mimeType: item.fileData?.mimeType || 'application/pdf',
+                type: item.resourceType || 'file',
+                size: item.fileData?.size || 0
+              }]
+            : [];
+
+          const handleRemoveSingleAttachment = (attIdx) => {
+            const attToDelete = attList[attIdx];
+            showDeleteConfirm({
+              title: 'Delete File?',
+              message: `Are you sure you want to delete:\n\n"${attToDelete.name || attToDelete.originalName || 'Attachment'}"`,
+              onConfirm: async () => {
+                const updatedAtts = attList.filter((_, idx) => idx !== attIdx);
+                try {
+                  await updateResource(resId, { attachments: updatedAtts });
+                  setData((prev) =>
+                    prev.map((r) => ((r._id || r.id) === resId ? { ...r, attachments: updatedAtts } : r))
+                  );
+                  showSuccess('Deleted', 'File has been deleted successfully.');
+                } catch (e) {
+                  showError('Error', 'Failed to remove attachment.');
+                }
+              }
+            });
+          };
 
           return (
             <View style={styles.card}>
@@ -517,18 +562,78 @@ const ResourcesScreen = ({ route, navigation }) => {
                 </Text>
               )}
 
-              {/* Dedicated Audio Player Bar for Audio Resources */}
-              {isAudio && targetUrl && (
-                <ResourceAudioBar url={targetUrl} title={item.title} />
-              )}
+              {/* Attachments List */}
+              {attList.length > 0 && (
+                <View style={{ marginTop: 10, gap: 6 }}>
+                  <Text style={{ fontFamily: typography.mono.bold, fontSize: 10, color: colors.mutedForeground, letterSpacing: 0.8 }}>
+                    ATTACHMENTS ({attList.length})
+                  </Text>
+                  {attList.map((att, attIdx) => {
+                    const attUrl = att.url;
+                    const isImg = att.mimeType?.startsWith('image/') || /\.(jpg|jpeg|png|webp)$/i.test(attUrl || '');
+                    const isAudio =
+                      att.type === 'recording' ||
+                      att.mimeType?.startsWith('audio/') ||
+                      /\.(mp3|wav|m4a|aac|ogg)$/i.test(attUrl || '');
 
-              {/* Image thumbnail preview if image */}
-              {isImg && targetUrl && (
-                <Image
-                  source={{ uri: targetUrl }}
-                  style={styles.cardImagePreview}
-                  resizeMode="cover"
-                />
+                    return (
+                      <View
+                        key={att.id || attIdx}
+                        style={{
+                          backgroundColor: colors.background,
+                          borderRadius: radii.md,
+                          padding: 8,
+                          borderWidth: 1,
+                          borderColor: colors.cardBorder,
+                        }}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <TouchableOpacity
+                            style={{ flex: 1, flexDirection: 'row', alignItems: 'center', marginRight: 6 }}
+                            onPress={() => attUrl && viewDocument(attUrl, att.name || 'Attachment')}
+                            activeOpacity={0.7}
+                          >
+                            <FileText size={14} color={colors.accent} style={{ marginRight: 6 }} />
+                            <Text style={{ fontFamily: typography.sans.medium, fontSize: 13, color: colors.foreground, flex: 1 }} numberOfLines={1}>
+                              {att.name || att.originalName || 'Attachment'}
+                            </Text>
+                          </TouchableOpacity>
+
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            {attUrl && (
+                              <TouchableOpacity
+                                onPress={() => viewDocument(attUrl, att.name || 'Attachment')}
+                                style={{ padding: 4 }}
+                              >
+                                <ExternalLink size={14} color={colors.accent} />
+                              </TouchableOpacity>
+                            )}
+                            <TouchableOpacity
+                              onPress={() => handleRemoveSingleAttachment(attIdx)}
+                              style={{ padding: 4 }}
+                            >
+                              <X size={14} color={colors.destructive} />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+
+                        {/* Image Preview */}
+                        {isImg && attUrl && (
+                          <Image
+                            source={{ uri: attUrl }}
+                            style={{ height: 100, borderRadius: radii.sm, marginTop: 6 }}
+                            resizeMode="cover"
+                          />
+                        )}
+
+                        {/* Audio Bar */}
+                        {isAudio && attUrl && (
+                          <ResourceAudioBar url={attUrl} title={att.name || item.title} />
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
               )}
 
               {/* Tags */}
@@ -543,24 +648,12 @@ const ResourcesScreen = ({ route, navigation }) => {
               )}
 
               <View style={styles.cardFooter}>
-                {!isAudio && (
-                  <TouchableOpacity
-                    style={styles.openBtn}
-                    onPress={() => handleOpenResource(item)}
-                    activeOpacity={0.7}
-                  >
-                    <ExternalLink size={14} color={colors.accent} />
-                    <Text style={styles.openBtnText}>
-                      {isFile ? 'View File' : 'Open Resource'}
-                    </Text>
-                  </TouchableOpacity>
-                )}
                 <Button
                   variant="danger"
                   onPress={() => handleDelete(resId)}
-                  style={[styles.deleteBtn, isAudio && { marginLeft: 'auto' }]}
+                  style={[styles.deleteBtn, { marginLeft: 'auto' }]}
                 >
-                  Delete
+                  Delete Resource
                 </Button>
               </View>
             </View>
@@ -622,64 +715,52 @@ const ResourcesScreen = ({ route, navigation }) => {
                 </Field>
               )}
 
-              {isFileType && (
-                <Field label="Upload File">
-                  {fileData ? (
-                    <AttachmentCard
-                      attachment={fileData}
-                      onRemove={() => setFileData(null)}
-                    />
-                  ) : (
-                    <View style={styles.uploadRow}>
-                      <TouchableOpacity
-                        style={[styles.uploadBox, uploadingFile && styles.disabled]}
-                        onPress={handlePickDocument}
-                        disabled={uploadingFile}
-                        activeOpacity={0.7}
-                      >
-                        <CloudUpload size={20} color={colors.accent} />
-                        <Text style={styles.uploadBoxText}>Pick Document (PDF/DOCX)</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.uploadBox, uploadingFile && styles.disabled]}
-                        onPress={handlePickImage}
-                        disabled={uploadingFile}
-                        activeOpacity={0.7}
-                      >
-                        <ImageIcon size={20} color={colors.accent} />
-                        <Text style={styles.uploadBoxText}>Pick Image</Text>
-                      </TouchableOpacity>
+              {/* Attachments Section */}
+              {(isFileType || isRecordingType) && (
+                <Field label={`Attachments (${attachments.length})`}>
+                  {attachments.length > 0 && (
+                    <View style={{ gap: 6, marginBottom: 8 }}>
+                      {attachments.map((att, idx) => (
+                        <AttachmentCard
+                          key={att.id || idx}
+                          attachment={att}
+                          onRemove={() => removeAttachment(idx)}
+                        />
+                      ))}
                     </View>
                   )}
-                </Field>
-              )}
 
-              {isRecordingType && (
-                <Field label="Voice Recording">
-                  {fileData ? (
-                    <AttachmentCard
-                      attachment={{
-                        type: 'recording',
-                        originalName: fileData.originalName || 'Voice Recording',
-                        mimeType: 'audio/m4a',
-                        duration: recordingDuration,
-                        url: fileData.url,
-                      }}
-                      onRemove={() => {
-                        setFileData(null);
-                        setRecordingDuration(0);
-                      }}
-                    />
-                  ) : (
+                  <View style={styles.uploadRow}>
                     <TouchableOpacity
-                      style={styles.recordAudioBox}
-                      onPress={() => setVoiceModalVisible(true)}
+                      style={[styles.uploadBox, uploadingFile && styles.disabled]}
+                      onPress={handlePickDocument}
+                      disabled={uploadingFile}
                       activeOpacity={0.7}
                     >
-                      <Mic size={22} color={colors.accent} />
-                      <Text style={styles.recordAudioText}>Tap to Record Audio</Text>
+                      <CloudUpload size={18} color={colors.accent} />
+                      <Text style={styles.uploadBoxText}>+ PDF / Doc</Text>
                     </TouchableOpacity>
-                  )}
+
+                    <TouchableOpacity
+                      style={[styles.uploadBox, uploadingFile && styles.disabled]}
+                      onPress={handlePickImage}
+                      disabled={uploadingFile}
+                      activeOpacity={0.7}
+                    >
+                      <ImageIcon size={18} color={colors.accent} />
+                      <Text style={styles.uploadBoxText}>+ Image</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.uploadBox, uploadingFile && styles.disabled]}
+                      onPress={() => setVoiceModalVisible(true)}
+                      disabled={uploadingFile}
+                      activeOpacity={0.7}
+                    >
+                      <Mic size={18} color={colors.accent} />
+                      <Text style={styles.uploadBoxText}>+ Voice</Text>
+                    </TouchableOpacity>
+                  </View>
                 </Field>
               )}
 

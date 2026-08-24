@@ -7,10 +7,19 @@ const taskSchema = new mongoose.Schema({
   title: { type: String, required: true, trim: true, maxlength: 160 },
   description: { type: String, default: '' },
   dueDate: { type: Date, required: true },
+  dueTime: { type: String, default: '' },
   priority: { type: String, enum: ['low', 'medium', 'high'], default: 'medium' },
-  status: { type: String, enum: ['pending', 'in-progress', 'completed'], default: 'pending' },
-  estimatedDuration: { type: Number, min: 1, default: 45 },
+  status: { type: String, enum: ['pending', 'in_progress', 'in-progress', 'paused', 'completed'], default: 'pending' },
+  scheduledStartAt: { type: Date, default: null },
+  startedAt: { type: Date, default: null },
+  lastStartedAt: { type: Date, default: null },
+  stoppedAt: { type: Date, default: null },
   completedAt: { type: Date, default: null },
+  reminderEnabled: { type: Boolean, default: false },
+  reminderTime: { type: String, default: '' },
+  reminderFrequency: { type: String, default: 'none' },
+  pendingStartNotificationId: { type: String, default: '' },
+  reminderNotificationId: { type: String, default: '' },
 }, { timestamps: true });
 
 taskSchema.index({ user: 1, dueDate: 1, status: 1 });

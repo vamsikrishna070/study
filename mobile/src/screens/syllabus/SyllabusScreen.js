@@ -141,6 +141,7 @@ const SyllabusScreen = ({ route, navigation }) => {
         },
       });
 
+      console.log('[SYLLABUS MOBILE] Extract started');
       setExtracting(true);
       const res = await extractSyllabus(
         subjectId,
@@ -148,9 +149,23 @@ const SyllabusScreen = ({ route, navigation }) => {
         uploaded.mimeType,
         uploaded.originalName
       );
-      const extracted = res.data?.units || res.units || res.data || [];
+      console.log('[SYLLABUS MOBILE] Request completed');
+      console.log('[SYLLABUS MOBILE] Response status:', res?.success ? 200 : 'unknown');
+
+      const extracted = Array.isArray(res?.data?.units)
+        ? res.data.units
+        : Array.isArray(res?.units)
+        ? res.units
+        : Array.isArray(res?.data)
+        ? res.data
+        : Array.isArray(res)
+        ? res
+        : [];
+
+      console.log('[SYLLABUS MOBILE] Units count:', extracted.length);
 
       if (extracted.length > 0) {
+        console.log('[SYLLABUS MOBILE] Opening review modal');
         setParsedUnits(extracted);
         setReviewVisible(true);
       } else {
@@ -163,6 +178,7 @@ const SyllabusScreen = ({ route, navigation }) => {
       }
       loadData();
     } catch (e) {
+      console.error('[SYLLABUS MOBILE] Error:', e);
       showError('Extraction Failed', e?.response?.data?.message || e.message || 'Failed to extract syllabus.');
     } finally {
       setUploadingPdf(false);
@@ -172,6 +188,7 @@ const SyllabusScreen = ({ route, navigation }) => {
 
   const handleExtractExisting = async () => {
     if (!currentSubject?.syllabusFile?.url) return;
+    console.log('[SYLLABUS MOBILE] Extract existing started');
     setExtracting(true);
     try {
       const res = await extractSyllabus(
@@ -180,8 +197,22 @@ const SyllabusScreen = ({ route, navigation }) => {
         currentSubject.syllabusFile.mimeType,
         currentSubject.syllabusFile.originalName
       );
-      const extracted = res.data?.units || res.units || res.data || [];
+      console.log('[SYLLABUS MOBILE] Request completed');
+
+      const extracted = Array.isArray(res?.data?.units)
+        ? res.data.units
+        : Array.isArray(res?.units)
+        ? res.units
+        : Array.isArray(res?.data)
+        ? res.data
+        : Array.isArray(res)
+        ? res
+        : [];
+
+      console.log('[SYLLABUS MOBILE] Units count:', extracted.length);
+
       if (extracted.length > 0) {
+        console.log('[SYLLABUS MOBILE] Opening review modal');
         setParsedUnits(extracted);
         setReviewVisible(true);
       } else {
@@ -193,6 +224,7 @@ const SyllabusScreen = ({ route, navigation }) => {
         });
       }
     } catch (err) {
+      console.error('[SYLLABUS MOBILE] Error:', err);
       showError('Extraction Failed', err?.response?.data?.message || 'Failed to extract syllabus.');
     } finally {
       setExtracting(false);
@@ -400,80 +432,107 @@ const SyllabusScreen = ({ route, navigation }) => {
               </View>
             ) : (
               <View style={styles.unitsSection}>
-                {units.map((unit, index) => {
-                  const uId = unit._id || unit.id || String(index);
-                  const isExpanded = !!expandedUnits[uId];
-                  const unitTopics = topics.filter(
-                    (t) => (t.unit?._id || t.unit) === uId || t.unit === unit.title
-                  );
-                  const completedInUnit = unitTopics.filter((t) => t.status === 'completed' || t.completed).length;
+                {(() => {
+                  let theoryCounter = 0;
+                  const theoryUnits = units.filter(u => !u.isLab && !u.title?.toLowerCase().includes('laboratory'));
+                  const labUnits = units.filter(u => u.isLab || u.title?.toLowerCase().includes('laboratory'));
+
+                  const renderUnitCard = (unit, index) => {
+                    const uId = unit._id || unit.id || String(index);
+                    const isExpanded = !!expandedUnits[uId];
+                    const unitTopics = topics.filter(
+                      (t) => (t.unit?._id || t.unit) === uId || t.unit === unit.title
+                    );
+                    const completedInUnit = unitTopics.filter((t) => t.status === 'completed' || t.completed).length;
+                    const isLab = Boolean(unit.isLab || unit.title?.toLowerCase().includes('laboratory'));
+                    if (!isLab) theoryCounter++;
+                    const badgeText = isLab ? 'LAB' : `U${theoryCounter}`;
+
+                    return (
+                      <View key={uId} style={[styles.unitCard, isLab && { borderColor: colors.primary }]}>
+                        <TouchableOpacity
+                          style={styles.unitHeader}
+                          onPress={() => toggleUnit(uId)}
+                          activeOpacity={0.7}
+                        >
+                          <View style={[styles.unitBadge, { backgroundColor: isLab ? colors.primary + '20' : `${subjectColor}1A` }]}>
+                            <Text style={[styles.unitBadgeText, { color: isLab ? colors.primary : subjectColor }]}>
+                              {badgeText}
+                            </Text>
+                          </View>
+                          <View style={styles.unitHeaderTextContainer}>
+                            <Text style={styles.unitTitle} numberOfLines={1}>
+                              {unit.title || unit.name || (isLab ? 'Laboratory' : `Unit ${theoryCounter}`)}
+                            </Text>
+                            <Text style={styles.unitTopicCount}>
+                              {completedInUnit} / {unitTopics.length} completed
+                            </Text>
+                          </View>
+                          {isExpanded ? (
+                            <ChevronDown size={18} color={colors.mutedForeground} />
+                          ) : (
+                            <ChevronRight size={18} color={colors.mutedForeground} />
+                          )}
+                        </TouchableOpacity>
+
+                        {isExpanded && (
+                          <View style={styles.topicsList}>
+                            {unitTopics.length === 0 ? (
+                              <Text style={styles.noTopicsText}>
+                                {isLab ? 'No experiments in this section.' : 'No topics in this unit.'}
+                              </Text>
+                            ) : (
+                              unitTopics.map((topic, tIdx) => {
+                                const isDone = topic.status === 'completed' || topic.completed;
+
+                                return (
+                                  <TouchableOpacity
+                                    key={topic._id || topic.id || tIdx}
+                                    style={styles.topicRow}
+                                    onPress={() => toggleTopic(topic)}
+                                    activeOpacity={0.7}
+                                  >
+                                    <View style={styles.checkboxContainer}>
+                                      {isDone ? (
+                                        <CircleCheck size={20} color={subjectColor} />
+                                      ) : (
+                                        <Circle size={20} color={colors.mutedForeground} />
+                                      )}
+                                    </View>
+                                    <Text
+                                      style={[
+                                        styles.topicName,
+                                        isDone && styles.topicNameDone,
+                                      ]}
+                                    >
+                                      {topic.title || topic.name}
+                                    </Text>
+                                  </TouchableOpacity>
+                                );
+                              })
+                            )}
+                          </View>
+                        )}
+                      </View>
+                    );
+                  };
 
                   return (
-                    <View key={uId} style={styles.unitCard}>
-                      <TouchableOpacity
-                        style={styles.unitHeader}
-                        onPress={() => toggleUnit(uId)}
-                        activeOpacity={0.7}
-                      >
-                        <View style={[styles.unitBadge, { backgroundColor: `${subjectColor}1A` }]}>
-                          <Text style={[styles.unitBadgeText, { color: subjectColor }]}>
-                            U{index + 1}
-                          </Text>
-                        </View>
-                        <View style={styles.unitHeaderTextContainer}>
-                          <Text style={styles.unitTitle} numberOfLines={1}>
-                            {unit.title || unit.name || `Unit ${index + 1}`}
-                          </Text>
-                          <Text style={styles.unitTopicCount}>
-                            {completedInUnit} / {unitTopics.length} completed
-                          </Text>
-                        </View>
-                        {isExpanded ? (
-                          <ChevronDown size={18} color={colors.mutedForeground} />
-                        ) : (
-                          <ChevronRight size={18} color={colors.mutedForeground} />
-                        )}
-                      </TouchableOpacity>
-
-                      {isExpanded && (
-                        <View style={styles.topicsList}>
-                          {unitTopics.length === 0 ? (
-                            <Text style={styles.noTopicsText}>No topics in this unit.</Text>
-                          ) : (
-                            unitTopics.map((topic, tIdx) => {
-                              const isDone = topic.status === 'completed' || topic.completed;
-
-                              return (
-                                <TouchableOpacity
-                                  key={topic._id || topic.id || tIdx}
-                                  style={styles.topicRow}
-                                  onPress={() => toggleTopic(topic)}
-                                  activeOpacity={0.7}
-                                >
-                                  <View style={styles.checkboxContainer}>
-                                    {isDone ? (
-                                      <CircleCheck size={20} color={subjectColor} />
-                                    ) : (
-                                      <Circle size={20} color={colors.mutedForeground} />
-                                    )}
-                                  </View>
-                                  <Text
-                                    style={[
-                                      styles.topicName,
-                                      isDone && styles.topicNameDone,
-                                    ]}
-                                  >
-                                    {topic.title || topic.name}
-                                  </Text>
-                                </TouchableOpacity>
-                              );
-                            })
-                          )}
-                        </View>
+                    <>
+                      {theoryUnits.length > 0 && labUnits.length > 0 && (
+                        <Text style={styles.sectionHeaderTitle}>THEORY</Text>
                       )}
-                    </View>
+                      {theoryUnits.map(renderUnitCard)}
+
+                      {labUnits.length > 0 && (
+                        <>
+                          <Text style={[styles.sectionHeaderTitle, { marginTop: spacing.md }]}>LABORATORY</Text>
+                          {labUnits.map(renderUnitCard)}
+                        </>
+                      )}
+                    </>
                   );
-                })}
+                })()}
               </View>
             )}
           </View>
@@ -589,6 +648,14 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
 
     unitsSection: {
       gap: spacing.sm,
+    },
+    sectionHeaderTitle: {
+      fontFamily: typography.mono.bold,
+      fontSize: 12,
+      color: colors.mutedForeground,
+      letterSpacing: 1.2,
+      marginBottom: 4,
+      marginTop: 8,
     },
     unitCard: {
       backgroundColor: colors.card,

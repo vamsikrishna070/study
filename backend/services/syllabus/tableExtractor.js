@@ -7,15 +7,93 @@
 
 import { parseUnitNumber, cleanOcrTypo } from './normalizer.js';
 
+export function detectTableSchema(lines) {
+  let schema = {
+    hasUnitPrefix: false,
+    leadingMetadataCount: 0,
+    trailingMetadataCount: 0,
+    isDetected: false
+  };
+
+  for (const line of lines) {
+    const l = line.toLowerCase();
+    if (/(?:unit|topic|content|hours?|clos?|cos?|pos?|references?)/i.test(l)) {
+      const items = [];
+      const addMatch = (regex, type) => {
+        let match;
+        const re = new RegExp(regex.source, 'gi');
+        while ((match = re.exec(l)) !== null) {
+          items.push({ type, index: match.index, text: match[0] });
+        }
+      };
+
+      addMatch(/\b(?:unit|module)\s*(?:no\.?)?\b/, 'UNIT');
+      addMatch(/\b(?:s\.?no\.?|sr\.?no\.?)\b/, 'UNIT');
+      addMatch(/\b(?:topics?|course\s*content|content|description|unit\s*name)\b/, 'CONTENT');
+      addMatch(/\b(?:hours?|contact\s*hours?|learning\s*hours?|lecture\s*hours?|lab\s*hours?|duration)\b/, 'META');
+      addMatch(/\b(?:clos?|cos?|pos?|psos?|course\s*outcomes?)\b/, 'META');
+      addMatch(/\b(?:bloom'?s?(?:\s*level)?)\b/, 'META');
+      addMatch(/\b(?:references?|textbooks?|books?)\b/, 'META');
+      addMatch(/\b(?:marks?|weightage|assessment)\b/, 'META');
+
+      if (items.length >= 2) {
+        items.sort((a, b) => a.index - b.index);
+        const merged = [];
+        let lastEnd = -1;
+        for (const item of items) {
+          if (item.index >= lastEnd) {
+            merged.push(item);
+            lastEnd = item.index + item.text.length;
+          }
+        }
+
+        let contentIndex = merged.findIndex((i) => i.type === 'CONTENT');
+        if (contentIndex === -1) {
+          contentIndex = merged.findIndex((i) => i.type === 'UNIT') + 1;
+        }
+
+        if (contentIndex !== -1 && merged.length > contentIndex) {
+          schema.leadingMetadataCount = contentIndex;
+          schema.trailingMetadataCount = merged.length - 1 - contentIndex;
+          schema.hasUnitPrefix = merged[0].type === 'UNIT';
+          schema.isDetected = true;
+          return schema;
+        }
+      }
+    }
+  }
+  return schema;
+}
+
 /**
  * Strips metadata columns (contact hours, CLOs, references, OCR noise) from a table row.
+ * Uses schema-based parsing if a schema is provided, falling back to robust regexes.
  */
-export function stripRowMetadata(text) {
+export function stripRowMetadata(text, schema = null) {
   if (!text) return '';
   let cleaned = text.trim();
 
+  // If semantic schema is known, pluck trailing metadata directly
+  if (schema && schema.isDetected && schema.trailingMetadataCount > 0) {
+    const parts = cleaned.split(/\s+/);
+    if (parts.length > schema.trailingMetadataCount + (schema.hasUnitPrefix ? 2 : 1)) {
+      // Check if trailing parts look like metadata (digits, short strings, references)
+      const trailing = parts.slice(-schema.trailingMetadataCount);
+      const isMetadataLike = trailing.every(t => /^[\d,\.\[\]\-]+|[A-Z]{1,3}\d*$|^\d+$/.test(t));
+      if (isMetadataLike) {
+        let startIndex = 0;
+        if (schema.hasUnitPrefix && /^\d+[\.\-\)]?$/.test(parts[0])) {
+          startIndex = 1;
+        }
+        cleaned = parts.slice(startIndex, parts.length - schema.trailingMetadataCount).join(' ');
+        // Still apply cleanOcrTypo at the end
+        return cleanOcrTypo(cleaned);
+      }
+    }
+  }
+
   // Strip leading pipes / bullet noise
-  cleaned = cleaned.replace(/^[|\[\]I!‘'~•\-\*\s]+/, '');
+  cleaned = cleaned.replace(/^[|\[\]!‘'~•\-\*\s]+/, '');
 
   // Strip inline OCR column artifacts (e.g. " 24 representation", " 24 motivation")
   cleaned = cleaned.replace(/\s+\d{1,2}(?:\.\d+)?\s*\|\s*/g, ' ');
@@ -30,6 +108,10 @@ export function stripRowMetadata(text) {
   cleaned = cleaned.replace(/\s+\|\s*[\d\w\s\.,|]+$/i, '');
   cleaned = cleaned.replace(/\s+\d+(?:\.\d+)?\s+[\d,\s\.]+\s+[\d,\s\.]+$/i, '');
   cleaned = cleaned.replace(/\s+\d+(?:\.\d+)?\s+[\d,\s\.]+$/i, '');
+
+  // Robust match for 3+ trailing columns (e.g., Hours, CLOs, References) commonly found in DAA / engineering syllabus tables
+  cleaned = cleaned.replace(/\s+\d+(?:\.\d+)?\s+[\d\w,\s\[\]\.\-]+\s+[\d\w,\s\[\]\.\-]+$/i, '');
+
   cleaned = cleaned.replace(/\s+\d{1,2}(?:\.\d+)?\s*$/i, '');
   cleaned = cleaned.replace(/[|\]\[}‘'~]+$/, '').trim();
 
@@ -187,7 +269,9 @@ export function extractTheoryUnitsFromTable(theoryLines) {
     }
 
     if (currentUnitNumber !== null && unitsMap.has(currentUnitNumber)) {
-      const cleaned = stripRowMetadata(entry);
+      // Find semantic table schema
+      const schema = detectTableSchema(theoryLines);
+      const cleaned = stripRowMetadata(entry, schema);
       if (cleaned && cleaned.length > 3 && !/^(?:Total\s+contact|Required|Contact\s+Hours)/i.test(cleaned)) {
         unitsMap.get(currentUnitNumber).topics.push({
           title: cleaned,

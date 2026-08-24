@@ -51,6 +51,16 @@ export const setupNotifications = async () => {
       name: 'Reminders (Study Bell)',
       sound: 'study_bell.wav',
     });
+
+    // Task Alerts channel
+    await Notifications.setNotificationChannelAsync('study-task-alerts', {
+      name: 'Task Alerts & Pending Notifications',
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#df6b47',
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      sound: true,
+    });
   }
 
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
@@ -76,35 +86,19 @@ export const scheduleReminderNotification = async (reminder) => {
     return null;
   }
 
-  const title = reminder.title || "Study Reminder";
-  const body = reminder.description
-    ? `${reminder.title}\n${reminder.description}`
-    : reminder.title;
-
-  // Determine Channel ID
+  const soundChoice = reminder.soundChoice || 'default';
   let channelId = 'study-alarm-default';
-  let soundFilename = true; // Use system default
 
-  if (reminder.soundId === 'default_alarm') {
+  if (soundChoice === 'default_alarm') {
     channelId = 'study-alarm-default-custom';
-    soundFilename = 'default_alarm.wav';
-  } else if (reminder.soundId === 'gentle_alarm') {
+  } else if (soundChoice === 'gentle') {
     channelId = 'study-alarm-gentle';
-    soundFilename = 'gentle_alarm.wav';
-  } else if (reminder.soundId === 'study_bell') {
+  } else if (soundChoice === 'bell') {
     channelId = 'study-alarm-bell';
-    soundFilename = 'study_bell.wav';
   }
 
   let trigger;
-  
-  if (type === 'one-time') {
-    trigger = {
-      type: Notifications.SchedulableTriggerInputTypes.DATE,
-      channelId,
-      date: triggerDate,
-    };
-  } else if (type === 'daily') {
+  if (type === 'daily') {
     trigger = {
       type: Notifications.SchedulableTriggerInputTypes.DAILY,
       channelId,
@@ -112,55 +106,133 @@ export const scheduleReminderNotification = async (reminder) => {
       minute: triggerDate.getMinutes(),
     };
   } else if (type === 'weekly') {
-    let jsWeekday = triggerDate.getDay(); 
-    if (reminder.weekdays && reminder.weekdays.length > 0) {
-      jsWeekday = reminder.weekdays[0]; 
-    }
-    const expoWeekday = jsWeekday + 1; 
     trigger = {
       type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
       channelId,
-      weekday: expoWeekday,
+      weekday: triggerDate.getDay() + 1,
       hour: triggerDate.getHours(),
       minute: triggerDate.getMinutes(),
     };
-  } else if (type === 'monthly') {
+  } else {
     trigger = {
-      type: Notifications.SchedulableTriggerInputTypes.MONTHLY,
+      type: Notifications.SchedulableTriggerInputTypes.DATE,
       channelId,
-      day: reminder.repeatDayOfMonth || triggerDate.getDate(),
-      hour: triggerDate.getHours(),
-      minute: triggerDate.getMinutes(),
-    };
-  } else if (type === 'yearly') {
-    trigger = {
-      type: Notifications.SchedulableTriggerInputTypes.YEARLY,
-      channelId,
-      month: triggerDate.getMonth(), 
-      day: reminder.repeatDayOfMonth || triggerDate.getDate(),
-      hour: triggerDate.getHours(),
-      minute: triggerDate.getMinutes(),
+      date: triggerDate,
     };
   }
 
-  const id = await Notifications.scheduleNotificationAsync({
-    content: {
-      title,
-      body,
-      vibrate: [0, 500, 500, 500],
-      sound: soundFilename,
-      priority: Notifications.AndroidNotificationPriority.MAX,
-      autoDismiss: false, // Keep it ringing
-    },
-    trigger,
-  });
-  
-  return id;
+  const title = reminder.title || 'Reminder';
+  const body = reminder.description || 'Time for your scheduled study session.';
+
+  try {
+    const id = await Notifications.scheduleNotificationAsync({
+      content: {
+        title,
+        body,
+        sound: true,
+        priority: Notifications.AndroidNotificationPriority.HIGH,
+      },
+      trigger,
+    });
+    return id;
+  } catch (err) {
+    console.error("[NotificationService] Failed to schedule notification:", err);
+    return null;
+  }
 };
 
 export const cancelReminderNotification = async (notificationId) => {
   if (notificationId) {
     await Notifications.cancelScheduledNotificationAsync(notificationId);
+  }
+};
+
+export const scheduleTaskPendingAlert = async (task) => {
+  if (!task || task.status === 'completed' || task.status === 'in_progress') return null;
+
+  let triggerTime = null;
+  if (task.scheduledStartAt) {
+    triggerTime = new Date(task.scheduledStartAt);
+  } else if (task.dueDate && task.dueTime) {
+    try {
+      const [h, m] = task.dueTime.split(':').map(Number);
+      const d = new Date(task.dueDate);
+      if (!isNaN(h) && !isNaN(m) && !isNaN(d.getTime())) {
+        d.setHours(h, m, 0, 0);
+        triggerTime = d;
+      }
+    } catch (_) {}
+  }
+
+  if (!triggerTime) return null;
+
+  // Subtract 1 hour for the 1-hour-before reminder
+  const notificationTime = new Date(triggerTime.getTime() - 60 * 60 * 1000);
+  if (notificationTime <= new Date()) return null;
+
+  const timeStr = task.dueTime || triggerTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const title = '🔴 TASK PENDING';
+  const body = `${task.title} — You haven't started this task yet. Complete by ${timeStr}.`;
+
+  try {
+    const id = await Notifications.scheduleNotificationAsync({
+      content: {
+        title,
+        body,
+        sound: true,
+        priority: Notifications.AndroidNotificationPriority.HIGH,
+        data: { taskId: task._id || task.id, type: 'task_pending' },
+      },
+      trigger: notificationTime,
+    });
+    return id;
+  } catch (err) {
+    console.error('[NotificationService] Failed to schedule Task Pending alert:', err);
+    return null;
+  }
+};
+
+export const scheduleTaskDailyReminder = async (task) => {
+  if (!task || !task.reminderEnabled || !task.reminderTime) return null;
+  const [hoursStr, minutesStr] = (task.reminderTime || '09:00').split(':');
+  const hours = parseInt(hoursStr, 10) || 0;
+  const minutes = parseInt(minutesStr, 10) || 0;
+
+  const title = `Task Reminder: ${task.title}`;
+  const body = "Don't forget to work on your task today.";
+
+  const trigger = {
+    type: Notifications.SchedulableTriggerInputTypes.DAILY,
+    channelId: 'study-alarm-default',
+    hour: hours,
+    minute: minutes,
+  };
+
+  try {
+    const id = await Notifications.scheduleNotificationAsync({
+      content: {
+        title,
+        body,
+        sound: true,
+        priority: Notifications.AndroidNotificationPriority.DEFAULT,
+        data: { taskId: task._id || task.id, type: 'task_daily' },
+      },
+      trigger,
+    });
+    return id;
+  } catch (err) {
+    console.error('[NotificationService] Failed to schedule Task daily reminder:', err);
+    return null;
+  }
+};
+
+export const cancelTaskNotification = async (notificationId) => {
+  if (notificationId) {
+    try {
+      await Notifications.cancelScheduledNotificationAsync(notificationId);
+    } catch (err) {
+      console.warn('[NotificationService] Failed to cancel Task notification:', err);
+    }
   }
 };
 

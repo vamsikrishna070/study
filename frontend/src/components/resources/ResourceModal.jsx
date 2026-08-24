@@ -34,6 +34,7 @@ export default function ResourceModal({ onClose }) {
     tags: ''
   });
   const [fileData, setFileData] = useState(null);
+  const [attachments, setAttachments] = useState([]);
   const [recordingDuration, setRecordingDuration] = useState(0);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -46,12 +47,17 @@ export default function ResourceModal({ onClose }) {
     setUploading(true);
     try {
       const data = await uploadFile(file);
-      setFileData({
-        ...data,
+      const newAtt = {
+        publicId: data.publicId,
+        url: data.url,
+        originalName: data.originalName || file.name,
+        name: data.originalName || file.name,
         mimeType: file.type,
         size: file.size,
-        originalName: data.originalName || file.name,
-      });
+        type: file.type.startsWith('image/') ? 'image' : file.type.startsWith('audio/') ? 'audio' : 'file',
+      };
+      setAttachments(prev => [...prev, newAtt]);
+      setFileData(newAtt);
       if (!form.title) {
         set('title', file.name.replace(/\.[^.]+$/, ''));
       }
@@ -63,28 +69,37 @@ export default function ResourceModal({ onClose }) {
   };
 
   const handleFileChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file) processFile(file);
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      files.forEach(f => processFile(f));
+    }
   };
 
   const handleDrop = (e) => {
     e.preventDefault();
     setDragOver(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) processFile(file);
+    const files = Array.from(e.dataTransfer.files || []);
+    if (files.length > 0) {
+      files.forEach(f => processFile(f));
+    }
   };
 
   const handleRecordingSave = async ({ file, title, duration }) => {
     setUploading(true);
     try {
       const data = await uploadFile(file);
-      setFileData({
-        ...data,
+      const newAtt = {
+        publicId: data.publicId,
+        url: data.url,
+        originalName: title || 'Voice Recording',
+        name: title || 'Voice Recording',
         mimeType: file.type || 'audio/webm',
         size: file.size,
-        originalName: title || 'Voice Recording',
+        type: 'recording',
         duration,
-      });
+      };
+      setAttachments(prev => [...prev, newAtt]);
+      setFileData(newAtt);
       setRecordingDuration(duration);
       if (!form.title) set('title', title || 'Voice Recording');
     } catch {
@@ -94,11 +109,16 @@ export default function ResourceModal({ onClose }) {
     }
   };
 
+  const removeAttachment = (idx) => {
+    setAttachments(prev => prev.filter((_, i) => i !== idx));
+  };
+
   const submit = (e) => {
     e.preventDefault();
+    const finalAttachments = attachments.length > 0 ? attachments : fileData ? [fileData] : [];
     const data = {
       title: form.title.trim(),
-      url: isLinkType ? form.url.trim() : (fileData?.url || ''),
+      url: isLinkType ? form.url.trim() : (finalAttachments[0]?.url || form.url.trim() || ''),
       resourceType: form.resourceType,
       subjectId: form.subjectId || undefined,
       topic: form.topic.trim(),
@@ -106,13 +126,14 @@ export default function ResourceModal({ onClose }) {
       rating: Number(form.rating),
       watched: form.watched === 'true',
       tags: form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
-      fileData: fileData ? {
-        publicId: fileData.publicId,
-        url: fileData.url,
-        originalName: fileData.originalName,
-        mimeType: fileData.mimeType,
-        size: fileData.size,
-        duration: fileData.duration || recordingDuration || undefined,
+      attachments: finalAttachments,
+      fileData: finalAttachments[0] ? {
+        publicId: finalAttachments[0].publicId,
+        url: finalAttachments[0].url,
+        originalName: finalAttachments[0].originalName || finalAttachments[0].name,
+        mimeType: finalAttachments[0].mimeType,
+        size: finalAttachments[0].size,
+        duration: finalAttachments[0].duration,
       } : undefined,
     };
 
@@ -125,7 +146,7 @@ export default function ResourceModal({ onClose }) {
   };
 
   const canSubmit = !create.isPending && !uploading && form.title && (
-    isLinkType ? form.url : (isFileType || isRecordingType) ? fileData : false
+    isLinkType ? form.url : attachments.length > 0 || fileData
   );
 
   const urlLabel = form.resourceType === 'youtube' ? 'YouTube URL *' : 'URL *';

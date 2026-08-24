@@ -16,6 +16,19 @@ const resourceSchema = new mongoose.Schema({
     duration: Number,
     metadata: mongoose.Schema.Types.Mixed
   },
+  attachments: [{
+    publicId: String,
+    originalName: String,
+    name: String,
+    url: String,
+    mimeType: String,
+    type: String,
+    size: Number,
+    thumbnailUrl: String,
+    duration: Number,
+    createdAt: { type: Date, default: Date.now },
+    metadata: mongoose.Schema.Types.Mixed
+  }],
   description: { type: String, default: '' },
   notes: { type: String, default: '' },
   rating: { type: Number, min: 0, max: 5, default: 0 },

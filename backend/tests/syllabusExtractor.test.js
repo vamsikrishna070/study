@@ -15,6 +15,7 @@ import {
   segmentDocumentSections,
   terminateOcrEngine,
 } from '../services/syllabusExtractorService.js';
+import { stripRowMetadata, detectTableSchema } from '../services/syllabus/tableExtractor.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -397,6 +398,44 @@ Course Unitization Plan (Lab)
   const utf16Buf = Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(txtContent, 'utf16le')]);
   const utf16Result = await extractSyllabusFromBuffer(utf16Buf, { originalFileName: 'utf16_syllabus.txt' });
   assert(utf16Result.theoryUnits.length === 3, 'TXT UTF-16 LE correctly decoded');
+
+  // 11. Table Metadata Semantic Stripping Tests
+  console.log('\n[11. Table Metadata Semantic Stripping]');
+  const mockTableLines = [
+    'Unit No Unit Name Hours CLO References',
+    '1 Linear Regression 2 1,3 1',
+    'Introduction to Neural Networks 3 1 2 3'
+  ];
+  const schema3 = detectTableSchema(mockTableLines);
+  
+  assert(
+    stripRowMetadata('Linear Regression 2 1,3 1', schema3) === 'Linear Regression',
+    'Metadata Contamination Test: Stripped "2 1,3 1" from "Linear Regression 2 1,3 1"'
+  );
+
+  const mockSchema5 = detectTableSchema(['UNIT TOPIC HOURS CO PO PSO']);
+  assert(
+    stripRowMetadata('Introduction to Neural Networks 3 1 2 3', mockSchema5) === 'Introduction to Neural Networks',
+    'Metadata Contamination Test: Stripped "3 1 2 3" (HOURS CO PO PSO) correctly'
+  );
+
+  const legitimateNumbers = [
+    '0/1 Knapsack',
+    '8-Queen\'s Problem',
+    '16-Puzzle Problem',
+    '3-SAT',
+    '2-Phase Locking',
+    '3-Tier Architecture',
+    'IPv4',
+    'IPv6',
+    'C++17'
+  ];
+  
+  let legitPassed = true;
+  for (const num of legitimateNumbers) {
+    if (stripRowMetadata(`${num} 2 1,3 1`, schema3) !== num) legitPassed = false;
+  }
+  assert(legitPassed, 'Legitimate Numbers Test: 0/1 Knapsack, 8-Queen, IPv4, C++17 remain perfectly intact when metadata is stripped');
 
   // Terminate any shared OCR workers
   await terminateOcrEngine();

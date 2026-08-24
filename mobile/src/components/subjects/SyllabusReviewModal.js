@@ -28,11 +28,17 @@ export function SyllabusReviewModal({
   const styles = useStyles(createStyles);
   const { showError, showSuccess } = useAppDialog();
 
-  const [units, setUnits] = useState(parsedUnits || []);
+  const getSafeUnits = (data) => {
+    if (Array.isArray(data)) return data;
+    if (data && Array.isArray(data.units)) return data.units;
+    return [];
+  };
+
+  const [units, setUnits] = useState(() => getSafeUnits(parsedUnits));
   const [saving, setSaving] = useState(false);
 
   React.useEffect(() => {
-    setUnits(parsedUnits || []);
+    setUnits(getSafeUnits(parsedUnits));
   }, [parsedUnits]);
 
   const handleUnitNameChange = (uIdx, val) => {
@@ -43,7 +49,7 @@ export function SyllabusReviewModal({
 
   const handleTopicNameChange = (uIdx, tIdx, val) => {
     const next = [...units];
-    const unitTopics = [...(next[uIdx].topics || [])];
+    const unitTopics = [...(next[uIdx]?.topics || [])];
     unitTopics[tIdx] = { ...unitTopics[tIdx], name: val };
     next[uIdx] = { ...next[uIdx], topics: unitTopics };
     setUnits(next);
@@ -55,13 +61,13 @@ export function SyllabusReviewModal({
 
   const removeTopic = (uIdx, tIdx) => {
     const next = [...units];
-    const unitTopics = (next[uIdx].topics || []).filter((_, i) => i !== tIdx);
+    const unitTopics = (next[uIdx]?.topics || []).filter((_, i) => i !== tIdx);
     next[uIdx] = { ...next[uIdx], topics: unitTopics };
     setUnits(next);
   };
 
   const handleConfirm = async () => {
-    if (units.length === 0) {
+    if (!Array.isArray(units) || units.length === 0) {
       showError('Empty Syllabus', 'Please keep at least one unit before saving.');
       return;
     }
@@ -79,6 +85,8 @@ export function SyllabusReviewModal({
     }
   };
 
+  const safeUnits = Array.isArray(units) ? units : [];
+
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <KeyboardAvoidingView
@@ -93,17 +101,17 @@ export function SyllabusReviewModal({
               <Text style={styles.title}>Review Extracted Syllabus</Text>
               <Text style={styles.subtitle}>
                 {(() => {
-                  const theoryUnits = units.filter(u => !u.name?.toLowerCase().includes('laboratory'));
-                  const labUnits = units.filter(u => u.name?.toLowerCase().includes('laboratory'));
-                  const labExpCount = labUnits.reduce((acc, u) => acc + (u.topics?.length || 0), 0);
-                  const totalTopics = units.reduce((acc, u) => acc + (u.topics?.length || 0), 0);
+                  const theoryUnits = safeUnits.filter(u => !u?.isLab && !u?.name?.toLowerCase().includes('laboratory'));
+                  const labUnits = safeUnits.filter(u => u?.isLab || u?.name?.toLowerCase().includes('laboratory'));
+                  const labExpCount = labUnits.reduce((acc, u) => acc + (u?.topics?.length || 0), 0);
+                  const totalTopics = safeUnits.reduce((acc, u) => acc + (u?.topics?.length || 0), 0);
                   if (theoryUnits.length > 0 && labUnits.length > 0) {
                     return `Extracted ${theoryUnits.length} theory units and ${labExpCount} lab experiments`;
                   }
                   if (theoryUnits.length === 0 && labUnits.length > 0) {
                     return `Extracted ${labExpCount} lab experiments`;
                   }
-                  return `Extracted ${units.length} units and ${totalTopics} topics`;
+                  return `Extracted ${safeUnits.length} units and ${totalTopics} topics`;
                 })()}
               </Text>
             </View>
@@ -114,27 +122,31 @@ export function SyllabusReviewModal({
 
           {/* Body */}
           <ScrollView style={styles.body} keyboardShouldPersistTaps="handled">
-            {units.length === 0 ? (
+            {safeUnits.length === 0 ? (
               <View style={styles.emptyBox}>
                 <BookOpen size={24} color={colors.mutedForeground} />
                 <Text style={styles.emptyText}>No units extracted from PDF.</Text>
               </View>
             ) : (
-              units.map((unit, uIdx) => {
-                const isLab = unit.name?.toLowerCase().includes('laboratory');
-                return (
-                  <View key={uIdx} style={[styles.unitCard, isLab && { borderColor: colors.primary, borderWidth: 1.5 }]}>
-                    {/* Unit Name Row */}
-                    <View style={styles.unitHeaderRow}>
-                      <Text style={[styles.unitIndexBadge, isLab && { backgroundColor: colors.primary, color: colors.primaryForeground, paddingHorizontal: 6 }]}>
-                        {isLab ? 'LAB' : `U${uIdx + 1}`}
-                      </Text>
-                      <Input
-                        value={unit.name}
-                        onChangeText={(val) => handleUnitNameChange(uIdx, val)}
-                        placeholder={isLab ? 'Laboratory section title' : 'Unit title'}
-                        style={styles.unitInput}
-                      />
+              (() => {
+                let theoryCounter = 0;
+                return safeUnits.map((unit, uIdx) => {
+                  const isLab = Boolean(unit?.isLab || unit?.name?.toLowerCase().includes('laboratory'));
+                  if (!isLab) theoryCounter++;
+                  const badgeText = isLab ? 'LAB' : `U${theoryCounter}`;
+                  return (
+                    <View key={uIdx} style={[styles.unitCard, isLab && { borderColor: colors.primary, borderWidth: 1.5 }]}>
+                      {/* Unit Name Row */}
+                      <View style={styles.unitHeaderRow}>
+                        <Text style={[styles.unitIndexBadge, isLab && { backgroundColor: colors.primary, color: colors.primaryForeground, paddingHorizontal: 6 }]}>
+                          {badgeText}
+                        </Text>
+                        <Input
+                          value={unit?.name || ''}
+                          onChangeText={(val) => handleUnitNameChange(uIdx, val)}
+                          placeholder={isLab ? 'Laboratory section title' : 'Unit title'}
+                          style={styles.unitInput}
+                        />
                       <TouchableOpacity
                         onPress={() => removeUnit(uIdx)}
                         style={styles.deleteBtn}
@@ -171,8 +183,9 @@ export function SyllabusReviewModal({
                     </View>
                   </View>
                 );
-              })
-            )}
+              });
+            })()
+          )}
           </ScrollView>
 
           {/* Footer */}

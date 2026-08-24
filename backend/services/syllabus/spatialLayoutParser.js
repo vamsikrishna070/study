@@ -105,6 +105,11 @@ export function stripMetadataColumns(text) {
   cleaned = cleaned.replace(/\s+\|\s*[\d\w\s\.,|]+$/i, '');
   cleaned = cleaned.replace(/\s+\d+(?:\.\d+)?\s+[\d,\s\.]+\s+[\d,\s\.]+$/i, '');
   cleaned = cleaned.replace(/\s+\d+(?:\.\d+)?\s+[\d,\s\.]+$/i, '');
+  
+  // Robust match for 3+ trailing columns (e.g., Hours, CLOs, References) commonly found in DAA / engineering syllabus tables
+  // Matches any sequence of space followed by numbers/commas/letters at the end of the line
+  cleaned = cleaned.replace(/\s+\d+(?:\.\d+)?\s+[\d\w,\s\[\]\.\-]+\s+[\d\w,\s\[\]\.\-]+$/i, '');
+
   cleaned = cleaned.replace(/\s+\d{1,2}(?:\.\d+)?\s*$/i, '');
 
   // Strip inline OCR column artifacts (e.g. " 24 representation", " 24 motivation")

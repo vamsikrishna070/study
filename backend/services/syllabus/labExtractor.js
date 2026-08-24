@@ -4,6 +4,7 @@
  */
 
 import { cleanOcrTypo } from './normalizer.js';
+import { detectTableSchema } from './tableExtractor.js';
 
 const TABLE_HEADER_WORDS = [
   'exp',
@@ -50,19 +51,32 @@ function isTableHeaderLine(line) {
 /**
  * Cleans an individual lab experiment title.
  */
-function cleanExperimentTitle(text) {
+function cleanExperimentTitle(text, schema) {
   if (!text || typeof text !== 'string') return '';
 
   let cleaned = text
-    .replace(/^(?:Exp(?:eriment)?\.?\s*(?:No\.?)?\s*\d+[:.\-–—]?|\bProgram\s*\d+[:.\-–—]?|\d+[.)\]:-]?\s*)/i, '')
+    .replace(/^(?:Exp(?:eriment)?\.?\s*(?:No\.?)?\s*\d+[:.\-–—]?|\bPrograms?\s*\d*[:.\-–—]?|\d+[.)\]:-]?\s*)/i, '')
     .replace(/\s+(?:CLO|CO)\s*\d+(?:\s*,\s*\d+)*$/i, '')
+    // Strip arbitrary trailing table metadata columns (Hours, CLOs, References) robustly
+    .replace(/\s+\d+(?:\.\d+)?\s+[\w\d,\s\[\]\.\-]+$/i, '')
     .replace(/\s+\d{1,2}(?:\.\d+)?(?:\s+\d+(?:\s*,\s*\d+)*)+$/, '')
     .replace(/(?:Course\s+Unit(?:ization|isation)\s+Plan\s*[-–—]?\s*(?:Theory|Lab)?).*$/i, '')
     .replace(/\s{2,}/g, ' ')
     .trim();
 
-  cleaned = cleanOcrTypo(cleaned);
-  return cleaned;
+  // If schema indicates trailing metadata, pluck it dynamically
+  if (schema && schema.isDetected && schema.trailingMetadataCount > 0) {
+    const parts = cleaned.split(/\s+/);
+    if (parts.length > schema.trailingMetadataCount + 1) {
+      const trailing = parts.slice(-schema.trailingMetadataCount);
+      const isMetadataLike = trailing.every(t => /^[\d,\.\[\]\-]+|[A-Z]{1,3}\d*$|^\d+$/.test(t));
+      if (isMetadataLike) {
+        cleaned = parts.slice(0, parts.length - schema.trailingMetadataCount).join(' ');
+      }
+    }
+  }
+
+  return cleanOcrTypo(cleaned);
 }
 
 /**
@@ -78,8 +92,10 @@ export function extractLabExperiments(labLines) {
   let currentExpNumber = 0;
 
   // Matches "Exp 1", "Exp. No. 1", "Experiment 1", "Program 1", "1. Title", "1 Title", or standalone "1"
-  const EXP_START_REGEX = /^(?:Exp(?:eriment)?\.?\s*(?:No\.?)?\s*(\d+)|\bProgram\s*(\d+)|^(\d+)(?:\s*[:.\-–—]|\s+|$))/i;
-  const ACTION_START_REGEX = /^(?:Write\s+a\s+program|Implement\s+|Design\s+|Build\s+|Given\s+a\s+dataset|Installation\s+of|Introduction\s+to\s+Python|Machine\s+Learning\s+packages)\b/;
+  const EXP_START_REGEX = /^(?:Exp(?:eriment)?\.?\s*(?:No\.?)?\s*(\d+)|\bPrograms?\s*(\d+)|^(\d+)(?:\s*[:.\-–—]|\s+|$))/i;
+  const ACTION_START_REGEX = /^(?:Write\s+a\s+program|Implement(?:ation)?\s+|Design\s+|Build\s+|Given\s+a\s+dataset|Installation\s+of|Introduction\s+to\s+Python|Machine\s+Learning\s+packages|Programs?\s+for|Converting\s+|Divide\s+and\s+conquer|Greedy\s+Approach|Dynamic\s+Programming)\b/i;
+
+  const schema = detectTableSchema(labLines);
 
   const flushBuffer = () => {
     if (!currentBuffer) return;
@@ -88,7 +104,7 @@ export function extractLabExperiments(labLines) {
       return;
     }
 
-    const cleanTitle = cleanExperimentTitle(currentBuffer);
+    const cleanTitle = cleanExperimentTitle(currentBuffer, schema);
     const alphaCount = (cleanTitle.match(/[a-zA-Z]/g) || []).length;
 
     if (alphaCount >= 4 && !isTableHeaderLine(cleanTitle)) {

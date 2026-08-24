@@ -100,11 +100,30 @@ export default function ResourcesPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {resources.map((r) => {
-            const isFile = !!r.fileData;
-            const targetUrl = isFile ? r.fileData?.url : r.url;
-            const isPdf = r.fileData?.mimeType?.includes('pdf') || r.resourceType === 'Document' || r.fileData?.originalName?.endsWith('.pdf');
             const resId = r.id || r._id;
             const subjectLabel = r.customSubject || r.subject?.name || r.subject || 'General';
+            const attList = (r.attachments && r.attachments.length > 0)
+              ? r.attachments
+              : (r.fileData?.url || r.url)
+              ? [{
+                  id: r.fileData?.publicId || 'legacy',
+                  name: r.fileData?.originalName || r.title,
+                  url: r.fileData?.url || r.url,
+                  mimeType: r.fileData?.mimeType || 'application/pdf',
+                  type: r.resourceType || 'file',
+                  size: r.fileData?.size || 0
+                }]
+              : [];
+
+            const handleRemoveAttachment = async (attIdx) => {
+              const updatedAtts = attList.filter((_, idx) => idx !== attIdx);
+              try {
+                await apiClient.patch(`/resources/${resId}`, { attachments: updatedAtts });
+                qc.invalidateQueries({ queryKey: getGetResourcesQueryKey() });
+              } catch {
+                alert('Failed to remove attachment');
+              }
+            };
 
             return (
               <article key={resId} className="card-lift flex flex-col rounded-2xl border border-card-border bg-card p-5">
@@ -119,7 +138,7 @@ export default function ResourcesPage() {
                     <button
                       onClick={() => remove(r)}
                       className="rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                      title="Delete resource"
+                      title="Delete full resource"
                     >
                       <Trash2 size={13} />
                     </button>
@@ -127,21 +146,66 @@ export default function ResourcesPage() {
                 </div>
 
                 <h2 className="mt-4 font-display text-xl leading-tight">{r.title}</h2>
-                <p className="mt-2 line-clamp-2 min-h-10 text-sm leading-5 text-muted-foreground">{r.description || 'No description added.'}</p>
+                <p className="mt-2 line-clamp-2 min-h-6 text-sm leading-5 text-muted-foreground">{r.description || 'No description added.'}</p>
 
-                {isFile && r.fileData?.mimeType?.startsWith('image/') && (
-                  <div className="mt-4 overflow-hidden rounded-xl border border-border">
-                    <img src={r.fileData.url} alt={r.title} className="h-32 w-full object-cover" />
-                  </div>
-                )}
-                {isFile && (r.fileData?.mimeType?.startsWith('audio/') || r.resourceType === 'recording') && (
-                  <div className="mt-4 rounded-xl bg-secondary/30 p-2 border border-border">
-                    <audio controls src={r.fileData.url} className="h-8 w-full outline-none" />
-                  </div>
-                )}
-                {isFile && r.fileData?.mimeType?.startsWith('video/') && (
-                  <div className="mt-4 overflow-hidden rounded-xl border border-border">
-                    <video controls src={r.fileData.url} className="h-32 w-full" />
+                {/* Attachments List */}
+                {attList.length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Attachments ({attList.length})</span>
+                    <div className="space-y-1.5">
+                      {attList.map((att, attIdx) => {
+                        const isPdf = att.mimeType?.includes('pdf') || att.name?.endsWith('.pdf');
+                        const isImg = att.mimeType?.startsWith('image/') || /\.(jpg|jpeg|png|webp)$/i.test(att.url);
+                        const isAudio = att.mimeType?.startsWith('audio/') || att.type === 'recording' || /\.(mp3|wav|m4a|aac|ogg)$/i.test(att.url);
+
+                        return (
+                          <div key={att.id || attIdx} className="flex flex-col gap-1 rounded-xl border border-border/80 bg-secondary/20 p-2 text-xs">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-medium truncate flex-1">{att.name || att.originalName || 'Attachment'}</span>
+                              <div className="flex items-center gap-1 shrink-0">
+                                {att.url && (
+                                  <a
+                                    href={att.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="rounded p-1 text-accent hover:bg-accent/10"
+                                    title="Open attachment"
+                                  >
+                                    <ArrowUpRight size={13} />
+                                  </a>
+                                )}
+                                {att.url && (
+                                  <button
+                                    onClick={() => handleDownload(att.url, att.name || att.originalName)}
+                                    className="rounded p-1 text-muted-foreground hover:bg-muted"
+                                    title="Download"
+                                  >
+                                    <Download size={13} />
+                                  </button>
+                                )}
+                                {attList.length > 1 && (
+                                  <button
+                                    onClick={() => handleRemoveAttachment(attIdx)}
+                                    className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                                    title="Remove attachment"
+                                  >
+                                    <X size={13} />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            {isImg && (
+                              <div className="overflow-hidden rounded-lg border border-border">
+                                <img src={att.url} alt={att.name} className="h-24 w-full object-cover" />
+                              </div>
+                            )}
+                            {isAudio && (
+                              <audio controls src={att.url} className="h-7 w-full outline-none mt-1" />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
 
@@ -158,39 +222,8 @@ export default function ResourcesPage() {
                   {r.topic && <><span className="text-muted-foreground">·</span><span className="text-muted-foreground">{r.topic}</span></>}
                 </div>
 
-                <div className="mt-auto flex items-center justify-between border-t border-border pt-4 mt-5">
+                <div className="mt-auto flex items-center justify-between border-t border-border pt-3 mt-4">
                   <span className="font-mono text-[10px] text-muted-foreground">{r.rating ? `${r.rating}/5 rating` : fmtDate(r.createdAt || r.addedAt)}</span>
-                  
-                  <div className="flex items-center gap-2">
-                    {targetUrl && (
-                      <a
-                        href={targetUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="focus-ring inline-flex items-center gap-1 text-xs font-bold text-accent hover:underline"
-                      >
-                        {isPdf ? 'View' : isFile ? 'Open' : 'Link'} <ArrowUpRight size={13} />
-                      </a>
-                    )}
-                    {isFile && (
-                      <button
-                        onClick={() => handleDownload(targetUrl, r.fileData?.originalName || r.title)}
-                        className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                        title="Download file"
-                      >
-                        <Download size={13} />
-                      </button>
-                    )}
-                    {targetUrl && (
-                      <button
-                        onClick={() => handleShare(targetUrl, resId)}
-                        className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                        title="Share link"
-                      >
-                        {copiedId === resId ? <Check size={13} className="text-green-500" /> : <Share2 size={13} />}
-                      </button>
-                    )}
-                  </div>
                 </div>
               </article>
             );

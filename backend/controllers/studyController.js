@@ -38,14 +38,40 @@ const serialize = (doc) => {
       : null) ||
     value.subjectId ||
     null;
+
+  let attachments = value.attachments || [];
+  if (attachments.length === 0 && (value.fileData?.url || value.url)) {
+    attachments = [{
+      _id: value.fileData?.publicId || value._id || 'legacy_1',
+      id: value.fileData?.publicId || value._id || 'legacy_1',
+      publicId: value.fileData?.publicId || '',
+      name: value.fileData?.originalName || value.title || 'Attachment',
+      originalName: value.fileData?.originalName || value.title || 'Attachment',
+      url: value.fileData?.url || value.url,
+      mimeType: value.fileData?.mimeType || 'application/pdf',
+      type: value.resourceType || 'file',
+      size: value.fileData?.size || 0,
+      createdAt: value.createdAt || new Date(),
+    }];
+  } else if (attachments.length > 0) {
+    attachments = attachments.map((att, idx) => ({
+      ...att,
+      id: att._id?.toString?.() || att.id || att.publicId || `att_${idx}`,
+      name: att.name || att.originalName || 'Attachment',
+    }));
+  }
+
+  const taskStatus = value.status === 'in-progress' ? 'in_progress' : (value.status || 'pending');
+
   return {
     ...value,
     id: id(doc),
     _id: id(doc),
+    attachments,
     subjectId: subjId,
     subject: subjectName(value.subject, value.customSubject),
     customSubject: value.customSubject || "",
-    duration: value.durationMinutes ?? value.estimatedDuration ?? 0,
+    status: taskStatus,
     addedAt: value.createdAt,
     updatedAt: value.updatedAt,
   };
@@ -82,8 +108,17 @@ export async function updateSubject(req, res) {
     return res
       .status(404)
       .json({ success: false, message: "Subject not found" });
+
+  const clearingSyllabus = req.body.syllabusFile === null || (req.body.syllabusFile && req.body.syllabusFile.url === '');
+
   Object.assign(item, req.body);
   await item.save();
+
+  if (clearingSyllabus) {
+    await Topic.deleteMany({ subject: item._id });
+    await Unit.deleteMany({ subject: item._id });
+  }
+
   res.json({ success: true, data: serialize(item) });
 }
 export async function deleteSubject(req, res) {
@@ -307,26 +342,72 @@ export async function createTask(req, res) {
         success: false,
         message: "Title, due date, and subject are required",
       });
+
+  let scheduledStartAt = req.body.scheduledStartAt ? new Date(req.body.scheduledStartAt) : null;
+  if (!scheduledStartAt && req.body.dueDate && req.body.dueTime) {
+    try {
+      const [hours, minutes] = req.body.dueTime.split(':').map(Number);
+      const d = new Date(req.body.dueDate);
+      if (!isNaN(hours) && !isNaN(minutes) && !isNaN(d.getTime())) {
+        d.setHours(hours, minutes, 0, 0);
+        scheduledStartAt = d;
+      }
+    } catch (_) {}
+  }
+
+  const initialStatus = req.body.status === 'in-progress' ? 'in_progress' : (req.body.status || 'pending');
+
   const item = await Task.create({
     ...req.body,
+    status: initialStatus,
+    scheduledStartAt,
     subject: req.body.subjectId,
-    estimatedDuration: req.body.duration,
     user: req.user._id,
   });
   await item.populate("subject", "name");
   res.status(201).json({ success: true, data: serialize(item) });
 }
+
 export async function updateTask(req, res) {
   const item = await owned(Task, req.user._id, req.params.id);
   if (!item)
     return res.status(404).json({ success: false, message: "Task not found" });
+
+  const prevStatus = item.status === 'in-progress' ? 'in_progress' : (item.status || 'pending');
   Object.assign(item, req.body);
+
+  if (req.body.status) {
+    const targetStatus = req.body.status === 'in-progress' ? 'in_progress' : req.body.status;
+    item.status = targetStatus;
+
+    if (targetStatus === 'in_progress' && prevStatus !== 'in_progress') {
+      const now = new Date();
+      if (!item.startedAt) item.startedAt = now;
+      item.lastStartedAt = now;
+    } else if (targetStatus === 'paused' && prevStatus === 'in_progress') {
+      const now = new Date();
+      item.stoppedAt = now;
+    } else if (targetStatus === 'completed') {
+      const now = new Date();
+      item.completedAt = now;
+    } else if (targetStatus === 'pending') {
+      item.completedAt = null;
+    }
+  }
+
   if (req.body.subjectId) item.subject = req.body.subjectId;
-  if (req.body.duration) item.estimatedDuration = req.body.duration;
-  if (req.body.status === "completed" && !item.completedAt)
-    item.completedAt = new Date();
-  if (req.body.status && req.body.status !== "completed")
-    item.completedAt = null;
+
+  if (!item.scheduledStartAt && item.dueDate && item.dueTime) {
+    try {
+      const [hours, minutes] = item.dueTime.split(':').map(Number);
+      const d = new Date(item.dueDate);
+      if (!isNaN(hours) && !isNaN(minutes) && !isNaN(d.getTime())) {
+        d.setHours(hours, minutes, 0, 0);
+        item.scheduledStartAt = d;
+      }
+    } catch (_) {}
+  }
+
   await item.save();
   await item.populate("subject", "name");
   res.json({ success: true, data: serialize(item) });
