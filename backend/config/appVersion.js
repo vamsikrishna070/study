@@ -1,4 +1,4 @@
-export const appVersionConfig = {
+const appVersionConfig = {
   latestVersion: '1.0.5',
   latestVersionCode: 6,
 
@@ -6,24 +6,29 @@ export const appVersionConfig = {
 
   downloadUrl:
     process.env.APP_DOWNLOAD_URL ||
-    'https://github.com/vamsikrishna070/study/releases/download/v1.0.3/studyarena-1.0.4.apk',
-    
+    'https://github.com/vamsikrishna070/study/releases/download/v1.0.5/studyarena-1.0.5.apk',
+
   releaseNotes: [
-    'Improved Tasks with Start, Stop, and End controls.',
-    'Added "Complete by" deadlines for Tasks.',
-    'Added automatic 1-hour-before Task notifications.',
-    'Added optional 24-hour Task reminders.',
-    'Task notifications remain separate from the existing Reminder/Alarm system.',
-    'Improved Resources with multiple PDF, image, and audio attachments.',
-    'Added individual attachment deletion for Resources.',
-    'Added Resource editing support.',
-    'Improved syllabus extraction for table-based university syllabi.',
-    'Added semantic table-column detection for better metadata separation.',
-    'Improved Theory and Laboratory extraction.',
-    'Preserved legitimate numbers in syllabus topics such as `0/1`, `IPv4`, `3-SAT`, etc.',
-    'Improved OCR/table extraction handling.',
+    'Added Start, Stop, and End controls for Tasks.',
+    'Added Complete by deadlines for Tasks.',
+    'Added automatic 1-hour-before deadline notifications.',
+    'Added optional 24-hour recurring Task reminders.',
+    'Kept Task notifications separate from the existing Reminder and Alarm systems.',
+    'Added multiple PDF, image, and audio attachments to Resources.',
+    'Added individual attachment deletion.',
+    'Added Resource editing.',
+    'Added proper link handling for web URLs such as Instagram, YouTube, and GitHub.',
+    'Improved PDF, image, and audio attachment opening based on file type.',
+    'Improved universal syllabus extraction for table-based university syllabi.',
+    'Added semantic table-column detection to separate syllabus content from metadata.',
+    'Improved Theory and Laboratory syllabus extraction.',
+    'Preserved legitimate numbers in syllabus topics such as 0/1, IPv4, and 3-SAT.',
+    'Improved OCR and hybrid/scanned PDF handling.',
     'Fixed mobile syllabus extraction and rendering issues.',
-    'Improved Web/Mobile consistency for Resources and Tasks.',
+    'Added whole-app App Lock with biometric authentication and PIN fallback.',
+    'Added configurable App Lock timeout options.',
+    'Improved Web and Mobile consistency for Tasks and Resources.',
+    'Fixed various Mobile UI and stability issues.',
   ],
 
   forceUpdate: false,
