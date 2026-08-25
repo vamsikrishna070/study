@@ -13,6 +13,7 @@ import {
   ScrollView,
   Alert,
   Image,
+  Linking,
 } from 'react-native';
 import {
   Library,
@@ -198,6 +199,7 @@ const ResourcesScreen = ({ route, navigation }) => {
 
   // Modal State
   const [modalVisible, setModalVisible] = useState(paramOpenCreate);
+  const [editingId, setEditingId] = useState(null);
   const [resourceType, setResourceType] = useState('link');
   const [title, setTitle] = useState('');
   const [url, setUrl] = useState('');
@@ -213,6 +215,51 @@ const ResourcesScreen = ({ route, navigation }) => {
 
   const [uploadingFile, setUploadingFile] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  const closeAndResetModal = () => {
+    setModalVisible(false);
+    setEditingId(null);
+    setTitle('');
+    setUrl('');
+    setTopic('');
+    setDescription('');
+    setRating(0);
+    setWatched('false');
+    setTagsInput('');
+    setFileData(null);
+    setAttachments([]);
+    setRecordingDuration(0);
+  };
+
+  const handleEdit = (item) => {
+    setEditingId(item._id || item.id);
+    setTitle(item.title || '');
+    setResourceType(item.resourceType || 'file');
+    setUrl(item.url || item.fileData?.url || '');
+    setSubjectId(item.subject?._id || item.subject?.id || item.subject || '');
+    setTopic(item.topic || '');
+    setDescription(item.description || '');
+    setRating(item.rating || 0);
+    setWatched(item.watched ? 'true' : 'false');
+    setTagsInput((item.tags || []).join(', '));
+    
+    // Make sure attachments from payload are populated
+    let atts = item.attachments || [];
+    if (atts.length === 0 && item.fileData && item.resourceType !== 'link' && item.resourceType !== 'youtube') {
+      atts = [{
+        id: item.fileData.publicId || 'legacy',
+        name: item.fileData.originalName || item.title,
+        url: item.fileData.url,
+        mimeType: item.fileData.mimeType,
+        type: item.resourceType || 'file',
+        size: item.fileData.size
+      }];
+    }
+    setAttachments(atts);
+    setFileData(null);
+    setRecordingDuration(0);
+    setModalVisible(true);
+  };
 
   // Voice recording modal
   const [voiceModalVisible, setVoiceModalVisible] = useState(false);
@@ -361,23 +408,18 @@ const ResourcesScreen = ({ route, navigation }) => {
           : undefined,
       };
 
-      const res = await createResource(payload);
-      setModalVisible(false);
-      setTitle('');
-      setUrl('');
-      setTopic('');
-      setDescription('');
-      setRating(0);
-      setWatched('false');
-      setTagsInput('');
-      setFileData(null);
-      setAttachments([]);
-      setRecordingDuration(0);
-
-      if (res.data) {
-        setData((prev) => [res.data, ...prev]);
-      } else {
+      if (editingId) {
+        await updateResource(editingId, payload);
+        closeAndResetModal();
         await loadData();
+      } else {
+        const res = await createResource(payload);
+        closeAndResetModal();
+        if (res.data) {
+          setData((prev) => [res.data, ...prev]);
+        } else {
+          await loadData();
+        }
       }
     } catch (e) {
       showError('Error', e?.response?.data?.message || 'Failed to save resource.');
@@ -485,7 +527,8 @@ const ResourcesScreen = ({ route, navigation }) => {
         }
         renderItem={({ item }) => {
           const resId = item._id || item.id;
-          const attList = (item.attachments && item.attachments.length > 0)
+          const isLink = item.resourceType === 'link' || item.resourceType === 'youtube';
+          const attList = isLink ? [] : (item.attachments && item.attachments.length > 0)
             ? item.attachments
             : (item.fileData?.url || item.url)
             ? [{
@@ -636,6 +679,25 @@ const ResourcesScreen = ({ route, navigation }) => {
                 </View>
               )}
 
+              {/* Link Block */}
+              {isLink && (item.url || item.fileData?.url) && (
+                <View style={{ marginTop: 10, padding: 12, backgroundColor: colors.muted + '20', borderRadius: radii.md, borderWidth: 1, borderColor: colors.cardBorder }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                    <ExternalLink size={16} color={colors.accent} style={{ marginRight: 6 }} />
+                    <Text style={{ fontFamily: typography.sans.semiBold, fontSize: 14, color: colors.foreground }}>Link</Text>
+                  </View>
+                  <Text style={{ fontFamily: typography.sans.regular, fontSize: 13, color: colors.primary, marginBottom: 8 }} numberOfLines={2}>
+                    {item.url || item.fileData?.url}
+                  </Text>
+                  <TouchableOpacity
+                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, backgroundColor: colors.accent + '15', borderRadius: radii.sm }}
+                    onPress={() => Linking.openURL(item.url || item.fileData?.url).catch(() => viewDocument(item.url || item.fileData?.url, item.title))}
+                  >
+                    <Text style={{ fontFamily: typography.sans.medium, fontSize: 13, color: colors.accent }}>Open Link</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
               {/* Tags */}
               {item.tags?.length > 0 && (
                 <View style={styles.tagsRow}>
@@ -648,13 +710,22 @@ const ResourcesScreen = ({ route, navigation }) => {
               )}
 
               <View style={styles.cardFooter}>
-                <Button
-                  variant="danger"
-                  onPress={() => handleDelete(resId)}
-                  style={[styles.deleteBtn, { marginLeft: 'auto' }]}
-                >
-                  Delete Resource
-                </Button>
+                <View style={{ flexDirection: 'row', gap: 12, marginLeft: 'auto' }}>
+                  <Button
+                    variant="quiet"
+                    onPress={() => handleEdit(item)}
+                    style={[styles.deleteBtn, { backgroundColor: 'transparent' }]}
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    variant="danger"
+                    onPress={() => handleDelete(resId)}
+                    style={styles.deleteBtn}
+                  >
+                    Delete Resource
+                  </Button>
+                </View>
               </View>
             </View>
           );
@@ -662,7 +733,7 @@ const ResourcesScreen = ({ route, navigation }) => {
       />
 
       {/* Save Resource Modal */}
-      <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={() => setModalVisible(false)}>
+      <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={closeAndResetModal}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.modalContainer}
@@ -670,8 +741,8 @@ const ResourcesScreen = ({ route, navigation }) => {
           <View style={styles.modalBackdrop} />
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Save a Resource</Text>
-              <Button variant="quiet" style={styles.closeBtn} onPress={() => setModalVisible(false)}>
+              <Text style={styles.modalTitle}>{editingId ? 'Edit Resource' : 'Save a Resource'}</Text>
+              <Button variant="quiet" style={styles.closeBtn} onPress={closeAndResetModal}>
                 <X size={20} color={colors.foreground} />
               </Button>
             </View>
@@ -803,7 +874,7 @@ const ResourcesScreen = ({ route, navigation }) => {
                 { paddingBottom: Math.max(insets.bottom, spacing.md) },
               ]}
             >
-              <Button variant="quiet" style={styles.modalBtn} onPress={() => setModalVisible(false)}>
+              <Button variant="quiet" style={styles.modalBtn} onPress={closeAndResetModal}>
                 Cancel
               </Button>
               <Button
