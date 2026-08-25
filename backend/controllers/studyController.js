@@ -478,6 +478,15 @@ export async function createResource(req, res) {
     return res
       .status(400)
       .json({ success: false, message: "Title is required" });
+
+  // Normalize attachments — handle JSON string from multipart/form-data
+  if (req.body.attachments && typeof req.body.attachments === 'string') {
+    try { req.body.attachments = JSON.parse(req.body.attachments); } catch { req.body.attachments = []; }
+  }
+  if (req.body.attachments && !Array.isArray(req.body.attachments)) {
+    req.body.attachments = [];
+  }
+
   const item = await Resource.create({
     ...req.body,
     subject: req.body.subjectId || null,
@@ -492,6 +501,15 @@ export async function updateResource(req, res) {
     return res
       .status(404)
       .json({ success: false, message: "Resource not found" });
+
+  // Normalize attachments — handle JSON string from multipart/form-data
+  if (req.body.attachments && typeof req.body.attachments === 'string') {
+    try { req.body.attachments = JSON.parse(req.body.attachments); } catch { req.body.attachments = []; }
+  }
+  if (req.body.attachments && !Array.isArray(req.body.attachments)) {
+    req.body.attachments = [];
+  }
+
   Object.assign(item, req.body);
   if (req.body.subjectId) item.subject = req.body.subjectId;
   await item.save();

@@ -22,7 +22,7 @@ const resourceSchema = new mongoose.Schema({
     name: String,
     url: String,
     mimeType: String,
-    type: String,
+    type: { type: String },
     size: Number,
     thumbnailUrl: String,
     duration: Number,
