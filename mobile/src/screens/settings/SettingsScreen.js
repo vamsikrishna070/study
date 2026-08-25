@@ -1,6 +1,6 @@
 import React, { useContext, useState } from 'react';
 import { View, StyleSheet, ScrollView, Text, TouchableOpacity, Switch, Alert, Image, Modal } from 'react-native';
-import { Camera, Moon, Sun, Trophy, ToggleLeft, ToggleRight, Bell, Smartphone, RefreshCw, Lock, ChevronRight, Clock, KeyRound, Circle, CircleDot } from 'lucide-react-native';
+import { Camera, Moon, Sun, Trophy, ToggleLeft, ToggleRight, Bell, Smartphone, RefreshCw, Lock, ChevronRight, Clock, KeyRound, Circle, CircleDot, Fingerprint } from 'lucide-react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { AuthContext } from '../../context/AuthContext';
 import { AppUpdateContext } from '../../context/AppUpdateContext';
@@ -21,7 +21,18 @@ const SettingsScreen = ({ navigation }) => {
   const styles = useStyles(createStyles);
   const { showSuccess, showError, showDialog } = useAppDialog();
   const { appVersion, isChecking: isCheckingUpdate, checkUpdate } = useContext(AppUpdateContext);
-  const { isLockEnabled, lockTimeout, enableLock, disableLock, updateTimeout, verifyPin, biometricAvailable } = useAppLock();
+  const {
+    isLockEnabled,
+    lockTimeout,
+    enableLock,
+    disableLock,
+    updateTimeout,
+    verifyPin,
+    biometricEnabled,
+    biometricAvailable,
+    biometricStatus,
+    updateBiometricEnabled,
+  } = useAppLock();
 
   const { user, logout, setUser } = useContext(AuthContext);
   const [form, setForm] = useState({
@@ -45,7 +56,7 @@ const SettingsScreen = ({ navigation }) => {
 
   const handleAuthAction = async (action) => {
     setLockAction(action);
-    if (biometricAvailable) {
+    if (biometricAvailable && biometricEnabled) {
       try {
         const result = await LocalAuthentication.authenticateAsync({
           promptMessage: 'Verify Identity',
@@ -66,7 +77,7 @@ const SettingsScreen = ({ navigation }) => {
       }
     }
 
-    // Fallback to PIN if biometric cancelled/failed or not available
+    // Fallback to PIN if biometric cancelled/failed or not enabled
     setShowPinConfirm(true);
   };
 
@@ -275,6 +286,47 @@ const SettingsScreen = ({ navigation }) => {
 
           {isLockEnabled && (
             <>
+              <View style={[styles.toggleRow, !biometricAvailable && { opacity: 0.6 }]}>
+                <View style={styles.toggleRowLeft}>
+                  <View style={styles.iconBox}>
+                    <Fingerprint size={20} color={colors.foreground} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.toggleTitle}>Biometric Unlock</Text>
+                    <Text style={styles.toggleDetail}>
+                      {!biometricStatus?.hasHardware
+                        ? 'Biometric hardware unavailable'
+                        : !biometricStatus?.isEnrolled
+                        ? 'No biometric is enrolled on this device'
+                        : 'Use fingerprint or biometric authentication'}
+                    </Text>
+                  </View>
+                </View>
+                <Switch
+                  value={biometricEnabled && biometricAvailable}
+                  disabled={!biometricAvailable}
+                  onValueChange={async (val) => {
+                    if (val) {
+                      try {
+                        const result = await LocalAuthentication.authenticateAsync({
+                          promptMessage: 'Confirm Biometrics for StudyArena',
+                          cancelLabel: 'Cancel',
+                          disableDeviceFallback: true,
+                        });
+                        if (result.success) {
+                          await updateBiometricEnabled(true);
+                        }
+                      } catch (e) {
+                        // User cancelled or failed
+                      }
+                    } else {
+                      await updateBiometricEnabled(false);
+                    }
+                  }}
+                  color={colors.accent}
+                />
+              </View>
+
               <TouchableOpacity
                 style={styles.toggleRow}
                 activeOpacity={0.7}

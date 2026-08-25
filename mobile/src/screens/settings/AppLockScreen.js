@@ -8,7 +8,7 @@ import { useAppTheme } from '../../theme/theme';
 import { Button } from '../../components/ui/Button';
 
 export function AppLockScreen() {
-  const { isLocked, isLockEnabled, biometricAvailable, biometricStatus, unlock, verifyPin } = useAppLock();
+  const { isLocked, isLockEnabled, biometricEnabled, biometricAvailable, biometricStatus, unlock, verifyPin } = useAppLock();
   const { colors, typography, radii, spacing } = useAppTheme();
   const insets = useSafeAreaInsets();
 
@@ -16,21 +16,26 @@ export function AppLockScreen() {
   const [enteredPin, setEnteredPin] = useState('');
   const [errorText, setErrorText] = useState('');
 
-  // Prompt biometric on mount if locked and available
+  // Prompt biometric on mount ONLY if locked, enabled, biometricEnabled preference is true, and hardware/enrollment available
   useEffect(() => {
     if (isLocked && isLockEnabled) {
-      setPinMode(false);
       setEnteredPin('');
       setErrorText('');
-      if (biometricAvailable) {
+      if (biometricEnabled && biometricAvailable) {
+        setPinMode(false);
         promptBiometric();
       } else {
         setPinMode(true);
       }
     }
-  }, [isLocked, isLockEnabled, biometricAvailable]);
+  }, [isLocked, isLockEnabled, biometricEnabled, biometricAvailable]);
 
   const promptBiometric = async () => {
+    if (!biometricEnabled || !biometricAvailable) {
+      setPinMode(true);
+      return;
+    }
+
     try {
       const result = await LocalAuthentication.authenticateAsync({
         promptMessage: 'Unlock StudyArena',
@@ -41,7 +46,7 @@ export function AppLockScreen() {
       if (result.success) {
         unlock();
       } else {
-        // User cancelled or failed too many times
+        // User cancelled or failed
         setPinMode(true);
       }
     } catch (e) {
@@ -154,17 +159,20 @@ export function AppLockScreen() {
           {pinMode ? (
             <View style={{ width: '100%', alignItems: 'center' }}>
               {renderKeypad()}
-              {biometricAvailable && (
+              {biometricEnabled && biometricAvailable && (
                 <Button
                   variant="ghost"
-                  onPress={() => setPinMode(false)}
+                  onPress={() => {
+                    setPinMode(false);
+                    promptBiometric();
+                  }}
                   style={{ marginTop: 24 }}
                 >
                   Use Biometrics
                 </Button>
               )}
             </View>
-          ) : biometricAvailable ? (
+          ) : biometricEnabled && biometricAvailable ? (
             <View style={{ width: '100%', alignItems: 'center', marginTop: 32 }}>
               <View style={[styles.fingerprintCircle, { backgroundColor: colors.primary + '15' }]}>
                 <Fingerprint size={56} color={colors.primary} />
@@ -186,11 +194,6 @@ export function AppLockScreen() {
             </View>
           ) : (
             <View style={{ width: '100%', alignItems: 'center', marginTop: 24 }}>
-              {biometricStatus?.hasHardware && !biometricStatus?.isEnrolled && (
-                <Text style={[styles.biometricNotice, { color: colors.mutedForeground, fontFamily: typography.sans.regular }]}>
-                  No biometric is enrolled on this device.
-                </Text>
-              )}
               <Button
                 variant="primary"
                 onPress={() => setPinMode(true)}

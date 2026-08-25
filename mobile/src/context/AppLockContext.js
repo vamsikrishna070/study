@@ -7,6 +7,7 @@ const AppLockContext = createContext(null);
 
 const PIN_STORE_KEY = 'studyarena.applock.pin';
 const LOCK_TIMEOUT_KEY = 'studyarena.applock.timeout';
+const BIOMETRIC_STORE_KEY = 'studyarena.applock.biometricEnabled';
 
 export const useAppLock = () => useContext(AppLockContext);
 
@@ -14,6 +15,7 @@ const AppLockProvider = ({ children }) => {
   const [isLockEnabled, setIsLockEnabled] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
   const [lockTimeout, setLockTimeout] = useState(0); // in ms, 0 means immediately
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricStatus, setBiometricStatus] = useState({ hasHardware: false, isEnrolled: false, supportedTypes: [] });
 
@@ -27,6 +29,7 @@ const AppLockProvider = ({ children }) => {
       try {
         const storedPin = await SecureStore.getItemAsync(PIN_STORE_KEY);
         const storedTimeout = await SecureStore.getItemAsync(LOCK_TIMEOUT_KEY);
+        const storedBiometric = await SecureStore.getItemAsync(BIOMETRIC_STORE_KEY);
 
         const hasHardware = await LocalAuthentication.hasHardwareAsync();
         const isEnrolled = await LocalAuthentication.isEnrolledAsync();
@@ -35,9 +38,14 @@ const AppLockProvider = ({ children }) => {
         console.log('[AppLock] biometric hardware:', hasHardware);
         console.log('[AppLock] biometric enrolled:', isEnrolled);
         console.log('[AppLock] supported types:', supportedTypes);
+        console.log('[AppLock] stored biometricEnabled:', storedBiometric);
 
         setBiometricStatus({ hasHardware, isEnrolled, supportedTypes });
         setBiometricAvailable(hasHardware && isEnrolled);
+
+        // Explicit user preference: default to false if missing or not 'true'
+        const isBioPrefEnabled = storedBiometric === 'true';
+        setBiometricEnabled(isBioPrefEnabled);
 
         if (storedPin) {
           setIsLockEnabled(true);
@@ -51,6 +59,7 @@ const AppLockProvider = ({ children }) => {
         console.error('[AppLock] SecureStore initialization failed:', err);
         setIsLockEnabled(false);
         setIsLocked(false);
+        setBiometricEnabled(false);
         setLockTimeout(0);
       } finally {
         isLoaded.current = true;
@@ -109,8 +118,10 @@ const AppLockProvider = ({ children }) => {
     try {
       await SecureStore.deleteItemAsync(PIN_STORE_KEY);
       await SecureStore.deleteItemAsync(LOCK_TIMEOUT_KEY);
+      await SecureStore.deleteItemAsync(BIOMETRIC_STORE_KEY);
       setIsLockEnabled(false);
       setIsLocked(false);
+      setBiometricEnabled(false);
       return true;
     } catch (e) {
       console.warn('Error disabling lock:', e);
@@ -124,6 +135,18 @@ const AppLockProvider = ({ children }) => {
       setLockTimeout(timeoutMs);
       return true;
     } catch (e) {
+      return false;
+    }
+  };
+
+  const updateBiometricEnabled = async (enabled) => {
+    try {
+      const valStr = enabled ? 'true' : 'false';
+      await SecureStore.setItemAsync(BIOMETRIC_STORE_KEY, valStr);
+      setBiometricEnabled(Boolean(enabled));
+      return true;
+    } catch (e) {
+      console.warn('Error updating biometric preference:', e);
       return false;
     }
   };
@@ -143,12 +166,14 @@ const AppLockProvider = ({ children }) => {
         isLockEnabled,
         isLocked,
         lockTimeout,
+        biometricEnabled,
         biometricAvailable,
         biometricStatus,
         unlock,
         enableLock,
         disableLock,
         updateTimeout,
+        updateBiometricEnabled,
         verifyPin,
       }}
     >
