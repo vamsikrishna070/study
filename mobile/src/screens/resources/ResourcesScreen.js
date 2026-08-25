@@ -32,6 +32,8 @@ import {
   RotateCcw,
 } from 'lucide-react-native';
 import { viewDocument } from '../../utils/documentViewer';
+import { getAttachmentKind, getKindLabel, getOpenLabel, openAttachment } from '../../utils/attachmentHelper';
+import { formatFileSize } from '../../components/ui/AttachmentCard';
 import { globalAudioPlayer } from '../../services/audioPlayerService';
 import { getResources, createResource, deleteResource, updateResource } from '../../api/resources';
 import { getSubjects } from '../../api/subjects';
@@ -607,72 +609,117 @@ const ResourcesScreen = ({ route, navigation }) => {
 
               {/* Attachments List */}
               {attList.length > 0 && (
-                <View style={{ marginTop: 10, gap: 6 }}>
+                <View style={{ marginTop: 10, gap: 8 }}>
                   <Text style={{ fontFamily: typography.mono.bold, fontSize: 10, color: colors.mutedForeground, letterSpacing: 0.8 }}>
                     ATTACHMENTS ({attList.length})
                   </Text>
                   {attList.map((att, attIdx) => {
                     const attUrl = att.url;
-                    const isImg = att.mimeType?.startsWith('image/') || /\.(jpg|jpeg|png|webp)$/i.test(attUrl || '');
-                    const isAudio =
-                      att.type === 'recording' ||
-                      att.mimeType?.startsWith('audio/') ||
-                      /\.(mp3|wav|m4a|aac|ogg)$/i.test(attUrl || '');
+                    const kind = getAttachmentKind(att);
+                    const kindLabel = getKindLabel(kind);
+                    const openLabel = getOpenLabel(kind);
+                    const isAudioKind = kind === 'audio';
+                    const isImageKind = kind === 'image';
+                    const sizeText = formatFileSize(att.size);
+
+                    // Pick icon based on kind
+                    const KindIcon = kind === 'pdf' ? FileText
+                      : kind === 'image' ? ImageIcon
+                      : kind === 'audio' ? Music
+                      : kind === 'video' ? Video
+                      : FileText;
+                    const iconColor = kind === 'pdf' ? colors.accent
+                      : kind === 'image' ? '#b58a4a'
+                      : kind === 'audio' ? '#8d6b8d'
+                      : kind === 'video' ? '#4b8f8b'
+                      : colors.mutedForeground;
+
+                    const handleOpen = async () => {
+                      if (!attUrl) return;
+                      try {
+                        await openAttachment(att);
+                      } catch (e) {
+                        showError('Could not open', e?.message || 'Unable to open this file.');
+                      }
+                    };
 
                     return (
                       <View
-                        key={att.id || attIdx}
+                        key={att.id || att._id || attIdx}
                         style={{
                           backgroundColor: colors.background,
                           borderRadius: radii.md,
-                          padding: 8,
+                          padding: 12,
                           borderWidth: 1,
                           borderColor: colors.cardBorder,
                         }}
                       >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <TouchableOpacity
-                            style={{ flex: 1, flexDirection: 'row', alignItems: 'center', marginRight: 6 }}
-                            onPress={() => attUrl && viewDocument(attUrl, att.name || 'Attachment')}
-                            activeOpacity={0.7}
-                          >
-                            <FileText size={14} color={colors.accent} style={{ marginRight: 6 }} />
-                            <Text style={{ fontFamily: typography.sans.medium, fontSize: 13, color: colors.foreground, flex: 1 }} numberOfLines={1}>
+                        {/* File info row */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <View style={{
+                            width: 34, height: 34, borderRadius: radii.sm,
+                            backgroundColor: `${iconColor}18`,
+                            alignItems: 'center', justifyContent: 'center', marginRight: 10,
+                          }}>
+                            <KindIcon size={18} color={iconColor} />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontFamily: typography.sans.medium, fontSize: 13, color: colors.foreground }} numberOfLines={1}>
                               {att.name || att.originalName || 'Attachment'}
                             </Text>
-                          </TouchableOpacity>
-
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                            {attUrl && (
-                              <TouchableOpacity
-                                onPress={() => viewDocument(attUrl, att.name || 'Attachment')}
-                                style={{ padding: 4 }}
-                              >
-                                <ExternalLink size={14} color={colors.accent} />
-                              </TouchableOpacity>
-                            )}
-                            <TouchableOpacity
-                              onPress={() => handleRemoveSingleAttachment(attIdx)}
-                              style={{ padding: 4 }}
-                            >
-                              <X size={14} color={colors.destructive} />
-                            </TouchableOpacity>
+                            <Text style={{ fontFamily: typography.mono.regular, fontSize: 11, color: colors.mutedForeground, marginTop: 1 }}>
+                              {kindLabel}{sizeText ? ` • ${sizeText}` : ''}
+                            </Text>
                           </View>
                         </View>
 
                         {/* Image Preview */}
-                        {isImg && attUrl && (
+                        {isImageKind && attUrl && (
                           <Image
                             source={{ uri: attUrl }}
-                            style={{ height: 100, borderRadius: radii.sm, marginTop: 6 }}
+                            style={{ height: 100, borderRadius: radii.sm, marginTop: 8 }}
                             resizeMode="cover"
                           />
                         )}
 
                         {/* Audio Bar */}
-                        {isAudio && attUrl && (
+                        {isAudioKind && attUrl && (
                           <ResourceAudioBar url={attUrl} title={att.name || item.title} />
                         )}
+
+                        {/* Action buttons row */}
+                        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginTop: 10, gap: 10 }}>
+                          {!isAudioKind && attUrl && (
+                            <TouchableOpacity
+                              onPress={handleOpen}
+                              activeOpacity={0.7}
+                              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                              style={{
+                                flexDirection: 'row', alignItems: 'center',
+                                paddingVertical: 6, paddingHorizontal: 14,
+                                backgroundColor: `${colors.accent}15`,
+                                borderRadius: radii.sm, borderWidth: 1, borderColor: `${colors.accent}30`,
+                              }}
+                            >
+                              <ExternalLink size={14} color={colors.accent} style={{ marginRight: 5 }} />
+                              <Text style={{ fontFamily: typography.sans.semiBold, fontSize: 12, color: colors.accent }}>{openLabel}</Text>
+                            </TouchableOpacity>
+                          )}
+                          <TouchableOpacity
+                            onPress={() => handleRemoveSingleAttachment(attIdx)}
+                            activeOpacity={0.7}
+                            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                            style={{
+                              flexDirection: 'row', alignItems: 'center',
+                              paddingVertical: 6, paddingHorizontal: 14,
+                              backgroundColor: `${colors.destructive}12`,
+                              borderRadius: radii.sm, borderWidth: 1, borderColor: `${colors.destructive}25`,
+                            }}
+                          >
+                            <X size={14} color={colors.destructive} style={{ marginRight: 5 }} />
+                            <Text style={{ fontFamily: typography.sans.semiBold, fontSize: 12, color: colors.destructive }}>Delete</Text>
+                          </TouchableOpacity>
+                        </View>
                       </View>
                     );
                   })}

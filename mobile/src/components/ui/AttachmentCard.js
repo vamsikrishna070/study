@@ -13,6 +13,7 @@ import {
   RotateCcw,
 } from 'lucide-react-native';
 import { viewDocument } from '../../utils/documentViewer';
+import { getAttachmentKind, openAttachment } from '../../utils/attachmentHelper';
 import { globalAudioPlayer } from '../../services/audioPlayerService';
 import { useAppTheme, useStyles } from '../../theme/theme';
 
@@ -62,41 +63,17 @@ export function AttachmentCard({
   const size = attachment.size || attachment.fileData?.size || 0;
   const duration = attachment.duration || attachment.fileData?.duration || 0;
 
-  const isImage =
-    rawMimeType.startsWith('image/') ||
-    rawType === 'image' ||
-    /\.(jpg|jpeg|png|webp|gif)$/i.test(rawUrl) ||
-    /\.(jpg|jpeg|png|webp|gif)$/i.test(originalName);
-
-  const isAudio =
-    rawMimeType.startsWith('audio/') ||
-    rawType === 'audio' ||
-    rawType === 'recording' ||
-    /\.(mp3|wav|m4a|aac|ogg)$/i.test(rawUrl) ||
-    /\.(mp3|wav|m4a|aac|ogg)$/i.test(originalName);
-
-  const isVideo =
-    rawMimeType.startsWith('video/') ||
-    rawType === 'video' ||
-    /\.(mp4|mov|avi|mkv)$/i.test(rawUrl) ||
-    /\.(mp4|mov|avi|mkv)$/i.test(originalName);
-
-  const isYouTube =
-    rawType === 'youtube' ||
-    /youtube\.com|youtu\.be/i.test(rawUrl);
-
-  const isPdf =
-    rawMimeType.includes('pdf') ||
-    /\.pdf$/i.test(rawUrl) ||
-    /\.pdf$/i.test(originalName);
+  const kind = getAttachmentKind(attachment);
+  const isImage = kind === 'image';
+  const isAudio = kind === 'audio';
+  const isVideo = kind === 'video';
+  const isPdf = kind === 'pdf';
+  const isYouTube = kind === 'link' && (/youtube\.com|youtu\.be/i.test(rawUrl) || rawType === 'youtube');
 
   // Handle Play/Pause/Resume for Audio
   const handleToggleAudio = async () => {
     if (!rawUrl) {
       setErrorMessage('Audio reference is missing or unavailable.');
-      console.log(
-        `[AUDIO DEBUG]\nrawUri: \nresolvedUri: \nscheme: missing\nexists: false\nsize: 0\nplayerCreated: false\nstatus: error`
-      );
       return;
     }
 
@@ -122,7 +99,17 @@ export function AttachmentCard({
 
   const handleOpenGeneral = async () => {
     if (rawUrl) {
-      await viewDocument(rawUrl, originalName || 'Attachment');
+      try {
+        await openAttachment(attachment);
+      } catch (e) {
+        if (__DEV__) console.warn('openAttachment error:', e);
+        // Fallback to viewDocument just in case, though openAttachment handles it
+        try {
+          await viewDocument(rawUrl, originalName || 'Attachment');
+        } catch (innerE) {
+          console.warn('Fallback viewDocument error:', innerE);
+        }
+      }
     }
   };
 
