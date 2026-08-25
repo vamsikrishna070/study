@@ -13,6 +13,9 @@ import { DialogProvider } from './src/components/ui/AppDialog';
 import { AppUpdateProvider } from './src/context/AppUpdateContext';
 import { Provider as PaperProvider } from 'react-native-paper';
 
+import AppLockProvider from './src/context/AppLockContext';
+import { AppLockScreen } from './src/screens/settings/AppLockScreen';
+
 import { StatusBar } from 'expo-status-bar';
 
 // Inner app to consume theme
@@ -23,11 +26,14 @@ const MainApp = () => {
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <DialogProvider>
         <AppUpdateProvider>
-          <AuthProvider>
-            <StudySessionProvider>
-              <AppNavigator />
-            </StudySessionProvider>
-          </AuthProvider>
+          <AppLockProvider>
+            <AuthProvider>
+              <StudySessionProvider>
+                <AppNavigator />
+                <AppLockScreen />
+              </StudySessionProvider>
+            </AuthProvider>
+          </AppLockProvider>
         </AppUpdateProvider>
       </DialogProvider>
     </PaperProvider>

@@ -48,6 +48,7 @@ import {
   scheduleTaskPendingAlert,
   scheduleTaskDailyReminder,
   cancelTaskNotification,
+  getAllScheduledNotifications,
 } from '../../services/NotificationService';
 
 const PRIORITY_OPTIONS = [
@@ -252,8 +253,14 @@ const TasksScreen = ({ route, navigation }) => {
         if (res.data) {
           setTasks((prev) => [res.data, ...prev]);
         } else {
-          await loadData();
+          setTasks((prev) => [payload, ...prev]);
         }
+      }
+
+      if (__DEV__) {
+        const allNotifs = await getAllScheduledNotifications();
+        console.log(`[TasksScreen] Currently scheduled notifications: ${allNotifs.length}`);
+        allNotifs.forEach(n => console.log(` - ID: ${n.identifier}, Title: ${n.content.title}, Type: ${n.trigger.type}`));
       }
 
       setModalVisible(false);

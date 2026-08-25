@@ -12,7 +12,7 @@ Notifications.setNotificationHandler({
 
 export const setupNotifications = async () => {
   let hasPermission = false;
-  
+
   if (Platform.OS === 'android') {
     const baseConfig = {
       importance: Notifications.AndroidImportance.MAX,
@@ -69,7 +69,7 @@ export const setupNotifications = async () => {
     const { status } = await Notifications.requestPermissionsAsync();
     finalStatus = status;
   }
-  
+
   if (finalStatus === 'granted') {
     hasPermission = true;
   }
@@ -80,7 +80,7 @@ export const setupNotifications = async () => {
 export const scheduleReminderNotification = async (reminder) => {
   const triggerDate = new Date(reminder.remindAt);
   const type = reminder.scheduleType || 'one-time';
-  
+
   if (type === 'one-time' && triggerDate <= new Date()) {
     console.warn("Cannot schedule one-time notification in the past.");
     return null;
@@ -151,9 +151,8 @@ export const scheduleTaskPendingAlert = async (task) => {
   if (!task || task.status === 'completed' || task.status === 'in_progress') return null;
 
   let triggerTime = null;
-  if (task.scheduledStartAt) {
-    triggerTime = new Date(task.scheduledStartAt);
-  } else if (task.dueDate && task.dueTime) {
+  // Always use dueDate and dueTime if available to ensure correct local timezone conversion
+  if (task.dueDate && task.dueTime) {
     try {
       const [h, m] = task.dueTime.split(':').map(Number);
       const d = new Date(task.dueDate);
@@ -162,13 +161,31 @@ export const scheduleTaskPendingAlert = async (task) => {
         triggerTime = d;
       }
     } catch (_) {}
+  } else if (task.scheduledStartAt) {
+    // Fallback if no specific due time is provided
+    triggerTime = new Date(task.scheduledStartAt);
   }
 
-  if (!triggerTime) return null;
+  if (!triggerTime || isNaN(triggerTime.getTime())) return null;
 
   // Subtract 1 hour for the 1-hour-before reminder
   const notificationTime = new Date(triggerTime.getTime() - 60 * 60 * 1000);
-  if (notificationTime <= new Date()) return null;
+
+  if (__DEV__) {
+    console.log('\n--- TASK NOTIFICATION DEBUG ---');
+    console.log(`Task: ${task.title}`);
+    console.log(`Current: ${new Date().toLocaleString()}`);
+    console.log(`Due: ${triggerTime.toLocaleString()}`);
+    console.log(`One-hour warning: ${notificationTime.toLocaleString()}`);
+    console.log(`Reminder enabled: ${task.reminderEnabled ? 'yes' : 'no'}`);
+    if (task.reminderEnabled) console.log(`Reminder time: ${task.reminderTime}`);
+  }
+
+  // If the 1-hour warning time has already passed, we don't schedule it.
+  if (notificationTime <= new Date()) {
+    if (__DEV__) console.log(`[NotificationService] Warning time is in the past. Skipping 1-hour warning.`);
+    return null;
+  }
 
   const timeStr = task.dueTime || triggerTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const title = '🔴 TASK PENDING';

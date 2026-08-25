@@ -1,8 +1,10 @@
 import React, { useContext, useState } from 'react';
-import { View, StyleSheet, ScrollView, Text, TouchableOpacity, Switch, Alert, Image } from 'react-native';
-import { Camera, Moon, Sun, Trophy, ToggleLeft, ToggleRight, Bell, Smartphone, RefreshCw } from 'lucide-react-native';
+import { View, StyleSheet, ScrollView, Text, TouchableOpacity, Switch, Alert, Image, Modal } from 'react-native';
+import { Camera, Moon, Sun, Trophy, ToggleLeft, ToggleRight, Bell, Smartphone, RefreshCw, Lock, ChevronRight, Clock, KeyRound, Circle, CircleDot } from 'lucide-react-native';
+import * as LocalAuthentication from 'expo-local-authentication';
 import { AuthContext } from '../../context/AuthContext';
 import { AppUpdateContext } from '../../context/AppUpdateContext';
+import { useAppLock } from '../../context/AppLockContext';
 import { Header } from '../../components/ui/Header';
 import { PageHeading } from '../../components/ui/PageHeading';
 import { Button } from '../../components/ui/Button';
@@ -19,6 +21,7 @@ const SettingsScreen = ({ navigation }) => {
   const styles = useStyles(createStyles);
   const { showSuccess, showError, showDialog } = useAppDialog();
   const { appVersion, isChecking: isCheckingUpdate, checkUpdate } = useContext(AppUpdateContext);
+  const { isLockEnabled, lockTimeout, enableLock, disableLock, updateTimeout, verifyPin, biometricAvailable } = useAppLock();
 
   const { user, logout, setUser } = useContext(AuthContext);
   const [form, setForm] = useState({
@@ -33,16 +36,50 @@ const SettingsScreen = ({ navigation }) => {
   const [notifications, setNotifications] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
+  const [showPinSetup, setShowPinSetup] = useState(false);
+  const [showPinConfirm, setShowPinConfirm] = useState(false);
+  const [showTimeoutSelect, setShowTimeoutSelect] = useState(false);
+  const [lockAction, setLockAction] = useState('disable'); // 'disable' | 'change'
+  const [pinBuffer, setPinBuffer] = useState('');
+  const [pinError, setPinError] = useState('');
+
+  const handleAuthAction = async (action) => {
+    setLockAction(action);
+    if (biometricAvailable) {
+      try {
+        const result = await LocalAuthentication.authenticateAsync({
+          promptMessage: 'Verify Identity',
+          cancelLabel: 'Use PIN',
+          disableDeviceFallback: true,
+        });
+
+        if (result.success) {
+          if (action === 'disable') {
+            await disableLock();
+          } else if (action === 'change') {
+            setShowPinSetup(true);
+          }
+          return;
+        }
+      } catch (e) {
+        // Fallback to PIN
+      }
+    }
+
+    // Fallback to PIN if biometric cancelled/failed or not available
+    setShowPinConfirm(true);
+  };
+
   const setFormValue = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-  
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const data = { 
-        ...form, 
+      const data = {
+        ...form,
         collegeId: form.collegeId || null,
         university: (form.university || '').trim(),
-        semester: Number(form.semester) || 1 
+        semester: Number(form.semester) || 1
       };
       const res = await apiClient.patch('/auth/profile', data);
       setUser(res.data.data || res.data.user || res.data);
@@ -88,9 +125,9 @@ const SettingsScreen = ({ navigation }) => {
     <View style={styles.container}>
       <Header />
       <ScrollView contentContainerStyle={styles.scroll}>
-        <PageHeading 
-          eyebrow="Your study desk" 
-          title="Settings" 
+        <PageHeading
+          eyebrow="Your study desk"
+          title="Settings"
           detail="Make the space fit how you work best."
         />
 
@@ -121,9 +158,9 @@ const SettingsScreen = ({ navigation }) => {
 
           <View style={styles.form}>
             <Field label="Full Name">
-              <Input 
-                value={form.name} 
-                onChangeText={t => setFormValue('name', t)} 
+              <Input
+                value={form.name}
+                onChangeText={t => setFormValue('name', t)}
                 placeholder="Enter your full name"
                 editable={!isSaving}
               />
@@ -142,29 +179,29 @@ const SettingsScreen = ({ navigation }) => {
             </Field>
 
             <Field label="Degree / Program">
-              <Input 
-                value={form.degree} 
-                onChangeText={t => setFormValue('degree', t)} 
+              <Input
+                value={form.degree}
+                onChangeText={t => setFormValue('degree', t)}
                 placeholder="Enter your degree / program"
                 editable={!isSaving}
               />
             </Field>
 
             <Field label="Department / Branch">
-              <Input 
-                value={form.branch} 
-                onChangeText={t => setFormValue('branch', t)} 
+              <Input
+                value={form.branch}
+                onChangeText={t => setFormValue('branch', t)}
                 placeholder="Enter your branch / department"
                 editable={!isSaving}
               />
             </Field>
 
             <Field label="Current Semester">
-              <Input 
-                value={form.semester} 
-                onChangeText={t => setFormValue('semester', t)} 
+              <Input
+                value={form.semester}
+                onChangeText={t => setFormValue('semester', t)}
                 placeholder="Enter your semester"
-                keyboardType="numeric" 
+                keyboardType="numeric"
                 editable={!isSaving}
               />
             </Field>
@@ -181,7 +218,7 @@ const SettingsScreen = ({ navigation }) => {
         <View style={styles.section}>
           <Text style={styles.sectionEyebrow}>Interface</Text>
           <Text style={styles.sectionTitle}>Appearance & Alerts</Text>
-          
+
           <View style={styles.toggleRow}>
             <View style={styles.toggleRowLeft}>
               <View style={styles.iconBox}>
@@ -209,6 +246,74 @@ const SettingsScreen = ({ navigation }) => {
             </View>
             <Switch value={notifications} onValueChange={setNotifications} color={colors.accent} />
           </View>
+        </View>
+
+        {/* Privacy & Security Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionEyebrow}>Privacy</Text>
+          <Text style={styles.sectionTitle}>App Lock</Text>
+
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleRowLeft}>
+              <View style={styles.iconBox}>
+                <Lock size={20} color={colors.foreground} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.toggleTitle}>Require Unlock</Text>
+                <Text style={styles.toggleDetail}>Protect StudyArena when you leave</Text>
+              </View>
+            </View>
+            <Switch
+              value={isLockEnabled}
+              onValueChange={(val) => {
+                if (val) setShowPinSetup(true);
+                else handleAuthAction('disable');
+              }}
+              color={colors.accent}
+            />
+          </View>
+
+          {isLockEnabled && (
+            <>
+              <TouchableOpacity
+                style={styles.toggleRow}
+                activeOpacity={0.7}
+                onPress={() => setShowTimeoutSelect(true)}
+              >
+                <View style={styles.toggleRowLeft}>
+                  <View style={styles.iconBox}>
+                    <Clock size={20} color={colors.foreground} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.toggleTitle}>Auto-lock Timeout</Text>
+                    <Text style={styles.toggleDetail}>
+                      {lockTimeout === 0 ? 'Immediately' :
+                       lockTimeout === 60000 ? '1 minute' :
+                       lockTimeout === 300000 ? '5 minutes' : '15 minutes'}
+                    </Text>
+                  </View>
+                </View>
+                <ChevronRight size={20} color={colors.mutedForeground} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.toggleRow}
+                activeOpacity={0.7}
+                onPress={() => handleAuthAction('change')}
+              >
+                <View style={styles.toggleRowLeft}>
+                  <View style={styles.iconBox}>
+                    <KeyRound size={20} color={colors.foreground} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.toggleTitle}>Change PIN</Text>
+                    <Text style={styles.toggleDetail}>Update your app lock PIN</Text>
+                  </View>
+                </View>
+                <ChevronRight size={20} color={colors.mutedForeground} />
+              </TouchableOpacity>
+            </>
+          )}
         </View>
 
         {/* App Version & Updates Section */}
@@ -260,8 +365,145 @@ const SettingsScreen = ({ navigation }) => {
             <Text style={styles.bannerVersion}>StudyArena · {appVersion?.displayString || 'v1.0.0'}</Text>
           </View>
         </View>
-
       </ScrollView>
+
+      {/* PIN Setup Modal */}
+      <Modal visible={showPinSetup} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Set App Lock PIN</Text>
+            <Text style={styles.modalDesc}>Enter a 4-digit PIN to secure your app.</Text>
+
+            <Input
+              value={pinBuffer}
+              onChangeText={(t) => setPinBuffer(t.replace(/[^0-9]/g, '').slice(0, 4))}
+              keyboardType="number-pad"
+              secureTextEntry
+              placeholder="0000"
+              style={{ textAlign: 'center', fontSize: 24, letterSpacing: 16 }}
+            />
+            {!!pinError && <Text style={styles.errorText}>{pinError}</Text>}
+
+            <View style={styles.modalActions}>
+              <Button variant="outline" style={{ flex: 1 }} onPress={() => { setShowPinSetup(false); setPinBuffer(''); setPinError(''); }}>Cancel</Button>
+              <View style={{ width: 16 }} />
+              <Button
+                style={{ flex: 1 }}
+                onPress={async () => {
+                  if (pinBuffer.length !== 4) {
+                    setPinError('PIN must be 4 digits');
+                    return;
+                  }
+                  await enableLock(pinBuffer, 0); // Default to immediately
+                  setShowPinSetup(false);
+                  setPinBuffer('');
+                  setPinError('');
+                }}
+              >
+                Save PIN
+              </Button>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* PIN Confirm Modal (for changing or disabling) */}
+      <Modal visible={showPinConfirm} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Confirm current PIN</Text>
+            <Text style={styles.modalDesc}>Enter your current 4-digit PIN.</Text>
+
+            <Input
+              value={pinBuffer}
+              onChangeText={(t) => setPinBuffer(t.replace(/[^0-9]/g, '').slice(0, 4))}
+              keyboardType="number-pad"
+              secureTextEntry
+              placeholder="0000"
+              style={{ textAlign: 'center', fontSize: 24, letterSpacing: 16 }}
+            />
+            {!!pinError && <Text style={styles.errorText}>{pinError}</Text>}
+
+            <View style={styles.modalActions}>
+              <Button variant="outline" style={{ flex: 1 }} onPress={() => { setShowPinConfirm(false); setPinBuffer(''); setPinError(''); }}>Cancel</Button>
+              <View style={{ width: 16 }} />
+              <Button
+                style={{ flex: 1 }}
+                onPress={async () => {
+                  const isValid = await verifyPin(pinBuffer);
+                  if (!isValid) {
+                    setPinError('Incorrect PIN');
+                    return;
+                  }
+
+                  setShowPinConfirm(false);
+                  setPinBuffer('');
+                  setPinError('');
+
+                  if (lockAction === 'disable') {
+                    await disableLock();
+                  } else if (lockAction === 'change') {
+                    setShowPinSetup(true);
+                  }
+                }}
+              >
+                Confirm
+              </Button>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Auto-lock Timeout Selection Modal */}
+      <Modal visible={showTimeoutSelect} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContentWide}>
+            <Text style={[styles.modalTitle, { textAlign: 'center' }]}>Auto-lock Timeout</Text>
+            <Text style={[styles.modalDesc, { textAlign: 'center', marginBottom: 24 }]}>Select when StudyArena should lock.</Text>
+
+            <View style={{ width: '100%' }}>
+              {[
+                { label: 'Immediately', value: 0 },
+                { label: '1 minute', value: 60000 },
+                { label: '5 minutes', value: 300000 },
+                { label: '15 minutes', value: 900000 },
+              ].map(opt => {
+                const isSelected = lockTimeout === opt.value;
+                return (
+                  <TouchableOpacity
+                    key={opt.value}
+                    style={[
+                      styles.timeoutOptionBtn,
+                      isSelected && { backgroundColor: colors.primary + '1A', borderColor: colors.primary }
+                    ]}
+                    onPress={() => {
+                      updateTimeout(opt.value);
+                      setShowTimeoutSelect(false);
+                    }}
+                  >
+                    <Text style={[
+                      styles.timeoutOptionText,
+                      isSelected && { color: colors.primary, fontFamily: typography.sans.bold }
+                    ]}>
+                      {opt.label}
+                    </Text>
+                    {isSelected ? (
+                      <CircleDot size={20} color={colors.primary} />
+                    ) : (
+                      <Circle size={20} color={colors.mutedForeground} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <Button variant="outline" style={{ marginTop: 16, width: '100%' }} onPress={() => setShowTimeoutSelect(false)}>
+              Cancel
+            </Button>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 };
@@ -427,6 +669,71 @@ const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.crea
     textTransform: 'uppercase',
     letterSpacing: 2,
     color: colors.mutedForeground,
+  },
+  timeoutOptionBtn: {
+    width: '100%',
+    minHeight: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    backgroundColor: colors.background,
+    marginBottom: 12,
+  },
+  timeoutOptionText: {
+    fontFamily: typography.sans.medium,
+    fontSize: 16,
+    color: colors.foreground,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalContent: {
+    backgroundColor: colors.card,
+    borderRadius: radii.xl,
+    padding: 24,
+    width: '100%',
+    maxWidth: 340,
+    alignItems: 'center',
+  },
+  modalContentWide: {
+    backgroundColor: colors.card,
+    borderRadius: radii.xl,
+    padding: 28,
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontFamily: typography.serif.medium,
+    fontSize: 20,
+    color: colors.foreground,
+    marginBottom: 8,
+  },
+  modalDesc: {
+    fontFamily: typography.sans.regular,
+    fontSize: 14,
+    color: colors.mutedForeground,
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    marginTop: 32,
+    width: '100%',
+  },
+  errorText: {
+    fontFamily: typography.sans.medium,
+    fontSize: 12,
+    color: colors.destructive,
+    marginTop: 8,
   }
 });
 
