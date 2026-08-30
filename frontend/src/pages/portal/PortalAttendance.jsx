@@ -98,13 +98,7 @@ export default function PortalAttendance() {
         )}
 
         {/* Attendance Summary */}
-        <div className="grid gap-5 sm:grid-cols-3">
-          <div className="rounded-2xl border border-card-border bg-card p-6">
-            <span className="font-mono text-xs text-muted-foreground uppercase tracking-wider">Overall Attendance</span>
-            <div className="mt-2 font-display text-4xl font-bold">{overallPercentage}%</div>
-            <p className="mt-1 text-xs text-muted-foreground">{totalPresent} / {totalClasses} Classes Attended</p>
-          </div>
-
+        <div className="grid gap-5 sm:grid-cols-2">
           <div className="rounded-2xl border border-card-border bg-card p-6">
             <span className="font-mono text-xs text-muted-foreground uppercase tracking-wider">Enrolled Subjects</span>
             <div className="mt-2 font-display text-4xl font-bold">{attendanceList.length}</div>

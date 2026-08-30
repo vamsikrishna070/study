@@ -15,6 +15,7 @@ const navItems = [
   { href: '/resources', label: 'Resources', icon: Library },
   { href: '/tasks', label: 'Tasks', icon: ListChecks },
   { href: '/exams', label: 'Exams', icon: CalendarDays },
+  { href: '/timetable', label: 'Timetable', icon: CalendarDays },
   { href: '/reminders', label: 'Reminders', icon: Bell },
   { href: '/progress', label: 'Progress', icon: TrendingUp },
 ];

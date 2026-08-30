@@ -65,11 +65,9 @@ const PortalAttendanceScreen = ({ navigation }) => {
 
       {/* Metric summary */}
       <View style={styles.metricCard}>
-        <Text style={styles.metricLabel}>OVERALL ATTENDANCE</Text>
-        <Text style={styles.metricValue}>{overallPercentage}%</Text>
-        <Text style={styles.metricSub}>
-          {totalPresent} / {totalClasses} Total Classes Attended
-        </Text>
+        <Text style={styles.metricLabel}>ENROLLED SUBJECTS</Text>
+        <Text style={styles.metricValue}>{attendanceList.length}</Text>
+        <Text style={styles.metricSub}>Active course modules</Text>
       </View>
 
       <Text style={styles.sectionTitle}>SUBJECT LOG</Text>

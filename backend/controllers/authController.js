@@ -21,6 +21,9 @@ const publicUser = (user) => ({
   profileImagePublicId: user.profileImagePublicId || '',
   notificationPreferences: user.notificationPreferences || { email: true, push: true },
   isVerified: user.isVerified || false,
+  currentStreak: user.currentStreak || 0,
+  longestStreak: user.longestStreak || 0,
+  lastActiveDate: user.lastActiveDate || '',
 });
 
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
@@ -315,4 +318,82 @@ export async function updateProfile(req, res) {
 
 export function logout(_req, res) {
   res.json({ success: true, data: null });
+}
+
+function formatDateYYYYMMDD(date) {
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getYesterdayYYYYMMDD(todayStr) {
+  const [y, m, d] = todayStr.split('-').map(Number);
+  const dateObj = new Date(y, m - 1, d);
+  dateObj.setDate(dateObj.getDate() - 1);
+  return formatDateYYYYMMDD(dateObj);
+}
+
+export async function recordActivity(req, res) {
+  try {
+    const userId = req.user._id;
+    const clientDate = req.body?.date;
+    const isValidDateFormat = typeof clientDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(clientDate);
+    const todayStr = isValidDateFormat ? clientDate : formatDateYYYYMMDD(new Date());
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const lastActive = user.lastActiveDate || '';
+
+    // Same day -> return existing streak without incrementing
+    if (lastActive === todayStr) {
+      return res.json({
+        success: true,
+        data: {
+          currentStreak: user.currentStreak || 1,
+          longestStreak: user.longestStreak || user.currentStreak || 1,
+          lastActiveDate: user.lastActiveDate,
+          user: publicUser(user),
+        },
+      });
+    }
+
+    const yesterdayStr = getYesterdayYYYYMMDD(todayStr);
+
+    let newStreak = 1;
+    if (!lastActive) {
+      // First-ever app activity
+      newStreak = 1;
+    } else if (lastActive === yesterdayStr) {
+      // Consecutive day
+      newStreak = (user.currentStreak || 0) + 1;
+    } else {
+      // Inactive 2+ days
+      newStreak = 1;
+    }
+
+    const newLongest = Math.max(user.longestStreak || 0, newStreak);
+
+    user.currentStreak = newStreak;
+    user.longestStreak = newLongest;
+    user.lastActiveDate = todayStr;
+    await user.save();
+
+    res.json({
+      success: true,
+      data: {
+        currentStreak: user.currentStreak,
+        longestStreak: user.longestStreak,
+        lastActiveDate: user.lastActiveDate,
+        user: publicUser(user),
+      },
+    });
+  } catch (error) {
+    console.error('[AuthController] Activity recording error:', error);
+    res.status(500).json({ success: false, message: 'Failed to update activity status' });
+  }
 }

@@ -5,10 +5,15 @@ import {
   syncPortalData,
   getAcademicCalendar,
   disconnectPortal,
+  getTodayAttendance,
+  markAttendanceCode,
+  getTimetableData,
 } from './portalClient.js';
 
 export const getPortalStatusQueryKey = () => ['portal', 'status'];
 export const getCalendarQueryKey = () => ['portal', 'calendar'];
+export const getTodayAttendanceQueryKey = () => ['portal', 'attendance', 'today'];
+export const getTimetableQueryKey = () => ['portal', 'timetable'];
 
 export const useGetPortalStatus = (options) =>
   useQuery({
@@ -23,6 +28,8 @@ export const useConnectPortal = () => {
     mutationFn: connectPortal,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: getPortalStatusQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getTodayAttendanceQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getTimetableQueryKey() });
     },
   });
 };
@@ -33,6 +40,8 @@ export const useSyncPortal = () => {
     mutationFn: syncPortalData,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: getPortalStatusQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getTodayAttendanceQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getTimetableQueryKey() });
     },
   });
 };
@@ -50,6 +59,33 @@ export const useDisconnectPortal = () => {
     mutationFn: disconnectPortal,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: getPortalStatusQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getTodayAttendanceQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getTimetableQueryKey() });
     },
   });
 };
+
+export const useGetTodayAttendance = (options) =>
+  useQuery({
+    queryKey: getTodayAttendanceQueryKey(),
+    queryFn: getTodayAttendance,
+    ...options,
+  });
+
+export const useMarkAttendanceCode = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: markAttendanceCode,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: getTodayAttendanceQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getPortalStatusQueryKey() });
+    },
+  });
+};
+
+export const useGetTimetable = (options) =>
+  useQuery({
+    queryKey: getTimetableQueryKey(),
+    queryFn: getTimetableData,
+    ...options,
+  });

@@ -26,6 +26,7 @@ import {
   Pencil,
   CloudUpload,
 } from 'lucide-react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { getSubjects, createSubject, updateSubject, deleteSubject } from '../../api/subjects';
 import { extractSyllabus } from '../../api/syllabus';
 import { AuthContext } from '../../context/AuthContext';
@@ -99,9 +100,11 @@ const SubjectsScreen = ({ navigation }) => {
     }
   };
 
-  useEffect(() => {
-    loadSubjects();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      loadSubjects();
+    }, [])
+  );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -305,7 +308,8 @@ const SubjectsScreen = ({ navigation }) => {
         renderItem={({ item }) => {
           const subjectColor = item.color || colors.accent;
           const subId = item._id || item.id;
-          const progress = Number(item.progress) || 0;
+          const rawProgress = Number(item.progress) || 0;
+          const progress = Math.min(100, Math.max(0, Math.round(rawProgress)));
           const hasSyllabus = Boolean(item.syllabusFile?.url);
 
           return (
@@ -341,7 +345,9 @@ const SubjectsScreen = ({ navigation }) => {
                 {/* Progress Track */}
                 <View style={styles.progressContainer}>
                   <View style={styles.progressHeader}>
-                    <Text style={styles.progressLabel}>Progress</Text>
+                    <Text style={styles.progressLabel}>
+                      Progress {item.topicsTotal ? `(${item.topicsCompleted || 0}/${item.topicsTotal})` : ''}
+                    </Text>
                     <Text style={[styles.progressValue, { color: subjectColor }]}>
                       {progress}%
                     </Text>

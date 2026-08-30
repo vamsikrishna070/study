@@ -1,6 +1,7 @@
 import Subject from '../models/Subject.js';
 import Unit from '../models/Unit.js';
 import Topic from '../models/Topic.js';
+import { updateSubjectProgressHelper } from './studyController.js';
 import {
   extractSyllabusFromBuffer,
   sanitizeDocumentUrl,
@@ -208,6 +209,9 @@ export async function confirmSyllabus(req, res) {
         }
       }
     }
+
+    // Recalculate subject progress
+    await updateSubjectProgressHelper(subject._id, req.user._id);
 
     res.json({ success: true, message: 'Syllabus successfully saved' });
   } catch (error) {

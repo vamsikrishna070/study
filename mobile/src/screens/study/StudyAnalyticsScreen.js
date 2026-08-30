@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useContext } from 'react';
+import { AuthContext } from '../../context/AuthContext';
 import {
   View,
   Text,
@@ -30,6 +31,7 @@ import { typography, spacing, radii, useAppTheme, useStyles } from '../../theme/
 export default function StudyAnalyticsScreen({ navigation }) {
   const { colors, typography, spacing, radii } = useAppTheme();
   const styles = useStyles(createStyles);
+  const { user } = useContext(AuthContext);
 
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -129,8 +131,8 @@ export default function StudyAnalyticsScreen({ navigation }) {
                   <Text style={styles.streakBadgeText}>Active Streak</Text>
                 </View>
                 <Text style={[styles.metricValue, { color: colors.primaryForeground }]}>
-                  {stats.streak || 0}{' '}
-                  <Text style={{ fontSize: 18 }}>day{stats.streak !== 1 ? 's' : ''}</Text>
+                  {user?.currentStreak !== undefined && user?.currentStreak !== null ? user.currentStreak : (stats.streak || 0)}{' '}
+                  <Text style={{ fontSize: 18 }}>day{(user?.currentStreak ?? stats.streak) !== 1 ? 's' : ''}</Text>
                 </Text>
                 <Text style={[styles.metricDetail, { color: colors.primaryForeground, opacity: 0.7 }]}>
                   Consecutive focus

@@ -27,6 +27,8 @@ import { isSrmApStudent } from '../../utils/srmAp';
 const navItems = [
   { href: 'OverviewTab', label: 'Overview', icon: LayoutDashboard },
   { href: 'PortalDashboard', label: 'SRM Portal', icon: GraduationCap },
+  { href: 'PortalAttendance', label: 'Attendance', icon: Clock },
+  { href: 'PortalTimetable', label: 'Timetable', icon: CalendarDays },
   { href: 'StudySessions', label: 'Study Sessions', icon: Timer },
   { href: 'SubjectsTab', label: 'Subjects', icon: BookOpen },
   { href: 'Syllabus', label: 'Syllabus', icon: FileStack },

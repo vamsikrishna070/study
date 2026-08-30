@@ -63,3 +63,8 @@ export const updateProfile = async (profileData) => {
   const response = await client.patch('/auth/profile', profileData);
   return response.data.data || response.data;
 };
+
+export const recordActivity = async (date) => {
+  const response = await client.post('/auth/activity', { date });
+  return response.data.data || response.data;
+};

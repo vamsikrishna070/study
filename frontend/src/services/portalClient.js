@@ -24,3 +24,18 @@ export const disconnectPortal = async () => {
   const res = await apiClient.delete('/portal/disconnect');
   return res.data;
 };
+
+export const getTodayAttendance = async () => {
+  const res = await apiClient.get('/portal/attendance/today');
+  return res.data.data;
+};
+
+export const markAttendanceCode = async (attendanceCode) => {
+  const res = await apiClient.post('/portal/attendance/mark', { attendanceCode });
+  return res.data;
+};
+
+export const getTimetableData = async () => {
+  const res = await apiClient.get('/portal/timetable');
+  return res.data.data;
+};

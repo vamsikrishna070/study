@@ -1,6 +1,6 @@
 import React, { createContext, useState, useEffect } from 'react';
 import { getToken, removeToken } from '../storage/token';
-import { loginUser, registerUser, verifyEmail, logoutUser, getCurrentUser } from '../api/auth';
+import { loginUser, registerUser, verifyEmail, logoutUser, getCurrentUser, recordActivity } from '../api/auth';
 
 export const AuthContext = createContext();
 
@@ -9,12 +9,33 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [isNewRegistration, setIsNewRegistration] = useState(false);
 
+  const getLocalDateString = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const syncDailyActivity = async () => {
+    try {
+      const todayStr = getLocalDateString();
+      const res = await recordActivity(todayStr);
+      if (res && res.user) {
+        setUser(res.user);
+      }
+    } catch (e) {
+      console.error('[Mobile AuthContext] recordActivity error:', e);
+    }
+  };
+
   const refreshUser = async () => {
     try {
       const token = await getToken();
       if (token && token !== 'null' && token !== 'undefined') {
         const userData = await getCurrentUser();
         setUser(userData.user || userData);
+        syncDailyActivity();
       }
     } catch (error) {
       console.error('Error in refreshUser:', error);
@@ -29,6 +50,7 @@ export const AuthProvider = ({ children }) => {
           try {
             const userData = await getCurrentUser();
             setUser(userData.user || userData);
+            syncDailyActivity();
           } catch (error) {
             console.error('Error loading user (AuthContext). Token might be invalid.', error?.message || error);
             await removeToken();

@@ -217,6 +217,9 @@ export default function Syllabus() {
         status: newStatus,
         completed: !isCompleted 
       });
+      const subsRes = await apiClient.get('/subjects');
+      const subsData = subsRes.data?.data || subsRes.data || [];
+      setAllSubjects(subsData);
     } catch (e) {
       // Revert state on error
       setTopics((prev) =>

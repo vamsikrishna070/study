@@ -12,10 +12,13 @@ export function isSrmApStudent(user) {
   const u = (user.university || '').toLowerCase().trim();
   if (!u) return false;
 
-  // Match against known SRM AP university name variants
+  // Match against known SRM AP university name variants or general SRM strings
   const SRM_AP_PATTERNS = [
-    'srm ap',
+    'srm',
     'srmap',
+    'srm ap',
+    'srmuniversity',
+    'srm university',
     'srmuniversity-ap',
     'srm university ap',
     'srm university - ap',

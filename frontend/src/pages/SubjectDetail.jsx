@@ -255,12 +255,18 @@ export default function SubjectDetail() {
     try {
       const newStatus =
         topic.status === "completed" ? "not-started" : "completed";
-      await apiClient.patch(`/topics/${topic._id}`, { status: newStatus });
-      setTopics(
-        topics.map((t) =>
-          t._id === topic._id ? { ...t, status: newStatus } : t,
-        ),
+      const topicId = topic._id || topic.id;
+      const updatedTopics = topics.map((t) =>
+        (t._id || t.id) === topicId ? { ...t, status: newStatus } : t
       );
+      setTopics(updatedTopics);
+
+      await apiClient.patch(`/topics/${topicId}`, { status: newStatus });
+      
+      const subjRes = await apiClient.get(`/subjects/${id}`);
+      if (subjRes.data?.data) {
+        setSubject(subjRes.data.data);
+      }
     } catch (err) {
       // ignore
     }

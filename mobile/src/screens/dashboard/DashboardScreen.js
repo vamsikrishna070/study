@@ -82,7 +82,9 @@ const DashboardScreen = ({ navigation }) => {
 
   const studyStats = data.studyStats;
   const todayStudyFormatted = studyStats?.today?.formatted || '0m';
-  const streak = studyStats?.streak || 0;
+  const streak = user?.currentStreak !== undefined && user?.currentStreak !== null
+    ? user.currentStreak
+    : (studyStats?.streak || 0);
   const recentSessions = studyStats?.recentSessions || [];
 
   return (

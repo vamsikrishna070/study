@@ -147,18 +147,12 @@ export default function PortalDashboard() {
   }
 
   const isConnected = data?.isConnected;
+  const hasStoredPortalData = data?.hasStoredPortalData || Boolean(data?.srmUsername || data?.profile?.studentName);
+  const isSessionExpired = data?.connectionStatus === 'expired' || data?.isSessionExpired;
   const profile = data?.profile || {};
   const cgpa = data?.cgpa?.cgpa || '0.00';
   const attendanceList = data?.attendance || [];
   const timetableList = data?.timetable || [];
-
-  let totalClasses = 0;
-  let totalPresent = 0;
-  attendanceList.forEach((item) => {
-    totalClasses += Number(item.classes_conducted) || 0;
-    totalPresent += Number(item.present) || 0;
-  });
-  const overallPercentage = totalClasses > 0 ? ((totalPresent / totalClasses) * 100).toFixed(1) : '0.0';
 
   const lastSynced = data?.lastSuccessfulSync
     ? new Date(data.lastSuccessfulSync).toLocaleString('en-IN', {
@@ -180,9 +174,9 @@ export default function PortalDashboard() {
               <GraduationCap size={16} /> SRM AP STUDENT PORTAL
             </div>
             <h1 className="font-display text-4xl font-bold">
-              {isConnected ? profile.studentName || data.srmUsername : 'Connect Portal'}
+              {hasStoredPortalData ? profile.studentName || data.srmUsername : 'Connect Portal'}
             </h1>
-            {isConnected && (
+            {hasStoredPortalData && (
               <p className="mt-1 text-sm text-muted-foreground">
                 Reg No: <span className="font-mono font-semibold text-foreground">{data.srmUsername}</span> • Last synced: {lastSynced}
               </p>
@@ -190,7 +184,7 @@ export default function PortalDashboard() {
           </div>
 
           <div className="flex items-center gap-3">
-            {isConnected ? (
+            {hasStoredPortalData ? (
               <>
                 <button
                   onClick={handleSyncNow}
@@ -218,8 +212,26 @@ export default function PortalDashboard() {
           </div>
         </div>
 
-        {isConnected ? (
+        {hasStoredPortalData ? (
           <>
+            {/* Non-blocking session expired banner */}
+            {isSessionExpired && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-500 font-semibold shadow-sm">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle size={16} />
+                  <span>Live portal session expired. Showing your last synced data.</span>
+                </div>
+                <button
+                  onClick={handleSyncNow}
+                  disabled={syncMutation.isPending}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-bold text-white hover:opacity-90 disabled:opacity-50"
+                >
+                  <RefreshCw size={13} className={syncMutation.isPending ? 'animate-spin' : ''} />
+                  <span>Sync Now</span>
+                </button>
+              </div>
+            )}
+
             {/* Student Information */}
             <div className="rounded-2xl border border-card-border bg-card p-6 shadow-sm space-y-3">
               <div className="flex items-center gap-2 font-mono text-xs font-bold uppercase tracking-wider text-accent">
@@ -250,13 +262,7 @@ export default function PortalDashboard() {
             </div>
 
             {/* Metrics */}
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="rounded-2xl border border-card-border bg-card p-5 shadow-sm space-y-1">
-                <span className="font-mono text-xs font-bold uppercase text-muted-foreground">Overall Attendance</span>
-                <div className="font-display text-3xl font-bold text-foreground">{overallPercentage}%</div>
-                <p className="text-xs text-muted-foreground">across {attendanceList.length} enrolled subjects</p>
-              </div>
-
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-2xl border border-card-border bg-card p-5 shadow-sm space-y-1">
                 <span className="font-mono text-xs font-bold uppercase text-muted-foreground">Cumulative GPA</span>
                 <div className="font-display text-3xl font-bold text-amber-500">{cgpa}</div>
@@ -264,11 +270,11 @@ export default function PortalDashboard() {
               </div>
 
               <div className="rounded-2xl border border-card-border bg-card p-5 shadow-sm space-y-1">
-                <span className="font-mono text-xs font-bold uppercase text-muted-foreground">Classes Today</span>
+                <span className="font-mono text-xs font-bold uppercase text-muted-foreground">Enrolled Subjects</span>
                 <div className="font-display text-3xl font-bold text-accent">
-                  {timetableList[0]?.subjects?.filter(Boolean)?.length || 0}
+                  {attendanceList.length}
                 </div>
-                <p className="text-xs text-muted-foreground">Sessions on schedule</p>
+                <p className="text-xs text-muted-foreground">Active course modules</p>
               </div>
             </div>
 

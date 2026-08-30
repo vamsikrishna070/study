@@ -33,14 +33,15 @@ const srmPortalAccountSchema = new mongoose.Schema({
     default: 'connected' 
   },
   lastSuccessfulSync: { type: Date, default: null },
-  profileCache: { type: Object, default: {} },
-  attendanceCache: { type: Array, default: [] },
-  attendanceHistoryCache: { type: Array, default: [] },
-  timetableCache: { type: Array, default: [] },
-  subjectsCache: { type: Array, default: [] },
-  examsCache: { type: Array, default: [] },
-  resultsCache: { type: Array, default: [] },
-  cgpaCache: { type: Object, default: {} },
+  profileCache: { type: mongoose.Schema.Types.Mixed, default: {} },
+  attendanceCache: { type: mongoose.Schema.Types.Mixed, default: [] },
+  todayAttendanceCache: { type: mongoose.Schema.Types.Mixed, default: [] },
+  attendanceHistoryCache: { type: mongoose.Schema.Types.Mixed, default: [] },
+  timetableCache: { type: mongoose.Schema.Types.Mixed, default: [] },
+  subjectsCache: { type: mongoose.Schema.Types.Mixed, default: [] },
+  examsCache: { type: mongoose.Schema.Types.Mixed, default: [] },
+  resultsCache: { type: mongoose.Schema.Types.Mixed, default: [] },
+  cgpaCache: { type: mongoose.Schema.Types.Mixed, default: {} },
   selfExamPerformance: [selfExamPerformanceSchema]
 }, { timestamps: true });
 

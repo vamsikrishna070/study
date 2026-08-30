@@ -22,6 +22,8 @@ import {
   cx,
   fmtDate,
 } from "../components/shared.jsx";
+import TodayAttendanceCard from "../components/dashboard/TodayAttendanceCard.jsx";
+import TodayTimetableCard from "../components/dashboard/TodayTimetableCard.jsx";
 
 export function DashboardPage() {
   const query = useGetDashboard();
@@ -124,7 +126,7 @@ export function DashboardPage() {
             },
             {
               label: "Current streak",
-              value: `${stats.streak} days`,
+              value: `${user?.currentStreak || stats.streak || 0} ${user?.currentStreak === 1 || stats.streak === 1 ? 'day' : 'days'}`,
               icon: Flame,
               note: "keep it going",
               color: "text-accent",
@@ -152,6 +154,12 @@ export function DashboardPage() {
               <p className="mt-1 text-xs text-muted-foreground">{note}</p>
             </div>
           ))}
+        </section>
+
+        {/* Official SRM AP Attendance & Today's Timetable Section */}
+        <section className="grid gap-6 lg:grid-cols-2">
+          <TodayAttendanceCard />
+          <TodayTimetableCard />
         </section>
         <div className="grid gap-6 xl:grid-cols-[1.35fr_.9fr]">
           <section className="rounded-2xl border border-card-border bg-card p-6 sm:p-7">

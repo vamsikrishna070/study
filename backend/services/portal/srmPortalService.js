@@ -8,6 +8,7 @@ import SrmPortalAccount from '../../models/SrmPortalAccount.js';
 import User from '../../models/User.js';
 import Subject from '../../models/Subject.js';
 import { encryptPortalSecret, decryptPortalSecret } from '../../utils/portalCrypto.js';
+import { getActiveSession } from './srmAttendanceService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -125,7 +126,7 @@ async function solveCaptchaOcr(imageBuffer) {
 }
 
 // 3. Internal: Attempt SRM login with a solved CAPTCHA — returns jsessionId on success
-async function attemptSrmLogin(username, password) {
+export async function attemptSrmLogin(username, password) {
   const MAX_RETRIES = 3;
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
@@ -558,12 +559,19 @@ async function scrapeAndStoreData(account, sessionId) {
 export async function getPortalAccountData(userId) {
   const account = await SrmPortalAccount.findOne({ userId });
   if (!account) {
-    return { isConnected: false };
+    return { isConnected: false, hasStoredPortalData: false };
   }
+
+  const hasStoredData = Boolean(
+    account.srmUsername ||
+    (account.profileCache && Object.keys(account.profileCache).length > 0)
+  );
 
   return {
     isConnected: true,
-    connectionStatus: account.connectionStatus,
+    hasStoredPortalData: hasStoredData,
+    connectionStatus: account.connectionStatus || 'connected',
+    isSessionExpired: account.connectionStatus === 'expired',
     srmUsername: account.srmUsername,
     lastSuccessfulSync: account.lastSuccessfulSync,
     source: 'srm_portal',
@@ -584,19 +592,21 @@ export async function reSyncPortalData(userId) {
     throw new Error('SRM Portal account is not connected.');
   }
 
-  const sessionId = decryptPortalSecret(account.encryptedSessionId);
-  if (sessionId) {
-    try {
-      await scrapeAndStoreData(account, sessionId);
-      return await getPortalAccountData(userId);
-    } catch (err) {
-      console.warn('[PortalService] Session expired or fetch failed during resync:', err.message);
-    }
+  try {
+    const sessionId = await getActiveSession(account);
+    await scrapeAndStoreData(account, sessionId);
+    account.connectionStatus = 'connected';
+    account.lastSuccessfulSync = new Date();
+    await account.save();
+    return await getPortalAccountData(userId);
+  } catch (err) {
+    console.warn('[PortalService] Re-sync session refresh failed:', err.message);
+    account.connectionStatus = 'expired';
+    await account.save();
+    const data = await getPortalAccountData(userId);
+    data.syncWarning = 'Live SRM session could not be refreshed. Showing your last synced data.';
+    return data;
   }
-
-  account.connectionStatus = 'expired';
-  await account.save();
-  throw new Error('SRM Portal session expired. Please reconnect your portal.');
 }
 
 // 6. Static JSON APIs: Calendar & Resources

@@ -26,25 +26,18 @@ const VerifyOtpScreen = ({ route, navigation }) => {
   const [successMsg, setSuccessMsg] = useState('');
   
   const [cooldown, setCooldown] = useState(60); // Start with 60s countdown since OTP was just sent
+  const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef(null);
 
-  // Focus input automatically when navigation screen becomes active
+  // Gently request focus after navigation screen transition settles
   useFocusEffect(
     useCallback(() => {
       const timer = setTimeout(() => {
         inputRef.current?.focus();
-      }, 150);
+      }, 250);
       return () => clearTimeout(timer);
     }, [])
   );
-
-  // Focus input on mount
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      inputRef.current?.focus();
-    }, 100);
-    return () => clearTimeout(timer);
-  }, []);
 
   useEffect(() => {
     let timer;
@@ -189,14 +182,14 @@ const VerifyOtpScreen = ({ route, navigation }) => {
                 {/* Visual 6-box OTP display */}
                 <View style={styles.otpBoxesContainer} pointerEvents="none">
                   {otpDigits.map((digit, index) => {
-                    const isCurrent = otp.length === index;
+                    const isCurrentBox = isFocused && (otp.length === index || (otp.length === 6 && index === 5));
                     const isFilled = digit !== ' ';
                     return (
                       <View
                         key={index}
                         style={[
                           styles.otpBox,
-                          isCurrent && styles.otpBoxActive,
+                          isCurrentBox && styles.otpBoxActive,
                           isFilled && styles.otpBoxFilled,
                         ]}
                       >
@@ -206,14 +199,19 @@ const VerifyOtpScreen = ({ route, navigation }) => {
                   })}
                 </View>
 
-                {/* Overlaid TextInput capturing numeric input */}
+                {/* Overlaid TextInput directly capturing numeric touch on Android & iOS */}
                 <TextInput
                   ref={inputRef}
                   value={otp}
                   onChangeText={handleOtpChange}
+                  onFocus={() => setIsFocused(true)}
+                  onBlur={() => setIsFocused(false)}
                   keyboardType="number-pad"
+                  inputMode="numeric"
                   maxLength={6}
-                  autoFocus={true}
+                  caretHidden={true}
+                  contextMenuHidden={true}
+                  autoFocus={false}
                   textContentType="oneTimeCode"
                   autoComplete="sms-otp"
                   editable={!loading}
@@ -410,10 +408,17 @@ const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.crea
     color: colors.foreground,
   },
   hiddenInputOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    opacity: 0.01,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
     color: 'transparent',
-    fontSize: 1,
+    backgroundColor: 'transparent',
+    fontSize: 24,
+    zIndex: 10,
   },
   submitButton: {
     marginTop: spacing.md,

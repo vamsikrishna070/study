@@ -122,6 +122,7 @@ const SubjectDetailScreen = ({ route, navigation }) => {
 
     try {
       await updateTopicCompletion(topic._id || topic.id, !isCompleted);
+      loadData();
     } catch (err) {
       // Revert on error
       setTopics((prev) =>

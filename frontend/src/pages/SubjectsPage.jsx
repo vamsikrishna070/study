@@ -79,17 +79,24 @@ export function SubjectsPage() {
                 <p className="mt-5 min-h-10 text-sm leading-5 text-muted-foreground">
                   {s.description || 'No description yet. Add a little context to make this subject yours.'}
                 </p>
-                <div className="mt-6 flex items-center justify-between text-xs">
-                  <span className="font-semibold">Progress</span>
-                  <span className="font-mono text-muted-foreground">{s.progress}%</span>
-                </div>
-                <div className="mt-2 progress-track">
-                  <div className="progress-fill" style={{ width: `${s.progress}%`, backgroundColor: s.color }} />
-                </div>
-                <div className="mt-5 flex items-center justify-between border-t border-border pt-4 text-xs text-muted-foreground">
-                  <span>{s.topicsCompleted ?? 0} / {s.topicsTotal ?? 0} topics</span>
-                  <span>{s.examDaysLeft >= 0 ? `${s.examDaysLeft} days to exam` : 'Exam date unset'}</span>
-                </div>
+                {(() => {
+                  const progressPct = Math.min(100, Math.max(0, Math.round(Number(s.progress) || 0)));
+                  return (
+                    <>
+                      <div className="mt-6 flex items-center justify-between text-xs">
+                        <span className="font-semibold">Progress</span>
+                        <span className="font-mono text-muted-foreground">{progressPct}%</span>
+                      </div>
+                      <div className="mt-2 progress-track">
+                        <div className="progress-fill" style={{ width: `${progressPct}%`, backgroundColor: s.color }} />
+                      </div>
+                      <div className="mt-5 flex items-center justify-between border-t border-border pt-4 text-xs text-muted-foreground">
+                        <span>{s.topicsCompleted ?? 0} / {s.topicsTotal ?? 0} topics</span>
+                        <span>{s.examDaysLeft >= 0 ? `${s.examDaysLeft} days to exam` : 'Exam date unset'}</span>
+                      </div>
+                    </>
+                  );
+                })()}
               </article>
             );
           })}

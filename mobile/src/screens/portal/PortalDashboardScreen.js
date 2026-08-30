@@ -140,18 +140,22 @@ const PortalDashboardScreen = ({ navigation }) => {
   }
 
   const isConnected = data?.isConnected;
+  const hasStoredPortalData = data?.hasStoredPortalData || Boolean(data?.srmUsername || data?.profile?.studentName);
+  const isSessionExpired = data?.connectionStatus === 'expired' || data?.isSessionExpired;
   const profile = data?.profile || {};
   const cgpa = data?.cgpa?.cgpa || '0.00';
   const attendanceList = data?.attendance || [];
   const timetableList = data?.timetable || [];
 
-  let totalClasses = 0;
-  let totalPresent = 0;
-  attendanceList.forEach((item) => {
-    totalClasses += Number(item.classes_conducted) || 0;
-    totalPresent += Number(item.present) || 0;
-  });
-  const overallPercentage = totalClasses > 0 ? ((totalPresent / totalClasses) * 100).toFixed(1) : '0.0';
+  const lastSynced = data?.lastSuccessfulSync
+    ? new Date(data.lastSuccessfulSync).toLocaleString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : 'Not synced';
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
@@ -163,16 +167,16 @@ const PortalDashboardScreen = ({ navigation }) => {
             <Text style={styles.tagText}>SRM AP STUDENT PORTAL</Text>
           </View>
           <Text style={styles.title}>
-            {isConnected ? profile.studentName || data.srmUsername : 'Connect Portal'}
+            {hasStoredPortalData ? profile.studentName || data.srmUsername : 'Connect Portal'}
           </Text>
-          {isConnected && (
+          {hasStoredPortalData && (
             <Text style={styles.subtitle}>
-              Reg No: {data.srmUsername} {profile.program ? `• ${profile.program}` : ''}
+              Reg No: {data.srmUsername} • Last synced: {lastSynced}
             </Text>
           )}
         </View>
 
-        {isConnected ? (
+        {hasStoredPortalData ? (
           <View style={styles.actionRow}>
             <TouchableOpacity style={styles.syncBtn} onPress={handleSyncNow} disabled={syncing}>
               <RefreshCcw size={14} color={colors.accentForeground} />
@@ -191,8 +195,20 @@ const PortalDashboardScreen = ({ navigation }) => {
       </View>
 
       {/* Main Content */}
-      {isConnected ? (
+      {hasStoredPortalData ? (
         <>
+          {/* Non-blocking Session Expired Banner */}
+          {isSessionExpired && (
+            <View style={styles.sessionExpiredBanner}>
+              <Text style={styles.sessionExpiredText}>
+                Live portal session expired. Showing your last synced data.
+              </Text>
+              <TouchableOpacity style={styles.bannerSyncBtn} onPress={handleSyncNow} disabled={syncing}>
+                <Text style={styles.bannerSyncText}>{syncing ? 'Syncing...' : 'Sync Now'}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           {/* Student Info Card */}
           <View style={styles.infoCard}>
             <View style={styles.infoHead}>
@@ -222,21 +238,15 @@ const PortalDashboardScreen = ({ navigation }) => {
           {/* Quick Metrics */}
           <View style={styles.metricsGrid}>
             <View style={styles.metricCard}>
-              <Text style={styles.metricLabel}>ATTENDANCE</Text>
-              <Text style={styles.metricValue}>{overallPercentage}%</Text>
-              <Text style={styles.metricSub}>{attendanceList.length} Subjects</Text>
-            </View>
-
-            <View style={styles.metricCard}>
               <Text style={styles.metricLabel}>CGPA</Text>
               <Text style={[styles.metricValue, { color: '#f59e0b' }]}>{cgpa}</Text>
               <Text style={styles.metricSub}>Official Score</Text>
             </View>
 
             <View style={styles.metricCard}>
-              <Text style={styles.metricLabel}>SESSIONS TODAY</Text>
-              <Text style={styles.metricValue}>{timetableList[0]?.subjects?.filter(Boolean)?.length || 0}</Text>
-              <Text style={styles.metricSub}>On schedule</Text>
+              <Text style={styles.metricLabel}>ENROLLED SUBJECTS</Text>
+              <Text style={styles.metricValue}>{attendanceList.length}</Text>
+              <Text style={styles.metricSub}>Active modules</Text>
             </View>
           </View>
 
@@ -682,6 +692,36 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
       fontFamily: typography.sans.bold,
       fontSize: 13,
       color: colors.accentForeground,
+    },
+    sessionExpiredBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: '#F59E0B15',
+      borderColor: '#F59E0B40',
+      borderWidth: 1,
+      borderRadius: radii.md,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      marginBottom: spacing.md,
+    },
+    sessionExpiredText: {
+      fontFamily: typography.sans.medium,
+      fontSize: 12,
+      color: '#D97706',
+      flex: 1,
+    },
+    bannerSyncBtn: {
+      backgroundColor: '#D97706',
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 4,
+      borderRadius: radii.sm,
+      marginLeft: spacing.sm,
+    },
+    bannerSyncText: {
+      fontFamily: typography.sans.bold,
+      fontSize: 11,
+      color: '#FFFFFF',
     },
   });
 

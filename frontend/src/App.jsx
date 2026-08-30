@@ -48,6 +48,7 @@ function Router() {
     <Route path="/portal" element={<ProtectedRoute><SrmApRoute><PortalDashboard /></SrmApRoute></ProtectedRoute>} />
     <Route path="/portal/attendance" element={<ProtectedRoute><SrmApRoute><PortalAttendance /></SrmApRoute></ProtectedRoute>} />
     <Route path="/portal/timetable" element={<ProtectedRoute><SrmApRoute><PortalTimetable /></SrmApRoute></ProtectedRoute>} />
+    <Route path="/timetable" element={<ProtectedRoute><PortalTimetable /></ProtectedRoute>} />
     <Route path="/portal/exams" element={<ProtectedRoute><SrmApRoute><PortalExams /></SrmApRoute></ProtectedRoute>} />
     <Route path="/portal/results" element={<ProtectedRoute><SrmApRoute><PortalResults /></SrmApRoute></ProtectedRoute>} />
     <Route path="/portal/calendar" element={<ProtectedRoute><SrmApRoute><PortalCalendar /></SrmApRoute></ProtectedRoute>} />

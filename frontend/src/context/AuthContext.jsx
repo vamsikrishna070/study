@@ -19,6 +19,26 @@ export function AuthProvider({ children }) {
     return () => window.removeEventListener('unauthorized', handleUnauthorized);
   }, []);
 
+  const getLocalDateString = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const recordDailyActivity = async () => {
+    try {
+      const todayStr = getLocalDateString();
+      const { data } = await apiClient.post('/auth/activity', { date: todayStr });
+      if (data.success && data.data?.user) {
+        setUser(data.data.user);
+      }
+    } catch (e) {
+      console.error('Failed to record daily activity:', e);
+    }
+  };
+
   const checkAuth = async () => {
     const token = localStorage.getItem('studyarena_token');
     if (!token) {
@@ -32,6 +52,8 @@ export function AuthProvider({ children }) {
       if (data.success) {
         setUser(data.data);
         setIsAuthenticated(true);
+        // Automatically record daily activity/streak after authentication
+        recordDailyActivity();
       }
     } catch (error) {
       console.error('Auth check failed:', error);

@@ -80,16 +80,59 @@ const owned = (Model, user, itemId) => Model.findOne({ _id: itemId, user });
 const required = (body, fields) =>
   fields.every((field) => body[field] !== undefined && body[field] !== "");
 
+export async function updateSubjectProgressHelper(subjectId, userId) {
+  if (!subjectId || !userId) return { progress: 0, topicsCompleted: 0, topicsTotal: 0 };
+  const total = await Topic.countDocuments({ subject: subjectId, user: userId });
+  const completed = await Topic.countDocuments({ subject: subjectId, user: userId, status: "completed" });
+  const pct = total === 0 ? 0 : Math.min(100, Math.max(0, Math.round((completed / total) * 100)));
+  await Subject.updateOne({ _id: subjectId, user: userId }, { $set: { progress: pct } });
+  return { progress: pct, topicsCompleted: completed, topicsTotal: total };
+}
+
 export async function getSubjects(req, res) {
-  const items = await Subject.find({ user: req.user._id }).sort({
+  const subjects = await Subject.find({ user: req.user._id }).sort({
     createdAt: -1,
   });
-  res.json({ success: true, data: items.map(serialize) });
+  const allTopics = await Topic.find({ user: req.user._id }).select("subject status");
+
+  const statsMap = {};
+  allTopics.forEach((t) => {
+    const sId = t.subject?.toString();
+    if (!sId) return;
+    if (!statsMap[sId]) statsMap[sId] = { total: 0, completed: 0 };
+    statsMap[sId].total += 1;
+    if (t.status === "completed") statsMap[sId].completed += 1;
+  });
+
+  const serialized = subjects.map((subject) => {
+    const sId = subject._id.toString();
+    const stats = statsMap[sId];
+    const total = stats ? stats.total : 0;
+    const completed = stats ? stats.completed : 0;
+    const calculatedProgress = total === 0 ? 0 : Math.min(100, Math.max(0, Math.round((completed / total) * 100)));
+
+    const obj = serialize(subject);
+    obj.progress = calculatedProgress;
+    obj.topicsCompleted = completed;
+    obj.topicsTotal = total;
+    return obj;
+  });
+
+  res.json({ success: true, data: serialized });
 }
 export async function getSubject(req, res) {
   const item = await owned(Subject, req.user._id, req.params.id);
   if (!item) return res.status(404).json({ success: false, message: "Subject not found" });
-  res.json({ success: true, data: serialize(item) });
+
+  const totalTopics = await Topic.countDocuments({ subject: item._id, user: req.user._id });
+  const completedTopics = await Topic.countDocuments({ subject: item._id, user: req.user._id, status: "completed" });
+  const calculatedProgress = totalTopics === 0 ? 0 : Math.min(100, Math.max(0, Math.round((completedTopics / totalTopics) * 100)));
+
+  const obj = serialize(item);
+  obj.progress = calculatedProgress;
+  obj.topicsCompleted = completedTopics;
+  obj.topicsTotal = totalTopics;
+  res.json({ success: true, data: obj });
 }
 export async function createSubject(req, res) {
   if (!required(req.body, ["name", "code", "credits"]))
@@ -100,7 +143,11 @@ export async function createSubject(req, res) {
         message: "Name, code, and credits are required",
       });
   const item = await Subject.create({ ...req.body, user: req.user._id });
-  res.status(201).json({ success: true, data: serialize(item) });
+  const obj = serialize(item);
+  obj.progress = 0;
+  obj.topicsCompleted = 0;
+  obj.topicsTotal = 0;
+  res.status(201).json({ success: true, data: obj });
 }
 export async function updateSubject(req, res) {
   const item = await owned(Subject, req.user._id, req.params.id);
@@ -117,9 +164,19 @@ export async function updateSubject(req, res) {
   if (clearingSyllabus) {
     await Topic.deleteMany({ subject: item._id });
     await Unit.deleteMany({ subject: item._id });
+    item.progress = 0;
+    await item.save();
   }
 
-  res.json({ success: true, data: serialize(item) });
+  const totalTopics = await Topic.countDocuments({ subject: item._id, user: req.user._id });
+  const completedTopics = await Topic.countDocuments({ subject: item._id, user: req.user._id, status: "completed" });
+  const calculatedProgress = totalTopics === 0 ? 0 : Math.min(100, Math.max(0, Math.round((completedTopics / totalTopics) * 100)));
+
+  const obj = serialize(item);
+  obj.progress = calculatedProgress;
+  obj.topicsCompleted = completedTopics;
+  obj.topicsTotal = totalTopics;
+  res.json({ success: true, data: obj });
 }
 export async function deleteSubject(req, res) {
   const item = await owned(Subject, req.user._id, req.params.id);
@@ -127,6 +184,8 @@ export async function deleteSubject(req, res) {
     return res
       .status(404)
       .json({ success: false, message: "Subject not found" });
+  await Topic.deleteMany({ subject: item._id });
+  await Unit.deleteMany({ subject: item._id });
   await item.deleteOne();
   res.status(204).end();
 }
@@ -186,6 +245,7 @@ export async function createTopic(req, res) {
     user: req.user._id,
   });
   await item.populate("subject", "name");
+  await updateSubjectProgressHelper(req.body.subjectId, req.user._id);
   res.status(201).json({ success: true, data: serialize(item) });
 }
 export async function updateTopic(req, res) {
@@ -196,13 +256,16 @@ export async function updateTopic(req, res) {
   if (req.body.subjectId) item.subject = req.body.subjectId;
   await item.save();
   await item.populate("subject", "name");
+  await updateSubjectProgressHelper(item.subject?._id || item.subject, req.user._id);
   res.json({ success: true, data: serialize(item) });
 }
 export async function deleteTopic(req, res) {
   const item = await owned(Topic, req.user._id, req.params.id);
   if (!item)
     return res.status(404).json({ success: false, message: "Topic not found" });
+  const subjectId = item.subject;
   await item.deleteOne();
+  await updateSubjectProgressHelper(subjectId, req.user._id);
   res.status(204).end();
 }
 
@@ -667,7 +730,7 @@ export async function getDashboard(req, res) {
               60) *
               10,
           ) / 10,
-        streak,
+        streak: Math.max(user.currentStreak || 0, streak),
       },
       subjects: subjectsWithProgress.map(serialize),
       upcomingExams: exams
@@ -1127,7 +1190,7 @@ export async function getStudyStats(req, res) {
         formatted: formatDuration(totalMinutes),
         sessionsCount: allSessions.length,
       },
-      streak,
+      streak: Math.max(req.user?.currentStreak || 0, streak),
       averageDurationMinutes: avgSessionDuration,
       averageDurationFormatted: formatDuration(avgSessionDuration),
       topSubject,

@@ -5,6 +5,9 @@ import {
   syncPortal,
   getCalendar,
   disconnectPortal,
+  getTodayAttendance,
+  markAttendance,
+  getTimetableData,
 } from '../controllers/portal/portalController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { requireSrmApEligible } from '../middleware/srmApMiddleware.js';
@@ -21,5 +24,10 @@ router.get('/status', asyncHandler(getStatus));
 router.post('/sync', asyncHandler(syncPortal));
 router.get('/calendar', asyncHandler(getCalendar));
 router.delete('/disconnect', asyncHandler(disconnectPortal));
+
+// Attendance & Timetable endpoints
+router.get('/attendance/today', asyncHandler(getTodayAttendance));
+router.post('/attendance/mark', asyncHandler(markAttendance));
+router.get('/timetable', asyncHandler(getTimetableData));
 
 export default router;
