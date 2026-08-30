@@ -1,6 +1,6 @@
 import React, { useContext, useState } from 'react';
 import { View, StyleSheet, ScrollView, Text, TouchableOpacity, Switch, Alert, Image, Modal } from 'react-native';
-import { Camera, Moon, Sun, Trophy, ToggleLeft, ToggleRight, Bell, Smartphone, RefreshCw, Lock, ChevronRight, Clock, KeyRound, Circle, CircleDot, Fingerprint } from 'lucide-react-native';
+import { Camera, Moon, Sun, Trophy, ToggleLeft, ToggleRight, Bell, Smartphone, RefreshCw, Lock, ChevronRight, Clock, KeyRound, Circle, CircleDot, Fingerprint, CheckCircle2 } from 'lucide-react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { AuthContext } from '../../context/AuthContext';
 import { AppUpdateContext } from '../../context/AppUpdateContext';
@@ -15,6 +15,7 @@ import { useAppDialog } from '../../components/ui/AppDialog';
 import { typography, spacing, radii, useAppTheme, useStyles } from '../../theme/theme';
 import apiClient from '../../api/client';
 import { pickAndUploadImage } from '../../utils/fileUploader';
+import { getPortalStatus } from '../../api/portal';
 
 const SettingsScreen = ({ navigation }) => {
   const { colors, typography, spacing, radii, theme, isDark, toggleTheme } = useAppTheme();
@@ -39,10 +40,44 @@ const SettingsScreen = ({ navigation }) => {
     name: user?.name || '',
     collegeId: user?.collegeId || null,
     university: user?.university || '',
+    registrationNumber: user?.registrationNumber || '',
     degree: user?.degree || '',
     branch: user?.branch || '',
+    section: user?.section || '',
     semester: String(user?.semester || '1'),
   });
+
+  React.useEffect(() => {
+    if (user) {
+      setForm((f) => ({
+        ...f,
+        name: user.name || '',
+        collegeId: user.collegeId || null,
+        university: user.university || '',
+        registrationNumber: user.registrationNumber || '',
+        degree: user.degree || '',
+        branch: user.branch || '',
+        section: user.section || '',
+        semester: String(user.semester || '1'),
+      }));
+    }
+  }, [user]);
+
+  const [isSynced, setIsSynced] = useState(false);
+  const [lastSyncDate, setLastSyncDate] = useState('Recently');
+
+  React.useEffect(() => {
+    getPortalStatus()
+      .then((res) => {
+        if (res && res.isConnected) {
+          setIsSynced(true);
+          if (res.lastSuccessfulSync) {
+            setLastSyncDate(new Date(res.lastSuccessfulSync).toLocaleString());
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const [notifications, setNotifications] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -168,16 +203,35 @@ const SettingsScreen = ({ navigation }) => {
           </View>
 
           <View style={styles.form}>
+            {isSynced && (
+              <View style={styles.syncBanner}>
+                <View style={styles.syncBannerRow}>
+                  <CheckCircle2 size={16} color={colors.accent} />
+                  <Text style={styles.syncBannerTitle}>Profile synced with SRM AP Portal</Text>
+                </View>
+                <Text style={styles.syncBannerDetail}>Last synced: {lastSyncDate}</Text>
+              </View>
+            )}
+
             <Field label="Full Name">
               <Input
                 value={form.name}
                 onChangeText={t => setFormValue('name', t)}
                 placeholder="Enter your full name"
-                editable={!isSaving}
+                editable={!isSaving && !isSynced}
               />
             </Field>
 
-            <Field label="College / University" hint="Search or enter your institution">
+            <Field label="Registration Number">
+              <Input
+                value={form.registrationNumber}
+                onChangeText={t => setFormValue('registrationNumber', t)}
+                placeholder="E.g. AP24110010000"
+                editable={!isSaving && !isSynced}
+              />
+            </Field>
+
+            <Field label="College / University" hint={isSynced ? '' : "Search or enter your institution"}>
               <CollegePicker
                 collegeId={form.collegeId}
                 collegeName={form.university}
@@ -185,7 +239,7 @@ const SettingsScreen = ({ navigation }) => {
                 onSelect={({ collegeId: selectedId, collegeName: selectedName }) => {
                   setForm(f => ({ ...f, collegeId: selectedId, university: selectedName }));
                 }}
-                disabled={isSaving}
+                disabled={isSaving || isSynced}
               />
             </Field>
 
@@ -194,7 +248,7 @@ const SettingsScreen = ({ navigation }) => {
                 value={form.degree}
                 onChangeText={t => setFormValue('degree', t)}
                 placeholder="Enter your degree / program"
-                editable={!isSaving}
+                editable={!isSaving && !isSynced}
               />
             </Field>
 
@@ -203,19 +257,33 @@ const SettingsScreen = ({ navigation }) => {
                 value={form.branch}
                 onChangeText={t => setFormValue('branch', t)}
                 placeholder="Enter your branch / department"
-                editable={!isSaving}
+                editable={!isSaving && !isSynced}
               />
             </Field>
 
-            <Field label="Current Semester">
-              <Input
-                value={form.semester}
-                onChangeText={t => setFormValue('semester', t)}
-                placeholder="Enter your semester"
-                keyboardType="numeric"
-                editable={!isSaving}
-              />
-            </Field>
+            <View style={{ flexDirection: 'row', gap: spacing.md }}>
+              <View style={{ flex: 1 }}>
+                <Field label="Section">
+                  <Input
+                    value={form.section}
+                    onChangeText={t => setFormValue('section', t)}
+                    placeholder="E.g. Sec D"
+                    editable={!isSaving && !isSynced}
+                  />
+                </Field>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Field label="Current Semester">
+                  <Input
+                    value={form.semester}
+                    onChangeText={t => setFormValue('semester', t)}
+                    placeholder="Enter your semester"
+                    keyboardType="numeric"
+                    editable={!isSaving && !isSynced}
+                  />
+                </Field>
+              </View>
+            </View>
 
             <View style={styles.saveAction}>
               <Button onPress={handleSave} disabled={isSaving}>
@@ -641,6 +709,31 @@ const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.crea
   },
   form: {
     gap: spacing.md,
+  },
+  syncBanner: {
+    backgroundColor: colors.accent + '1A', // 10%
+    borderColor: colors.accent + '33', // 20%
+    borderWidth: 1,
+    borderRadius: radii.xl,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  syncBannerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: 4,
+  },
+  syncBannerTitle: {
+    fontFamily: typography.sans.medium,
+    fontSize: 14,
+    color: colors.foreground,
+  },
+  syncBannerDetail: {
+    fontFamily: typography.sans.regular,
+    fontSize: 12,
+    color: colors.mutedForeground,
+    marginLeft: 24,
   },
   saveAction: {
     alignItems: 'flex-end',

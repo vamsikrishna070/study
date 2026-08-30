@@ -29,11 +29,15 @@ import {
   syncPortalData,
   disconnectPortal,
 } from '../../api/portal';
+import { AuthContext } from '../../context/AuthContext';
+import { useAppDialog } from '../../hooks/useAppDialog';
 
 const PortalDashboardScreen = ({ navigation }) => {
   const { colors, typography, spacing, radii } = useAppTheme();
   const styles = useStyles(createStyles);
 
+  const { refreshUser } = useContext(AuthContext);
+  const { showSuccess, showError, showDialog } = useAppDialog();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
 
@@ -76,7 +80,10 @@ const PortalDashboardScreen = ({ navigation }) => {
         srmUsername: srmUsername.trim().toUpperCase(),
         srmPassword,
       });
-      Alert.alert('Connected', 'SRM Portal linked and data synchronized successfully!');
+
+      await refreshUser();
+      showSuccess('Portal Connected', 'SRM Portal linked and data synchronized successfully.');
+      
       setShowConnectModal(false);
       setSrmPassword('');
       fetchStatus();

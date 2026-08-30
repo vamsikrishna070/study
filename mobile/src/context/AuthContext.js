@@ -9,6 +9,18 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [isNewRegistration, setIsNewRegistration] = useState(false);
 
+  const refreshUser = async () => {
+    try {
+      const token = await getToken();
+      if (token && token !== 'null' && token !== 'undefined') {
+        const userData = await getCurrentUser();
+        setUser(userData.user || userData);
+      }
+    } catch (error) {
+      console.error('Error in refreshUser:', error);
+    }
+  };
+
   useEffect(() => {
     const loadUser = async () => {
       try {
@@ -18,7 +30,7 @@ export const AuthProvider = ({ children }) => {
             const userData = await getCurrentUser();
             setUser(userData.user || userData);
           } catch (error) {
-            console.log('Error loading user (AuthContext). Token might be invalid.', error?.message || error);
+            console.error('Error loading user (AuthContext). Token might be invalid.', error?.message || error);
             await removeToken();
             setUser(null);
           }
@@ -90,7 +102,8 @@ export const AuthProvider = ({ children }) => {
       register, 
       verify, 
       logout, 
-      setUser 
+      setUser,
+      refreshUser
     }}>
       {children}
     </AuthContext.Provider>
