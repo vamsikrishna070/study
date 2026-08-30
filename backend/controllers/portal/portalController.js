@@ -15,22 +15,41 @@ export async function connectPortal(req, res) {
   try {
     const { srmUsername, srmPassword } = req.body;
     if (!srmUsername || !srmPassword) {
-      return res.status(400).json({ success: false, message: 'Registration Number and Password are required' });
+      return res.status(400).json({
+        success: false,
+        code: 'INVALID_CREDENTIALS',
+        message: 'Registration Number and Password are required.',
+      });
     }
     const result = await connectPortalAccount(req.user._id, srmUsername, srmPassword);
     res.json({ success: true, data: result, message: 'SRM Portal connected successfully!' });
   } catch (error) {
-    console.error('[PortalController] connectPortal error:', error);
-    const isCredentialError = /invalid|credential|password|username|registration/i.test(error.message || '');
-    if (isCredentialError) {
-      return res.status(400).json({
-        success: false,
-        message: 'The SRM Portal credentials you entered are incorrect.',
-      });
+    console.error('[PortalController] connectPortal error:', error.message);
+    const code = error.code || 'LOGIN_FAILED';
+    let statusCode = 500;
+    let message = 'Unable to connect to SRM Portal. Please try again.';
+
+    if (code === 'INVALID_CREDENTIALS') {
+      statusCode = 400;
+      message = 'Registration number or portal password is incorrect.';
+    } else if (code === 'CAPTCHA_FAILED') {
+      statusCode = 503;
+      message = 'SRM Portal verification could not be completed. Please try again.';
+    } else if (code === 'PORTAL_UNAVAILABLE') {
+      statusCode = 503;
+      message = 'SRM Portal is currently unavailable. Please try again later.';
+    } else if (code === 'SCRAPE_FAILED' || code === 'SYNC_FAILED') {
+      statusCode = 502;
+      message = 'Your SRM Portal login succeeded, but some academic data could not be synchronized. Please try again.';
+    } else {
+      statusCode = 400;
+      message = error.message || 'Unable to authenticate with SRM Portal.';
     }
-    return res.status(503).json({
+
+    return res.status(statusCode).json({
       success: false,
-      message: 'The SRM Portal is temporarily unavailable. Please try again later.',
+      code,
+      message,
     });
   }
 }

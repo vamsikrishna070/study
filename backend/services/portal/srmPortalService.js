@@ -128,6 +128,7 @@ async function solveCaptchaOcr(imageBuffer) {
 // 3. Internal: Attempt SRM login with a solved CAPTCHA — returns jsessionId on success
 export async function attemptSrmLogin(username, password) {
   const MAX_RETRIES = 3;
+  let lastErrorReason = null;
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     let jsessionId;
@@ -135,19 +136,22 @@ export async function attemptSrmLogin(username, password) {
     try {
       ({ jsessionId, captchaBuffer } = await fetchSrmSession());
     } catch (err) {
-      throw new Error('SRM Student Portal is currently unreachable. Please try again later.');
+      console.warn(`[PortalService] Attempt ${attempt}: Unable to fetch SRM session/captcha:`, err.message);
+      const networkError = new Error('SRM Student Portal is currently unreachable. Please try again later.');
+      networkError.code = 'PORTAL_UNAVAILABLE';
+      throw networkError;
     }
 
     let captchaText = '';
     try {
       captchaText = await solveCaptchaOcr(captchaBuffer);
-    } catch {
-      // OCR failed — try again with a new session
+    } catch (ocrErr) {
+      console.warn(`[PortalService] Attempt ${attempt}: OCR recognition error. Retrying...`);
       continue;
     }
 
     if (!captchaText || captchaText.length < 3) {
-      // OCR returned too little — try again
+      console.warn(`[PortalService] Attempt ${attempt}: OCR returned short text (${captchaText}). Retrying...`);
       continue;
     }
 
@@ -171,33 +175,71 @@ export async function attemptSrmLogin(username, password) {
         body: payload.toString(),
       });
     } catch (networkErr) {
-      throw new Error('Unable to reach the SRM AP portal. Please check your internet connection.');
+      console.warn(`[PortalService] Attempt ${attempt}: Network failure during login POST:`, networkErr.message);
+      const netErr = new Error('Unable to reach the SRM AP portal. Please check your internet connection.');
+      netErr.code = 'PORTAL_UNAVAILABLE';
+      throw netErr;
     }
 
     const html = await loginRes.text();
-    const nameMatch = html.match(/<h2>(.*?)<\/h2>/);
-    if (nameMatch) {
-      // Successful login
+
+    // 1. Success check: student greeting or portal elements or h2
+    const nameMatch = html.match(/<h2>(.*?)<\/h2>/i);
+    const isSuccess = Boolean(nameMatch) || /Student Corner|HRDSystem|tblSubjectWiseAttendance|Welcome/i.test(html);
+    if (isSuccess) {
+      console.log(`[PortalService] SRM Portal login succeeded on attempt ${attempt}!`);
       return jsessionId;
     }
 
-    // If credentials are clearly wrong (not a CAPTCHA issue), fail immediately
-    if (/invalid|incorrect|wrong/i.test(html) && attempt >= 2) {
-      throw new Error('Invalid SRM registration number or portal password. Please check your credentials and try again.');
+    // 2. Failure check: distinguish Explicit Credential Error vs CAPTCHA error
+    const lowerHtml = html.toLowerCase();
+    const isExplicitCredentialError =
+      lowerHtml.includes('invalid user name') ||
+      lowerHtml.includes('invalid password') ||
+      lowerHtml.includes('invalid credentials') ||
+      lowerHtml.includes('user name or password') ||
+      lowerHtml.includes('wrong password') ||
+      lowerHtml.includes('invalid registration');
+
+    const isCaptchaError =
+      lowerHtml.includes('invalid captcha') ||
+      lowerHtml.includes('invalid verification') ||
+      lowerHtml.includes('captcha code') ||
+      lowerHtml.includes('verification code');
+
+    if (isExplicitCredentialError) {
+      console.warn(`[PortalService] Attempt ${attempt}: Credentials explicitly rejected by SRM AP portal.`);
+      const credErr = new Error('Registration number or portal password is incorrect.');
+      credErr.code = 'INVALID_CREDENTIALS';
+      throw credErr;
     }
-    // Otherwise retry (likely a CAPTCHA solve error)
+
+    if (isCaptchaError) {
+      console.warn(`[PortalService] Attempt ${attempt}: CAPTCHA misread by OCR. Retrying...`);
+      lastErrorReason = 'CAPTCHA_MISMATCH';
+      continue;
+    }
+
+    // Default retry for unrecognized response
+    console.warn(`[PortalService] Attempt ${attempt}: Login response unrecognized. Retrying...`);
+    lastErrorReason = 'UNRECOGNIZED_RESPONSE';
   }
 
-  throw new Error(
-    'Unable to automatically authenticate with the SRM AP portal after multiple attempts. ' +
-    'This may be a temporary portal issue. Please try again in a few minutes.'
+  const err = new Error(
+    lastErrorReason === 'CAPTCHA_MISMATCH'
+      ? 'SRM Portal verification could not be completed after 3 attempts. Please try again.'
+      : 'Unable to authenticate with SRM AP Portal after multiple attempts. Please try again.'
   );
+  err.code = lastErrorReason === 'CAPTCHA_MISMATCH' ? 'CAPTCHA_FAILED' : 'LOGIN_FAILED';
+  throw err;
 }
 
 // 4. Connect user's SRM portal account — fully automatic, no CAPTCHA exposed to student
 export async function connectPortalAccount(userId, srmUsername, srmPassword) {
   if (!srmUsername || !srmPassword) {
-    throw new Error('Registration Number and Password are required.');
+    const err = new Error('Registration Number and Password are required.');
+    err.code = 'INVALID_CREDENTIALS';
+    throw err;
   }
 
   const cleanUsername = srmUsername.trim().toUpperCase();
@@ -230,7 +272,11 @@ export async function connectPortalAccount(userId, srmUsername, srmPassword) {
   await account.save();
 
   // Scrape and cache initial data
-  await scrapeAndStoreData(account, jsessionId);
+  try {
+    await scrapeAndStoreData(account, jsessionId);
+  } catch (scrapeErr) {
+    console.warn('[PortalService] Initial data scrape partial failure:', scrapeErr.message);
+  }
 
   return {
     success: true,
@@ -609,7 +655,16 @@ export async function reSyncPortalData(userId) {
   }
 }
 
-// 6. Static JSON APIs: Calendar & Resources
+// 6. Disconnect SRM Portal account
+export async function disconnectPortalAccount(userId) {
+  await SrmPortalAccount.deleteOne({ userId });
+  return {
+    success: true,
+    message: 'SRM Portal disconnected successfully.',
+  };
+}
+
+// 7. Static JSON APIs: Calendar & Resources
 export function getAcademicCalendarData() {
   const calendarPath = path.join(staticDir, 'academic_calendar.json');
   if (fs.existsSync(calendarPath)) {
@@ -699,10 +754,4 @@ export function getLearningResourcesData(type, course, year, subjectId) {
   }
 
   return {};
-}
-
-// 7. Disconnect SRM account
-export async function disconnectPortalAccount(userId) {
-  await SrmPortalAccount.deleteOne({ userId });
-  return { success: true, message: 'SRM Portal disconnected successfully.' };
 }
