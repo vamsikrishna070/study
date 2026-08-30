@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
   View,
   Text,
@@ -32,7 +32,7 @@ import {
   disconnectPortal,
 } from '../../api/portal';
 import { AuthContext } from '../../context/AuthContext';
-import { useAppDialog } from '../../hooks/useAppDialog';
+import { useAppDialog } from '../../components/ui/AppDialog';
 
 const PortalDashboardScreen = ({ navigation }) => {
   const { colors, typography, spacing, radii } = useAppTheme();
