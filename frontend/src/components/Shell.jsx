@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Target, ChevronRight, Sparkles, Settings as SettingsIcon, MoreHorizontal, LayoutDashboard, BookOpen, FileText, ListChecks, CalendarDays, Library, TrendingUp, Bell, FileStack } from 'lucide-react';
+import { Target, ChevronRight, Sparkles, Settings as SettingsIcon, MoreHorizontal, LayoutDashboard, BookOpen, FileText, ListChecks, CalendarDays, Library, TrendingUp, Bell, FileStack, History } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { cx } from './shared.jsx';
 
 const navItems = [
   { href: '/', label: 'Overview', icon: LayoutDashboard },
   { href: '/subjects', label: 'Subjects', icon: BookOpen },
+  { href: '/study-log', label: 'Study Log', icon: History },
   { href: '/syllabus', label: 'Syllabus', icon: FileStack },
   { href: '/notes', label: 'Notes', icon: FileText },
   { href: '/resources', label: 'Resources', icon: Library },

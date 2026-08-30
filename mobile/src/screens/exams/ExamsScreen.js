@@ -12,6 +12,7 @@ import {
   ScrollView,
   Alert,
   TouchableOpacity,
+  Switch,
 } from 'react-native';
 import {
   CalendarDays,
@@ -23,7 +24,7 @@ import {
   FileText,
 } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { getExams, createExam, deleteExam } from '../../api/exams';
+import { getExams, createExam, deleteExam, updateExam } from '../../api/exams';
 import { getSubjects } from '../../api/subjects';
 import { AuthContext } from '../../context/AuthContext';
 import { Header } from '../../components/ui/Header';
@@ -48,6 +49,14 @@ const EXAM_TYPES = [
   { label: 'Other', value: 'Other' },
 ];
 
+const PERFORMANCE_RATINGS = [
+  { label: 'Excellent', value: 'Excellent' },
+  { label: 'Good', value: 'Good' },
+  { label: 'Average', value: 'Average' },
+  { label: 'Poor', value: 'Poor' },
+  { label: 'Very Poor', value: 'Very Poor' },
+];
+
 const ExamsScreen = ({ route, navigation }) => {
   const { colors, typography, spacing, radii } = useAppTheme();
   const styles = useStyles(createStyles);
@@ -63,6 +72,7 @@ const ExamsScreen = ({ route, navigation }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const [activeTab, setActiveTab] = useState('upcoming');
 
   // Modal State
   const [modalVisible, setModalVisible] = useState(paramOpenCreate);
@@ -77,6 +87,15 @@ const ExamsScreen = ({ route, navigation }) => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // Performance Modal State
+  const [perfModalVisible, setPerfModalVisible] = useState(false);
+  const [selectedExam, setSelectedExam] = useState(null);
+  const [perfRating, setPerfRating] = useState('Good');
+  const [perfReflection, setPerfReflection] = useState('');
+  const [marksPending, setMarksPending] = useState(true);
+  const [marksObtained, setMarksObtained] = useState('');
+  const [maxMarks, setMaxMarks] = useState('');
 
   const loadData = async () => {
     try {
@@ -182,6 +201,80 @@ const ExamsScreen = ({ route, navigation }) => {
     });
   };
 
+  const getPercentageString = () => {
+    if (marksPending) return '';
+    const ob = Number(marksObtained);
+    const mx = Number(maxMarks);
+    if (!isNaN(ob) && !isNaN(mx) && mx > 0) {
+      return ((ob / mx) * 100).toFixed(2) + '%';
+    }
+    return '';
+  };
+
+  const handleSavePerformance = async () => {
+    if (!selectedExam) return;
+
+    const data = {
+      completed: true,
+      performance: perfRating,
+      reflection: perfReflection.trim(),
+    };
+
+    if (marksPending) {
+      data.marksObtained = null;
+      data.maxMarks = null;
+      data.percentage = null;
+    } else {
+      if (marksObtained === '' || maxMarks === '') {
+        Alert.alert('Validation Error', 'Please enter both marks obtained and maximum marks, or select "Marks not available yet".');
+        return;
+      }
+      const ob = Number(marksObtained);
+      const mx = Number(maxMarks);
+
+      if (isNaN(ob) || ob < 0) {
+        Alert.alert('Validation Error', 'Marks obtained cannot be negative.');
+        return;
+      }
+      if (isNaN(mx) || mx <= 0) {
+        Alert.alert('Validation Error', 'Maximum marks must be greater than 0.');
+        return;
+      }
+      if (ob > mx) {
+        Alert.alert('Validation Error', 'Marks obtained cannot be greater than maximum marks.');
+        return;
+      }
+
+      data.marksObtained = ob;
+      data.maxMarks = mx;
+      data.percentage = parseFloat(((ob / mx) * 100).toFixed(2));
+    }
+
+    setSubmitting(true);
+    try {
+      const examId = selectedExam._id || selectedExam.id;
+      const res = await updateExam(examId, data);
+      
+      setPerfModalVisible(false);
+      setSelectedExam(null);
+      setPerfRating('Good');
+      setPerfReflection('');
+      setMarksPending(true);
+      setMarksObtained('');
+      setMaxMarks('');
+      
+      if (res.data) {
+        setExams((prev) => prev.map((e) => ((e._id || e.id) === examId ? res.data : e)));
+      } else {
+        await loadData();
+      }
+    } catch (e) {
+      Alert.alert('Error', e?.response?.data?.message || 'Failed to save exam performance.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const onDateChange = (event, selectedDate) => {
     setShowDatePicker(false);
     if (selectedDate) {
@@ -204,11 +297,18 @@ const ExamsScreen = ({ route, navigation }) => {
     value: s._id || s.id,
   }));
 
+  const filteredExams = exams.filter((e) => {
+    if (activeTab === 'completed') {
+      return e.completed === true;
+    }
+    return e.completed === false;
+  });
+
   return (
     <View style={styles.container}>
       <Header />
       <FlatList
-        data={exams}
+        data={filteredExams}
         keyExtractor={(item, idx) => item._id || item.id || idx.toString()}
         contentContainerStyle={styles.listContent}
         refreshControl={
@@ -228,19 +328,44 @@ const ExamsScreen = ({ route, navigation }) => {
               }
             />
             <QueryState error={error} onRetry={loadData} label="Exams" />
+
+            {/* Category Tabs */}
+            <View style={styles.tabContainer}>
+              {['upcoming', 'completed'].map((tab) => {
+                const isActive = activeTab === tab;
+                return (
+                  <TouchableOpacity
+                    key={tab}
+                    style={[styles.tabButton, isActive && styles.tabButtonActive]}
+                    onPress={() => setActiveTab(tab)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.tabButtonText, isActive && styles.tabButtonTextActive]}>
+                      {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </>
         }
         ListEmptyComponent={
           !error && !loading ? (
             <EmptyState
-              title="No upcoming exams"
-              detail="Stay ahead by adding your exam dates, venues, and syllabus milestones."
+              title={`No ${activeTab} exams`}
+              detail={
+                activeTab === 'upcoming'
+                  ? 'Stay ahead by adding your exam dates, venues, and syllabus milestones.'
+                  : 'Track your finished exams and review your grades here.'
+              }
               icon={CalendarDays}
               action={
-                <Button onPress={() => setModalVisible(true)}>
-                  <Plus size={16} color={colors.primaryForeground} style={{ marginRight: 6 }} />
-                  Schedule exam
-                </Button>
+                activeTab !== 'completed' ? (
+                  <Button onPress={() => setModalVisible(true)}>
+                    <Plus size={16} color={colors.primaryForeground} style={{ marginRight: 6 }} />
+                    Schedule exam
+                  </Button>
+                ) : null
               }
             />
           ) : null
@@ -248,15 +373,22 @@ const ExamsScreen = ({ route, navigation }) => {
         renderItem={({ item }) => {
           const examId = item._id || item.id;
           const daysLeft = item.daysLeft !== undefined ? item.daysLeft : Math.ceil((new Date(item.date) - new Date()) / 86400000);
-          const isUrgent = daysLeft >= 0 && daysLeft <= 7;
-          const isPast = daysLeft < 0;
+          const isUrgent = !item.completed && daysLeft >= 0 && daysLeft <= 7;
+          const isPast = daysLeft < 0 || item.completed;
 
           return (
             <View style={styles.card}>
               <View style={styles.cardHeader}>
                 <View style={styles.cardTitleBox}>
-                  <View style={styles.typeBadge}>
-                    <Text style={styles.typeBadgeText}>{item.type || 'EXAM'}</Text>
+                  <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+                    <View style={styles.typeBadge}>
+                      <Text style={styles.typeBadgeText}>{item.type || 'EXAM'}</Text>
+                    </View>
+                    {item.completed && (
+                      <View style={styles.completedBadge}>
+                        <Text style={styles.completedBadgeText}>Completed ✓</Text>
+                      </View>
+                    )}
                   </View>
                   <Text style={styles.cardTitle}>{item.name}</Text>
                   <Text style={styles.cardSubject}>
@@ -279,7 +411,7 @@ const ExamsScreen = ({ route, navigation }) => {
                       isPast && styles.pastText,
                     ]}
                   >
-                    {isPast ? 'Done' : daysLeft === 0 ? 'Today' : `${daysLeft}d`}
+                    {item.completed ? 'Done' : isPast ? 'Done' : daysLeft === 0 ? 'Today' : `${daysLeft}d`}
                   </Text>
                   {!isPast && daysLeft !== 0 && (
                     <Text style={[styles.countdownLabel, isUrgent && styles.urgentText]}>
@@ -327,19 +459,89 @@ const ExamsScreen = ({ route, navigation }) => {
                 </View>
               )}
 
-              <View style={styles.cardFooter}>
-                <View style={styles.progressBox}>
-                  <Text style={styles.progressText}>
-                    Subject Progress: {item.progress || item.subject?.progress || 0}%
+              {item.completed && (
+                <View style={styles.completedBox}>
+                  <Text style={styles.completedValue}>
+                    <Text style={styles.completedLabel}>Performance: </Text>
+                    {item.performance || 'Good'}
+                  </Text>
+                  {!!item.reflection && (
+                    <Text style={styles.completedValue}>
+                      <Text style={styles.completedLabel}>Reflection: </Text>
+                      <Text style={{ fontStyle: 'italic', color: colors.mutedForeground }}>
+                        "{item.reflection}"
+                      </Text>
+                    </Text>
+                  )}
+                  <Text style={styles.completedValue}>
+                    <Text style={styles.completedLabel}>Result: </Text>
+                    {item.marksObtained !== undefined && item.marksObtained !== null ? (
+                      <Text style={styles.completedValueBold}>
+                        {item.marksObtained} / {item.maxMarks} ({item.percentage}%)
+                      </Text>
+                    ) : (
+                      <Text style={{ color: '#f59e0b', fontFamily: typography.sans.bold }}>
+                        Result Pending
+                      </Text>
+                    )}
                   </Text>
                 </View>
-                <Button
-                  variant="danger"
-                  onPress={() => handleDelete(examId)}
-                  style={styles.deleteBtn}
-                >
-                  Delete
-                </Button>
+              )}
+
+              <View style={styles.cardFooter}>
+                <View style={styles.progressBox}>
+                  {!item.completed ? (
+                    <Text style={styles.progressText}>
+                      Subject Progress: {item.progress || item.subject?.progress || 0}%
+                    </Text>
+                  ) : (
+                    <Text style={styles.progressText}>Exam Completed</Text>
+                  )}
+                </View>
+                
+                <View style={styles.cardActions}>
+                  {!item.completed ? (
+                    <Button
+                      size="sm"
+                      onPress={() => {
+                        setSelectedExam(item);
+                        setPerfRating(item.performance || 'Good');
+                        setPerfReflection(item.reflection || '');
+                        setMarksPending(item.marksObtained === undefined || item.marksObtained === null);
+                        setMarksObtained(item.marksObtained !== undefined && item.marksObtained !== null ? String(item.marksObtained) : '');
+                        setMaxMarks(item.maxMarks !== undefined && item.maxMarks !== null ? String(item.maxMarks) : '');
+                        setPerfModalVisible(true);
+                      }}
+                      style={styles.actionBtn}
+                    >
+                      Complete
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant={!(item.marksObtained !== undefined && item.marksObtained !== null) ? 'primary' : 'outline'}
+                      onPress={() => {
+                        setSelectedExam(item);
+                        setPerfRating(item.performance || 'Good');
+                        setPerfReflection(item.reflection || '');
+                        setMarksPending(item.marksObtained === undefined || item.marksObtained === null);
+                        setMarksObtained(item.marksObtained !== undefined && item.marksObtained !== null ? String(item.marksObtained) : '');
+                        setMaxMarks(item.maxMarks !== undefined && item.maxMarks !== null ? String(item.maxMarks) : '');
+                        setPerfModalVisible(true);
+                      }}
+                      style={styles.actionBtn}
+                    >
+                      {!(item.marksObtained !== undefined && item.marksObtained !== null) ? 'Add Marks' : 'Edit Result'}
+                    </Button>
+                  )}
+                  <Button
+                    variant="danger"
+                    onPress={() => handleDelete(examId)}
+                    style={styles.deleteBtn}
+                  >
+                    Delete
+                  </Button>
+                </View>
               </View>
             </View>
           );
@@ -463,6 +665,113 @@ const ExamsScreen = ({ route, navigation }) => {
                 disabled={!name.trim() || !subjectId || submitting}
               >
                 Schedule Exam
+              </Button>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Performance Entry Modal */}
+      <Modal visible={perfModalVisible} animationType="slide" transparent onRequestClose={() => setPerfModalVisible(false)}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalContainer}
+        >
+          <View style={styles.modalBackdrop} />
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Record Performance</Text>
+              <Button variant="quiet" style={styles.closeBtn} onPress={() => setPerfModalVisible(false)}>
+                <X size={20} color={colors.foreground} />
+              </Button>
+            </View>
+
+            <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled">
+              {selectedExam && (
+                <Text style={{ fontFamily: typography.sans.medium, color: colors.mutedForeground, marginBottom: spacing.md }}>
+                  Exam: {selectedExam.name}
+                </Text>
+              )}
+
+              <Field label="How did you perform?">
+                <SelectPicker
+                  value={perfRating}
+                  onValueChange={setPerfRating}
+                  options={PERFORMANCE_RATINGS}
+                />
+              </Field>
+
+              <Field label="Your Reflection">
+                <Input
+                  value={perfReflection}
+                  onChangeText={setPerfReflection}
+                  placeholder="What went well? What needs improvement?"
+                  multiline
+                  style={{ minHeight: 80, alignItems: 'flex-start' }}
+                  textAlignVertical="top"
+                />
+              </Field>
+
+              <View style={styles.switchRow}>
+                <Text style={styles.switchLabel}>Marks not available yet</Text>
+                <Switch
+                  value={marksPending}
+                  onValueChange={setMarksPending}
+                  trackColor={{ false: colors.border, true: colors.accent }}
+                  thumbColor={Platform.OS === 'android' ? (marksPending ? colors.accent : '#f4f3f4') : undefined}
+                />
+              </View>
+
+              {!marksPending && (
+                <View style={{ gap: spacing.md, marginBottom: spacing.lg }}>
+                  <Field label="Marks Obtained">
+                    <Input
+                      value={marksObtained}
+                      onChangeText={setMarksObtained}
+                      placeholder="e.g. 78"
+                      keyboardType="numeric"
+                    />
+                  </Field>
+
+                  <Field label="Maximum Marks">
+                    <Input
+                      value={maxMarks}
+                      onChangeText={setMaxMarks}
+                      placeholder="e.g. 100"
+                      keyboardType="numeric"
+                    />
+                  </Field>
+
+                  <View>
+                    <Text style={{ fontFamily: typography.mono.bold, fontSize: 10, color: colors.mutedForeground, textTransform: 'uppercase', marginBottom: spacing.xs }}>
+                      Percentage
+                    </Text>
+                    <View style={styles.percentageContainer}>
+                      <Text style={styles.percentageText}>
+                        {getPercentageString() || '—'}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              )}
+            </ScrollView>
+
+            <View
+              style={[
+                styles.modalFooter,
+                { paddingBottom: Math.max(insets.bottom, spacing.md) },
+              ]}
+            >
+              <Button variant="quiet" style={styles.modalBtn} onPress={() => setPerfModalVisible(false)}>
+                Cancel
+              </Button>
+              <Button
+                style={styles.modalBtn}
+                onPress={handleSavePerformance}
+                loading={submitting}
+                disabled={submitting}
+              >
+                Save
               </Button>
             </View>
           </View>
@@ -648,6 +957,109 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
       backgroundColor: `${colors.muted}33`,
     },
     modalBtn: { minWidth: 100 },
+    completedBox: {
+      marginTop: spacing.sm,
+      backgroundColor: colors.background,
+      borderRadius: radii.md,
+      padding: spacing.sm,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      gap: 4,
+    },
+    completedLabel: {
+      fontFamily: typography.sans.semibold,
+      fontSize: 12,
+      color: colors.mutedForeground,
+    },
+    completedValue: {
+      fontFamily: typography.sans.regular,
+      fontSize: 12,
+      color: colors.foreground,
+    },
+    completedValueBold: {
+      fontFamily: typography.sans.bold,
+      fontSize: 12,
+      color: colors.accent,
+    },
+    completedBadge: {
+      alignSelf: 'flex-start',
+      backgroundColor: '#10b981' + '15',
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: radii.sm,
+      marginBottom: 4,
+    },
+    completedBadgeText: {
+      fontFamily: typography.mono.bold,
+      fontSize: 9,
+      color: '#10b981',
+      textTransform: 'uppercase',
+    },
+    cardActions: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      gap: spacing.sm,
+      marginTop: spacing.sm,
+    },
+    actionBtn: {
+      minHeight: 30,
+      paddingVertical: 2,
+      paddingHorizontal: 10,
+    },
+    switchRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: spacing.xs,
+      marginBottom: spacing.sm,
+      gap: spacing.md,
+    },
+    switchLabel: {
+      fontFamily: typography.sans.semibold,
+      fontSize: 14,
+      color: colors.foreground,
+      flex: 1,
+    },
+    percentageContainer: {
+      backgroundColor: colors.background,
+      borderRadius: radii.xl,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      paddingHorizontal: spacing.md,
+      paddingVertical: 12,
+      height: 48,
+      justifyContent: 'center',
+    },
+    percentageText: {
+      fontFamily: typography.mono.bold,
+      fontSize: 14,
+      color: colors.foreground,
+    },
+    tabContainer: {
+      flexDirection: 'row',
+      borderBottomWidth: 1,
+      borderBottomColor: colors.cardBorder,
+      marginBottom: spacing.md,
+      marginTop: spacing.sm,
+    },
+    tabButton: {
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      borderBottomWidth: 2,
+      borderBottomColor: 'transparent',
+    },
+    tabButtonActive: {
+      borderBottomColor: colors.accent,
+    },
+    tabButtonText: {
+      fontFamily: typography.sans.semibold,
+      fontSize: 14,
+      color: colors.mutedForeground,
+    },
+    tabButtonTextActive: {
+      color: colors.accent,
+      fontFamily: typography.sans.bold,
+    },
   });
 
 export default ExamsScreen;

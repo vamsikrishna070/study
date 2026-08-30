@@ -21,6 +21,7 @@ import ResourcesPage from './pages/ResourcesPage.jsx';
 import ProgressPage from './pages/ProgressPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
 import StudySession from './pages/StudySession.jsx';
+import StudyLogPage from './pages/StudyLogPage.jsx';
 import Recordings from './pages/Recordings.jsx';
 import Reminders from './pages/Reminders.jsx';
 import Calendar from './pages/Calendar.jsx';
@@ -50,6 +51,7 @@ function Router() {
     <Route path="/exams" element={<ProtectedRoute><ExamsPage /></ProtectedRoute>} />
     <Route path="/resources" element={<ProtectedRoute><ResourcesPage /></ProtectedRoute>} />
     <Route path="/progress" element={<ProtectedRoute><ProgressPage /></ProtectedRoute>} />
+    <Route path="/study-log" element={<ProtectedRoute><StudyLogPage /></ProtectedRoute>} />
     <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
     <Route path="*" element={<div className="rounded-2xl border border-card-border bg-card p-12 text-center"><h1 className="font-display text-4xl">Page not found</h1><Link className="mt-4 inline-block text-accent" to="/">Return to overview</Link></div>} />
   </Routes></ErrorBoundary>;

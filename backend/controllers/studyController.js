@@ -441,6 +441,28 @@ export async function createExam(req, res) {
         success: false,
         message: "Name, date, and subject are required",
       });
+
+  if (req.body.marksObtained === '' || req.body.marksObtained === null || req.body.maxMarks === '' || req.body.maxMarks === null) {
+    req.body.marksObtained = null;
+    req.body.maxMarks = null;
+    req.body.percentage = null;
+  } else if (req.body.marksObtained !== undefined && req.body.maxMarks !== undefined) {
+    const marksObtainedVal = Number(req.body.marksObtained);
+    const maxMarksVal = Number(req.body.maxMarks);
+    if (isNaN(marksObtainedVal) || marksObtainedVal < 0) {
+      return res.status(400).json({ success: false, message: "Marks obtained cannot be negative" });
+    }
+    if (isNaN(maxMarksVal) || maxMarksVal <= 0) {
+      return res.status(400).json({ success: false, message: "Maximum marks must be greater than 0" });
+    }
+    if (marksObtainedVal > maxMarksVal) {
+      return res.status(400).json({ success: false, message: "Marks obtained cannot be greater than maximum marks" });
+    }
+    req.body.percentage = parseFloat(((marksObtainedVal / maxMarksVal) * 100).toFixed(2));
+    req.body.marksObtained = marksObtainedVal;
+    req.body.maxMarks = maxMarksVal;
+  }
+
   const item = await Exam.create({
     ...req.body,
     subject: req.body.subjectId,
@@ -453,6 +475,28 @@ export async function updateExam(req, res) {
   const item = await owned(Exam, req.user._id, req.params.id);
   if (!item)
     return res.status(404).json({ success: false, message: "Exam not found" });
+
+  if (req.body.marksObtained === '' || req.body.marksObtained === null || req.body.maxMarks === '' || req.body.maxMarks === null) {
+    req.body.marksObtained = null;
+    req.body.maxMarks = null;
+    req.body.percentage = null;
+  } else if (req.body.marksObtained !== undefined && req.body.maxMarks !== undefined) {
+    const marksObtainedVal = Number(req.body.marksObtained);
+    const maxMarksVal = Number(req.body.maxMarks);
+    if (isNaN(marksObtainedVal) || marksObtainedVal < 0) {
+      return res.status(400).json({ success: false, message: "Marks obtained cannot be negative" });
+    }
+    if (isNaN(maxMarksVal) || maxMarksVal <= 0) {
+      return res.status(400).json({ success: false, message: "Maximum marks must be greater than 0" });
+    }
+    if (marksObtainedVal > maxMarksVal) {
+      return res.status(400).json({ success: false, message: "Marks obtained cannot be greater than maximum marks" });
+    }
+    req.body.percentage = parseFloat(((marksObtainedVal / maxMarksVal) * 100).toFixed(2));
+    req.body.marksObtained = marksObtainedVal;
+    req.body.maxMarks = maxMarksVal;
+  }
+
   Object.assign(item, req.body);
   if (req.body.subjectId) item.subject = req.body.subjectId;
   await item.save();

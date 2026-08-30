@@ -10,10 +10,6 @@
       "fallbackToCacheTimeout": 0
     },
     "runtimeVersion": "1.0.6",
-    "android": {
-      "package": "com.studyarena.mobile",
-      "versionCode": 7
-    },
     "web": {
       "favicon": "./assets/favicon.png"
     },

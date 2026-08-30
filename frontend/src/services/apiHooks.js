@@ -89,3 +89,8 @@ export const useDeleteReminder = () => mutation(({ id }) => apiClient.delete(`/r
 // Search
 export const getSearchQueryKey = (q) => ['search', q];
 export const useSearch = (q, options) => query(getSearchQueryKey(q), () => apiClient.get('/search', { params: { q } }), { enabled: !!q, ...options });
+
+// Study Sessions / Study Log
+export const getGetStudySessionsQueryKey = (params = {}) => ['study-sessions', params];
+export const useGetStudySessions = (params, options) => query(getGetStudySessionsQueryKey(params), () => apiClient.get('/study-sessions', { params }), options);
+export const useDeleteStudySession = () => mutation(({ id }) => apiClient.delete(`/study-sessions/${id}`));

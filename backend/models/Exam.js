@@ -9,6 +9,14 @@ const examSchema = new mongoose.Schema({
   time: { type: String, default: '' },
   venue: { type: String, default: '' },
   notes: { type: String, default: '' },
+  completed: { type: Boolean, default: false },
+  performance: { type: String, trim: true, default: '' },
+  reflection: { type: String, trim: true, default: '' },
+  marksObtained: { type: Number },
+  maxMarks: { type: Number },
+  percentage: { type: Number },
+  resultDate: { type: Date },
+  remarks: { type: String, trim: true, default: '' },
 }, { timestamps: true });
 
 export default mongoose.model('Exam', examSchema);
