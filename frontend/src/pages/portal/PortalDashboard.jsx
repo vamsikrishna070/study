@@ -153,6 +153,8 @@ export default function PortalDashboard() {
   const cgpa = data?.cgpa?.cgpa || '0.00';
   const attendanceList = data?.attendance || [];
   const timetableList = data?.timetable || [];
+  const subjectsList = data?.subjects || [];
+  const enrolledCount = data?.enrolledSubjectsCount ?? Math.max(subjectsList.length, attendanceList.length);
 
   const lastSynced = data?.lastSuccessfulSync
     ? new Date(data.lastSuccessfulSync).toLocaleString('en-IN', {
@@ -272,7 +274,7 @@ export default function PortalDashboard() {
               <div className="rounded-2xl border border-card-border bg-card p-5 shadow-sm space-y-1">
                 <span className="font-mono text-xs font-bold uppercase text-muted-foreground">Enrolled Subjects</span>
                 <div className="font-display text-3xl font-bold text-accent">
-                  {attendanceList.length}
+                  {enrolledCount}
                 </div>
                 <p className="text-xs text-muted-foreground">Active course modules</p>
               </div>

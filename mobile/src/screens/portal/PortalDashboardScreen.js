@@ -146,6 +146,8 @@ const PortalDashboardScreen = ({ navigation }) => {
   const cgpa = data?.cgpa?.cgpa || '0.00';
   const attendanceList = data?.attendance || [];
   const timetableList = data?.timetable || [];
+  const subjectsList = data?.subjects || [];
+  const enrolledCount = data?.enrolledSubjectsCount ?? Math.max(subjectsList.length, attendanceList.length);
 
   const lastSynced = data?.lastSuccessfulSync
     ? new Date(data.lastSuccessfulSync).toLocaleString('en-IN', {
@@ -245,7 +247,7 @@ const PortalDashboardScreen = ({ navigation }) => {
 
             <View style={styles.metricCard}>
               <Text style={styles.metricLabel}>ENROLLED SUBJECTS</Text>
-              <Text style={styles.metricValue}>{attendanceList.length}</Text>
+              <Text style={styles.metricValue}>{enrolledCount}</Text>
               <Text style={styles.metricSub}>Active modules</Text>
             </View>
           </View>

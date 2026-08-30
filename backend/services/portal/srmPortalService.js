@@ -364,40 +364,51 @@ async function scrapeAndStoreData(account, sessionId) {
       cgpa: cgpaDiv.length ? cgpaDiv.text().split(":")[1]?.trim() || "0" : "0",
     };
 
-    // Subject Map
+    // 1. Subject Map from Report Page 2 ($subjects)
     const subjectMap = {};
-    $subjects("table.table-striped tr").each((_, row) => {
+    $subjects("table tr").each((_, row) => {
       const td = $subjects(row).find("td");
-      if (td.length === 5) {
-        subjectMap[td.eq(1).text().trim()] = {
-          semester: td.eq(0).text().trim(),
-          credit: td.eq(3).text().trim(),
-        };
+      if (td.length >= 4) {
+        const sem = td.eq(0).text().trim();
+        const code = td.eq(1).text().trim();
+        const name = td.eq(2).text().trim();
+        const credit = td.eq(3).text().trim();
+        if (code && sem && !/code|semester/i.test(code)) {
+          subjectMap[code] = { semester: sem, name, credit };
+        }
       }
     });
 
-    // Attendance
+    // 2. Attendance List & Subject Map from Report Page 3 ($attendance)
     const attendance = [];
-    $attendance("table#tblSubjectWiseAttendance tr").each((_, row) => {
+    const attendanceSubjectsMap = new Map();
+    $attendance("table tr").each((_, row) => {
       const td = $attendance(row).find("td");
-      if (td.length === 9) {
-        attendance.push({
-          subject_code: td.eq(0).text().trim(),
-          subject_name: td.eq(1).text().trim(),
-          classes_conducted: td.eq(2).text().trim(),
-          present: td.eq(3).text().trim(),
-          absent: td.eq(4).text().trim(),
-          od_ml_taken: td.eq(5).text().trim(),
-          present_percentage: td.eq(6).text().trim(),
-          od_ml_percentage: td.eq(7).text().trim(),
-          attendance_percentage: td.eq(8).text().trim(),
-        });
+      if (td.length >= 7) {
+        const code = td.eq(0).text().trim();
+        const name = td.eq(1).text().trim();
+        if (code && name && !/code|subject|conducted/i.test(code)) {
+          attendanceSubjectsMap.set(code, name);
+          if (td.length >= 9) {
+            attendance.push({
+              subject_code: code,
+              subject_name: name,
+              classes_conducted: td.eq(2).text().trim(),
+              present: td.eq(3).text().trim(),
+              absent: td.eq(4).text().trim(),
+              od_ml_taken: td.eq(5).text().trim(),
+              present_percentage: td.eq(6).text().trim(),
+              od_ml_percentage: td.eq(7).text().trim(),
+              attendance_percentage: td.eq(8).text().trim(),
+            });
+          }
+        }
       }
     });
 
-    // Timetable & Subjects
+    // 3. Timetable & Subjects Legend from Report Page 10 ($timetable)
     const rawTimetable = [];
-    $timetable("tr").slice(2).each((_, row) => {
+    $timetable("tr").each((_, row) => {
       const td = $timetable(row).find("td");
       if (td.length > 1) {
         rawTimetable.push({
@@ -407,26 +418,82 @@ async function scrapeAndStoreData(account, sessionId) {
       }
     });
 
-    const timetable = rawTimetable.slice(0, 5);
-    const subjectDetails = [];
-    rawTimetable.slice(7).forEach((item) => {
-      if (item.subjects.length >= 4) {
-        const code = item.day;
-        const faculty = item.subjects[2].trim();
-        const cabinLocation = getFacultyCabin(faculty);
+    const timetable = rawTimetable.filter((item) => /monday|tuesday|wednesday|thursday|friday|saturday|day/i.test(item.day)).slice(0, 6);
 
-        subjectDetails.push({
+    // Extract subjects legend from $timetable by scanning all rows
+    const legendSubjectsMap = new Map();
+    $timetable("tr").each((_, row) => {
+      const td = $timetable(row).find("td");
+      if (td.length >= 3) {
+        const firstCol = td.eq(0).text().trim();
+        const secondCol = td.eq(1).text().trim();
+
+        // If first column looks like a course code (e.g. CSE302, 21CSC302J, MAT101, etc.)
+        if (/^[A-Z0-9]{3,15}$/i.test(firstCol) && !/day|s\.?no|code|hour|monday|tuesday|wednesday|thursday|friday|saturday/i.test(firstCol)) {
+          const code = firstCol;
+          const name = secondCol || attendanceSubjectsMap.get(code) || subjectMap[code]?.name || code;
+          const ltp = td.length >= 3 ? td.eq(2).text().trim() : '';
+          const faculty = td.length >= 4 ? td.eq(3).text().trim() : '';
+          const classrooms = td.length >= 5 ? td.eq(4).text().trim() : '';
+          const cabinLocation = faculty ? getFacultyCabin(faculty) : null;
+
+          legendSubjectsMap.set(code, {
+            code,
+            name,
+            ltp,
+            credit: subjectMap[code]?.credit || '',
+            semester: subjectMap[code]?.semester || profile.semester || '',
+            faculty,
+            classrooms,
+            facultyCabin: cabinLocation ? { name: faculty, location: cabinLocation } : null,
+          });
+        }
+      }
+    });
+
+    // 4. Multi-Source Merger: Combine Legend + Attendance + SubjectMap
+    const mergedSubjectsMap = new Map();
+
+    // Add legend subjects first
+    legendSubjectsMap.forEach((sub, code) => {
+      mergedSubjectsMap.set(code, sub);
+    });
+
+    // Add attendance subjects if missing
+    attendanceSubjectsMap.forEach((name, code) => {
+      if (!mergedSubjectsMap.has(code)) {
+        mergedSubjectsMap.set(code, {
           code,
-          name: item.subjects[0],
-          ltp: item.subjects[1],
-          credit: subjectMap[code]?.credit || "",
-          semester: subjectMap[code]?.semester || "",
-          faculty,
-          classrooms: item.subjects[3],
-          facultyCabin: cabinLocation ? { name: faculty, location: cabinLocation } : null,
+          name,
+          ltp: '',
+          credit: subjectMap[code]?.credit || '',
+          semester: subjectMap[code]?.semester || profile.semester || '',
+          faculty: '',
+          classrooms: '',
+          facultyCabin: null,
         });
       }
     });
+
+    // Add subjectMap subjects if missing
+    Object.entries(subjectMap).forEach(([code, info]) => {
+      if (!mergedSubjectsMap.has(code)) {
+        mergedSubjectsMap.set(code, {
+          code,
+          name: info.name || code,
+          ltp: '',
+          credit: info.credit || '',
+          semester: info.semester || profile.semester || '',
+          faculty: '',
+          classrooms: '',
+          facultyCabin: null,
+        });
+      }
+    });
+
+    const subjectDetails = Array.from(mergedSubjectsMap.values());
+    console.log(`[SRM SYNC] Scraped Subjects Count: ${subjectDetails.length}`);
+    console.log(`[SRM SYNC] Subject Codes: [${subjectDetails.map((s) => s.code).join(', ')}]`);
 
     // Internal Marks (Exams)
     // PRESERVE NULL FOR UNPUBLISHED MARKS. NEVER DEFAULT UNPUBLISHED MARKS TO 0.
@@ -608,9 +675,21 @@ export async function getPortalAccountData(userId) {
     return { isConnected: false, hasStoredPortalData: false };
   }
 
+  let userSubjectsCount = 0;
+  try {
+    userSubjectsCount = await Subject.countDocuments({ user: userId });
+  } catch (cntErr) {
+    console.warn('[PortalService] Unable to count user subjects:', cntErr.message);
+  }
+
+  const cachedSubjectsCount = account.subjectsCache?.length || 0;
+  const attendanceCount = account.attendanceCache?.length || 0;
+  const totalEnrolledCount = Math.max(userSubjectsCount, cachedSubjectsCount, attendanceCount);
+
   const hasStoredData = Boolean(
     account.srmUsername ||
-    (account.profileCache && Object.keys(account.profileCache).length > 0)
+    (account.profileCache && Object.keys(account.profileCache).length > 0) ||
+    totalEnrolledCount > 0
   );
 
   return {
@@ -626,6 +705,7 @@ export async function getPortalAccountData(userId) {
     attendance: account.attendanceCache || [],
     timetable: account.timetableCache || [],
     subjects: account.subjectsCache || [],
+    enrolledSubjectsCount: totalEnrolledCount,
     exams: account.examsCache || [],
     results: account.resultsCache || [],
   };
