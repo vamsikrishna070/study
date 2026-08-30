@@ -23,6 +23,8 @@ import {
   UserCheck,
 } from 'lucide-react-native';
 import { useAppTheme, useStyles } from '../../theme/theme';
+import { formatSemester } from '../../utils/semester';
+import { getUserFriendlyError } from '../../utils/errorUtils';
 import {
   getPortalStatus,
   connectPortal,
@@ -90,8 +92,7 @@ const PortalDashboardScreen = ({ navigation }) => {
     } catch (err) {
       Alert.alert(
         'Connection Failed',
-        err.response?.data?.message ||
-          'Unable to connect to the SRM AP portal. Please verify your registration number and password.'
+        getUserFriendlyError(err, 'portal_connect')
       );
     } finally {
       setConnecting(false);
@@ -105,7 +106,7 @@ const PortalDashboardScreen = ({ navigation }) => {
       Alert.alert('Synced', 'Portal data updated from SRM.');
       fetchStatus();
     } catch (err) {
-      Alert.alert('Sync Failed', err.message || 'Could not sync portal data.');
+      Alert.alert('Sync Failed', getUserFriendlyError(err, 'portal_sync'));
     } finally {
       setSyncing(false);
     }
@@ -122,7 +123,7 @@ const PortalDashboardScreen = ({ navigation }) => {
             await disconnectPortal();
             fetchStatus();
           } catch (err) {
-            Alert.alert('Error', err.message);
+            Alert.alert('Disconnect Failed', getUserFriendlyError(err, 'portal_sync'));
           }
         },
       },
@@ -212,8 +213,8 @@ const PortalDashboardScreen = ({ navigation }) => {
                 <Text style={styles.infoVal}>{profile.section || '—'}</Text>
               </View>
               <View style={styles.infoCol}>
-                <Text style={styles.infoLabel}>SEMESTER</Text>
-                <Text style={styles.infoVal}>Sem {profile.semester || '1'}</Text>
+                <Text style={styles.infoLabel}>CURRENT SEMESTER</Text>
+                <Text style={styles.infoVal}>{formatSemester(profile.semester || 1)}</Text>
               </View>
             </View>
           </View>

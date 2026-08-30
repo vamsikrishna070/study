@@ -3,6 +3,7 @@ import { View, StyleSheet, ScrollView, Text, TouchableOpacity, Switch, Alert, Im
 import { Camera, Moon, Sun, Trophy, ToggleLeft, ToggleRight, Bell, Smartphone, RefreshCw, Lock, ChevronRight, Clock, KeyRound, Circle, CircleDot, Fingerprint, CheckCircle2 } from 'lucide-react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { AuthContext } from '../../context/AuthContext';
+import { getUserFriendlyError } from '../../utils/errorUtils';
 import { AppUpdateContext } from '../../context/AppUpdateContext';
 import { useAppLock } from '../../context/AppLockContext';
 import { Header } from '../../components/ui/Header';
@@ -131,7 +132,7 @@ const SettingsScreen = ({ navigation }) => {
       setUser(res.data.data || res.data.user || res.data);
       showSuccess('Profile Saved', 'Your profile details have been updated.');
     } catch (error) {
-      showError('Update Failed', 'Failed to update profile settings. Please try again.');
+      showError('Update Failed', getUserFriendlyError(error, 'profile_update'));
     } finally {
       setIsSaving(false);
     }

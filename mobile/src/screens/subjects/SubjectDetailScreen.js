@@ -26,6 +26,7 @@ import {
   CloudUpload,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { formatSemester } from '../../utils/semester';
 import { Button } from '../../components/ui/Button';
 import { DocumentPreviewCard } from '../../components/ui/DocumentPreviewCard';
 import { SyllabusReviewModal } from '../../components/subjects/SyllabusReviewModal';
@@ -309,7 +310,7 @@ const SubjectDetailScreen = ({ route, navigation }) => {
             <Text style={styles.heroTitle}>{subject.name}</Text>
 
             <View style={styles.metaRow}>
-              <Text style={styles.metaText}>Semester {subject.semester || 1}</Text>
+              <Text style={styles.metaText}>{formatSemester(subject.semester)}</Text>
               {!!subject.faculty && <Text style={styles.metaDot}>•</Text>}
               {!!subject.faculty && (
                 <Text style={styles.metaText}>Faculty: {subject.faculty}</Text>

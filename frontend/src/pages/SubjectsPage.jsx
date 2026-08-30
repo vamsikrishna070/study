@@ -7,6 +7,8 @@ import Shell from '../components/Shell.jsx';
 import { Button, EmptyState, LoadingBlock, PageHeading, QueryState } from '../components/shared.jsx';
 import SubjectModal from '../components/subjects/SubjectModal.jsx';
 
+import { formatSemester } from '../utils/semester.js';
+
 export function SubjectsPage() {
   const query = useGetSubjects();
   const data = query.data;
@@ -63,7 +65,7 @@ export function SubjectsPage() {
                     <Link to={`/subjects/${subjId}`} className="block hover:text-accent transition-colors">
                       <h2 className="mt-2 font-display text-3xl hover:underline">{s.name}</h2>
                     </Link>
-                    <p className="mt-1 text-xs text-muted-foreground">{s.faculty || 'Faculty not set'} · Semester {s.semester}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{s.faculty || 'Faculty not set'} · {formatSemester(s.semester)}</p>
                   </div>
                   <div className="flex gap-1">
                     <button onClick={() => { setEditing(s); setOpen(true); }} className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground" data-testid={`button-edit-subject-${subjId}`}>

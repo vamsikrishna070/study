@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { ArrowLeft, CheckCircle2, XCircle } from 'lucide-react-native';
 import { useAppTheme, useStyles } from '../../theme/theme';
+import { formatSemester } from '../../utils/semester';
 import { getPortalStatus } from '../../api/portal';
 
 const PortalResultsScreen = ({ navigation }) => {
@@ -69,7 +70,7 @@ const PortalResultsScreen = ({ navigation }) => {
                 <Text style={styles.nameText}>{row.subject_description}</Text>
 
                 <View style={styles.detailsRow}>
-                  <Text style={styles.detailText}>Sem: {row.semester}</Text>
+                  <Text style={styles.detailText}>{formatSemester(row.semester)}</Text>
                   <Text style={styles.detailText}>Credits: {row.credit}</Text>
                   <Text style={[styles.detailText, styles.gradeText]}>Grade: {row.grade}</Text>
                 </View>

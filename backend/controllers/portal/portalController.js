@@ -15,11 +15,17 @@ export async function connectPortal(req, res) {
     const result = await connectPortalAccount(req.user._id, srmUsername, srmPassword);
     res.json({ success: true, data: result, message: 'SRM Portal connected successfully!' });
   } catch (error) {
-    const isCredentialError = /invalid srm|invalid registration|password/i.test(error.message || '');
-    const statusCode = isCredentialError ? 400 : 503;
-    res.status(statusCode).json({
+    console.error('[PortalController] connectPortal error:', error);
+    const isCredentialError = /invalid|credential|password|username|registration/i.test(error.message || '');
+    if (isCredentialError) {
+      return res.status(400).json({
+        success: false,
+        message: 'The SRM Portal credentials you entered are incorrect.',
+      });
+    }
+    return res.status(503).json({
       success: false,
-      message: error.message || 'Unable to connect to the SRM AP portal. Please verify your registration number and password.',
+      message: 'The SRM Portal is temporarily unavailable. Please try again later.',
     });
   }
 }
@@ -29,7 +35,8 @@ export async function getStatus(req, res) {
     const data = await getPortalAccountData(req.user._id);
     res.json({ success: true, data });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message || 'Failed to load SRM portal status' });
+    console.error('[PortalController] getStatus error:', error);
+    res.status(500).json({ success: false, message: 'We couldn\'t load your SRM Portal status right now. Please try again.' });
   }
 }
 
@@ -38,10 +45,11 @@ export async function syncPortal(req, res) {
     const data = await reSyncPortalData(req.user._id);
     res.json({ success: true, data, message: 'Portal data refreshed successfully' });
   } catch (error) {
+    console.error('[PortalController] syncPortal error:', error);
     if (error.message?.includes('session expired')) {
-      return res.status(401).json({ success: false, message: error.message, action: 'reconnect' });
+      return res.status(401).json({ success: false, message: 'Your SRM Portal session has expired. Please re-enter your credentials.', action: 'reconnect' });
     }
-    res.status(500).json({ success: false, message: error.message || 'Failed to sync portal data' });
+    res.status(500).json({ success: false, message: 'We couldn\'t sync your academic information right now. Please try again.' });
   }
 }
 
@@ -50,7 +58,8 @@ export async function getCalendar(req, res) {
     const data = getAcademicCalendarData();
     res.json({ success: true, data });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message || 'Failed to load academic calendar' });
+    console.error('[PortalController] getCalendar error:', error);
+    res.status(500).json({ success: false, message: 'We couldn\'t load the academic calendar right now. Please try again.' });
   }
 }
 
@@ -59,6 +68,7 @@ export async function disconnectPortal(req, res) {
     const result = await disconnectPortalAccount(req.user._id);
     res.json(result);
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message || 'Failed to disconnect SRM portal' });
+    console.error('[PortalController] disconnectPortal error:', error);
+    res.status(500).json({ success: false, message: 'We couldn\'t disconnect your SRM Portal right now. Please try again.' });
   }
 }

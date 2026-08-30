@@ -11,4 +11,7 @@ export const env = {
   VAPID_PUBLIC_KEY: process.env.VAPID_PUBLIC_KEY || '',
   VAPID_PRIVATE_KEY: process.env.VAPID_PRIVATE_KEY || '',
   VAPID_SUBJECT: process.env.VAPID_SUBJECT || '',
+  BREVO_API_KEY: process.env.BREVO_API_KEY || '',
+  BREVO_FROM_EMAIL: process.env.BREVO_FROM_EMAIL || '',
+  BREVO_FROM_NAME: process.env.BREVO_FROM_NAME || 'StudyArena',
 };

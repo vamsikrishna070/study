@@ -1,8 +1,10 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import Onboarding from '../pages/Onboarding.jsx';
 
 export default function ProtectedRoute({ children }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
+  const location = useLocation();
 
   if (isLoading) {
     return (
@@ -13,7 +15,17 @@ export default function ProtectedRoute({ children }) {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+
+  // Check if SRM user needs academic onboarding
+  const isSrm = Boolean(user?.university?.toLowerCase().includes('srm'));
+  const lacksAcademicDetails = !user?.degree || !user?.branch;
+  const needsOnboarding = isSrm && lacksAcademicDetails;
+
+  // Don't intercept settings route so they can manually fix profile there if they want
+  if (needsOnboarding && location.pathname !== '/settings') {
+    return <Onboarding onComplete={() => window.location.reload()} />;
   }
 
   return children;

@@ -1,5 +1,7 @@
-import React, { useState, useContext, useEffect, useRef } from 'react';
+import React, { useState, useContext, useEffect, useRef, useCallback } from 'react';
 import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Text, TouchableOpacity, TextInput } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { getUserFriendlyError } from '../../utils/errorUtils';
 import { KeyRound, Lock, ArrowLeft, RefreshCw, CircleCheck } from 'lucide-react-native';
 import { AuthContext } from '../../context/AuthContext';
 import { Button } from '../../components/ui/Button';
@@ -25,6 +27,24 @@ const VerifyOtpScreen = ({ route, navigation }) => {
   
   const [cooldown, setCooldown] = useState(60); // Start with 60s countdown since OTP was just sent
   const inputRef = useRef(null);
+
+  // Focus input automatically when navigation screen becomes active
+  useFocusEffect(
+    useCallback(() => {
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 150);
+      return () => clearTimeout(timer);
+    }, [])
+  );
+
+  // Focus input on mount
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      inputRef.current?.focus();
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     let timer;
@@ -79,26 +99,7 @@ const VerifyOtpScreen = ({ route, navigation }) => {
         }, 1200);
       }
     } catch (error) {
-      if (error.response) {
-        if (error.response.status === 400) {
-          const msg = error.response.data?.message || '';
-          if (msg.toLowerCase().includes('expired')) {
-            setErrorMsg('Verification code expired. Please tap "Resend Code" below.');
-          } else if (msg.toLowerCase().includes('invalid')) {
-            setErrorMsg('Invalid verification code. Please check and try again.');
-          } else {
-            setErrorMsg(msg || 'Verification failed. Please check the code.');
-          }
-        } else if (error.response.status === 404) {
-          setErrorMsg('Account not found. Please register again.');
-        } else {
-          setErrorMsg('Unable to verify code. Please try again shortly.');
-        }
-      } else if (error.request) {
-        setErrorMsg('Unable to connect to StudyArena. Please check your internet connection.');
-      } else {
-        setErrorMsg('An unexpected error occurred. Please try again.');
-      }
+      setErrorMsg(getUserFriendlyError(error, 'auth_otp'));
     } finally {
       setLoading(false);
     }
@@ -117,7 +118,7 @@ const VerifyOtpScreen = ({ route, navigation }) => {
       setSuccessMsg('A fresh verification code has been sent to your email.');
       setCooldown(60);
       setOtp('');
-      inputRef.current?.focus();
+      setTimeout(() => inputRef.current?.focus(), 100);
     } catch (error) {
       if (error.response) {
         if (error.response.status === 429) {
@@ -180,43 +181,45 @@ const VerifyOtpScreen = ({ route, navigation }) => {
             )}
 
             <Field label="6-Digit Verification Code">
-              {/* Visual 6-box OTP display */}
               <TouchableOpacity
-                style={styles.otpBoxesContainer}
+                style={styles.otpInputWrapper}
                 activeOpacity={1}
                 onPress={() => inputRef.current?.focus()}
               >
-                {otpDigits.map((digit, index) => {
-                  const isCurrent = otp.length === index;
-                  const isFilled = digit !== ' ';
-                  return (
-                    <View
-                      key={index}
-                      style={[
-                        styles.otpBox,
-                        isCurrent && styles.otpBoxActive,
-                        isFilled && styles.otpBoxFilled,
-                      ]}
-                    >
-                      <Text style={styles.otpBoxText}>{isFilled ? digit : ''}</Text>
-                    </View>
-                  );
-                })}
-              </TouchableOpacity>
+                {/* Visual 6-box OTP display */}
+                <View style={styles.otpBoxesContainer} pointerEvents="none">
+                  {otpDigits.map((digit, index) => {
+                    const isCurrent = otp.length === index;
+                    const isFilled = digit !== ' ';
+                    return (
+                      <View
+                        key={index}
+                        style={[
+                          styles.otpBox,
+                          isCurrent && styles.otpBoxActive,
+                          isFilled && styles.otpBoxFilled,
+                        ]}
+                      >
+                        <Text style={styles.otpBoxText}>{isFilled ? digit : ''}</Text>
+                      </View>
+                    );
+                  })}
+                </View>
 
-              {/* Hidden text input capturing typed / pasted digits */}
-              <TextInput
-                ref={inputRef}
-                value={otp}
-                onChangeText={handleOtpChange}
-                keyboardType="numeric"
-                maxLength={6}
-                autoFocus={true}
-                textContentType="oneTimeCode"
-                autoComplete="sms-otp"
-                editable={!loading}
-                style={styles.hiddenInput}
-              />
+                {/* Overlaid TextInput capturing numeric input */}
+                <TextInput
+                  ref={inputRef}
+                  value={otp}
+                  onChangeText={handleOtpChange}
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  autoFocus={true}
+                  textContentType="oneTimeCode"
+                  autoComplete="sms-otp"
+                  editable={!loading}
+                  style={styles.hiddenInputOverlay}
+                />
+              </TouchableOpacity>
             </Field>
 
             {mode === 'password-reset' && (
@@ -374,11 +377,15 @@ const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.crea
     color: '#10B981',
     textAlign: 'center',
   },
+  otpInputWrapper: {
+    position: 'relative',
+    marginVertical: spacing.xs,
+    width: '100%',
+  },
   otpBoxesContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 8,
-    marginVertical: spacing.xs,
   },
   otpBox: {
     flex: 1,
@@ -402,11 +409,11 @@ const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.crea
     fontSize: 22,
     color: colors.foreground,
   },
-  hiddenInput: {
-    position: 'absolute',
+  hiddenInputOverlay: {
+    ...StyleSheet.absoluteFillObject,
     opacity: 0.01,
-    width: 1,
-    height: 1,
+    color: 'transparent',
+    fontSize: 1,
   },
   submitButton: {
     marginTop: spacing.md,

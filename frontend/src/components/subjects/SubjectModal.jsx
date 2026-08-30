@@ -1,11 +1,14 @@
 import { useState, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useToast } from '../ui/use-toast.js';
+import { getUserFriendlyError } from '../../utils/errorUtils.js';
 import { UploadCloud } from 'lucide-react';
 import { getGetDashboardQueryKey, getGetSubjectsQueryKey, useCreateSubject, useUpdateSubject, uploadFile } from '../../services/apiHooks.js';
 import { Button, Field, Modal, colors, cx, inputClass } from '../shared.jsx';
 import AttachmentCard from '../shared/AttachmentCard.jsx';
 
 export default function SubjectModal({ initial, onClose }) {
+  const { toast } = useToast();
   const qc = useQueryClient();
   const create = useCreateSubject();
   const update = useUpdateSubject();
@@ -70,7 +73,16 @@ export default function SubjectModal({ initial, onClose }) {
       qc.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
       onClose();
     };
-    initial ? update.mutate({ id: initial.id || initial._id, data }, { onSuccess: done }) : create.mutate({ data }, { onSuccess: done });
+    const fail = (err) => {
+      toast({
+        title: initial ? 'Update Failed' : 'Creation Failed',
+        description: getUserFriendlyError(err, initial ? 'subject_update' : 'subject_create'),
+        variant: 'destructive',
+      });
+    };
+    initial
+      ? update.mutate({ id: initial.id || initial._id, data }, { onSuccess: done, onError: fail })
+      : create.mutate({ data }, { onSuccess: done, onError: fail });
   };
   
   const canSubmit = !create.isPending && !update.isPending && !uploading && form.name && form.code;

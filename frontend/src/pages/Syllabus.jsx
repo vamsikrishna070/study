@@ -12,6 +12,7 @@ import {
   BookOpen, 
   Upload 
 } from 'lucide-react';
+import { formatSemester } from '../utils/semester.js';
 import apiClient from '../services/apiClient.js';
 import { uploadFile } from '../services/apiHooks.js';
 import Shell from '../components/Shell.jsx';
@@ -146,11 +147,9 @@ export default function Syllabus() {
         alert('Syllabus PDF was uploaded successfully. Text extraction could not automatically detect structured units, but your document is safely attached.');
       }
 
-      loadData(subjectId);
     } catch (err) {
-      const msg = err.response?.data?.message || err.message || 'Could not extract the syllabus. Please make sure the PDF contains readable syllabus text.';
+      const msg = getUserFriendlyError(err, 'syllabus_upload');
       setExtractionError(msg);
-      alert(msg);
     } finally {
       setUploadingPdf(false);
       setExtracting(false);
@@ -313,7 +312,7 @@ export default function Syllabus() {
               <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: subjectColor }} />
               <span className="font-semibold text-foreground">{currentSubject.code}</span>
               <span>·</span>
-              <span>Semester {currentSubject.semester || 1}</span>
+              <span>{formatSemester(currentSubject.semester)}</span>
             </div>
           )}
         </div>

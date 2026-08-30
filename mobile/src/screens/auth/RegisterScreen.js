@@ -2,6 +2,7 @@ import React, { useState, useContext, useMemo } from 'react';
 import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Text, TouchableOpacity } from 'react-native';
 import { UserPlus, Eye, EyeOff, Check, X } from 'lucide-react-native';
 import { AuthContext } from '../../context/AuthContext';
+import { getUserFriendlyError } from '../../utils/errorUtils';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Field } from '../../components/ui/Field';
@@ -85,19 +86,7 @@ const RegisterScreen = ({ navigation }) => {
       await register(trimmedName, trimmedEmail, password);
       navigation.navigate('VerifyOtp', { email: trimmedEmail, mode: 'email-verification' });
     } catch (error) {
-      if (error.response) {
-        if (error.response.status === 409) {
-          setErrorMsg('An account with this email already exists.');
-        } else if (error.response.data?.message) {
-          setErrorMsg(error.response.data.message);
-        } else {
-          setErrorMsg('Unable to complete registration. Please try again.');
-        }
-      } else if (error.request) {
-        setErrorMsg('Unable to connect to StudyArena. Please check your connection.');
-      } else {
-        setErrorMsg('An unexpected error occurred. Please try again.');
-      }
+      setErrorMsg(getUserFriendlyError(error, 'auth_register'));
     } finally {
       setLoading(false);
     }

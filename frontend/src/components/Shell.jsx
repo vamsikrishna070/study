@@ -19,6 +19,8 @@ const navItems = [
   { href: '/progress', label: 'Progress', icon: TrendingUp },
 ];
 
+import { formatSemester } from '../utils/semester.js';
+
 export default function Shell({ children }) {
   const { pathname: location } = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -92,7 +94,7 @@ export default function Shell({ children }) {
           <div className="hidden md:block"><span className="font-mono text-[10px] uppercase tracking-[.2em] text-muted-foreground">Personal academic workspace</span></div>
           <div className="ml-auto flex items-center gap-4">
             <div className="hidden items-center gap-2 rounded-full bg-secondary px-3 py-1.5 text-xs font-semibold text-secondary-foreground sm:flex">
-              <span className="h-1.5 w-1.5 rounded-full bg-accent" />Semester {user.semester || 1}
+              <span className="h-1.5 w-1.5 rounded-full bg-accent" />{formatSemester(user?.semester)}
             </div>
             <Link to="/settings" data-testid="link-header-profile" className="focus-ring rounded-full">
               <ProfileAvatar className="h-9 w-9 bg-primary" />

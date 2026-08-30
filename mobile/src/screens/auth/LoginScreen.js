@@ -2,6 +2,7 @@ import React, { useState, useContext } from 'react';
 import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Text } from 'react-native';
 import { GraduationCap } from 'lucide-react-native';
 import { AuthContext } from '../../context/AuthContext';
+import { getUserFriendlyError } from '../../utils/errorUtils';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Field } from '../../components/ui/Field';
@@ -10,7 +11,7 @@ import { typography, radii, spacing, useAppTheme, useStyles } from '../../theme/
 const LoginScreen = ({ navigation }) => {
   const { colors, typography, spacing, radii, theme } = useAppTheme();
   const styles = useStyles(createStyles);
-  const { login } = useContext(AuthContext);
+  const { login } = useContext(AuthContext);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -26,18 +27,10 @@ const LoginScreen = ({ navigation }) => {
     try {
       await login(email, password);
     } catch (error) {
-      if (error.response) {
-        if (error.response.status === 401) {
-          setErrorMsg('Invalid email or password');
-        } else if (error.response.data?.unverified) {
-          navigation.navigate('VerifyOtp', { email, mode: 'email-verification' });
-        } else {
-          setErrorMsg(error.response.data?.message || 'Login failed.');
-        }
-      } else if (error.request) {
-        setErrorMsg('Network error. Please check your connection.');
+      if (error.response?.data?.unverified) {
+        navigation.navigate('VerifyOtp', { email, mode: 'email-verification' });
       } else {
-        setErrorMsg('An unexpected error occurred.');
+        setErrorMsg(getUserFriendlyError(error, 'auth_login'));
       }
     } finally {
       setLoading(false);
@@ -128,11 +121,12 @@ const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.crea
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
-    padding: spacing.md,
+    padding: spacing.lg,
+    paddingVertical: spacing.xxl,
   },
   card: {
     backgroundColor: colors.card,
-    borderRadius: 24, // 3xl roughly
+    borderRadius: 24,
     padding: spacing.xl,
     borderWidth: 1,
     borderColor: colors.cardBorder,
@@ -157,7 +151,7 @@ const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.crea
   },
   title: {
     fontFamily: typography.serif.medium,
-    fontSize: 32,
+    fontSize: 28,
     color: colors.foreground,
     letterSpacing: -0.5,
   },
@@ -168,35 +162,37 @@ const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.crea
     marginTop: spacing.xs,
   },
   form: {
-    marginBottom: spacing.xl,
+    marginBottom: spacing.md,
   },
   errorContainer: {
-    backgroundColor: `${colors.destructive}1A`, // 10%
+    backgroundColor: `${colors.destructive}1A`,
     padding: spacing.sm,
     borderRadius: radii.sm,
     marginBottom: spacing.md,
   },
   errorText: {
     fontFamily: typography.sans.medium,
-    fontSize: 14,
+    fontSize: 13,
     color: colors.destructive,
-  },
-  submitButton: {
-    marginTop: spacing.md,
+    textAlign: 'center',
   },
   forgotPasswordContainer: {
     alignItems: 'flex-end',
     marginBottom: spacing.md,
+    marginTop: -spacing.xs,
   },
   forgotPasswordText: {
     fontFamily: typography.sans.medium,
-    fontSize: 14,
-    color: colors.primary,
+    fontSize: 13,
+    color: colors.accent,
+  },
+  submitButton: {
+    marginTop: spacing.xs,
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    alignItems: 'center',
+    marginTop: spacing.lg,
   },
   footerText: {
     fontFamily: typography.sans.regular,
@@ -207,5 +203,7 @@ const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.crea
     fontFamily: typography.sans.bold,
     fontSize: 14,
     color: colors.accent,
-  }
-});export default LoginScreen;
+  },
+});
+
+export default LoginScreen;

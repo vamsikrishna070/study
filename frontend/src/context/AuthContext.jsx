@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import apiClient from '../services/apiClient.js';
+import { getUserFriendlyError } from '../utils/errorUtils.js';
 
 const AuthContext = createContext();
 
@@ -50,14 +51,13 @@ export function AuthProvider({ children }) {
         setUser(data.data.user);
         setIsAuthenticated(true);
         return { success: true };
-      } else {
-        return { success: false, unverified: data.unverified, message: data.message || 'Login failed' };
       }
+      return { success: false, message: data.message || 'Unable to log in. Please check your details and try again.' };
     } catch (error) {
       if (error.response?.data?.unverified) {
-        return { success: false, unverified: true, message: error.response.data.message };
+        return { success: false, message: error.response.data.message, unverified: true };
       }
-      return { success: false, message: error.response?.data?.message || 'Login failed' };
+      return { success: false, message: getUserFriendlyError(error, 'auth_login') };
     }
   };
 
@@ -65,11 +65,11 @@ export function AuthProvider({ children }) {
     try {
       const { data } = await apiClient.post('/auth/register', userData);
       if (data.success) {
-        // Registration now sends an OTP, no longer logging the user in immediately
         return { success: true, message: data.message };
       }
+      return { success: false, message: data.message || 'We couldn\'t create your account. Please try again.' };
     } catch (error) {
-      return { success: false, message: error.response?.data?.message || 'Registration failed' };
+      return { success: false, message: getUserFriendlyError(error, 'auth_register') };
     }
   };
 
@@ -83,8 +83,9 @@ export function AuthProvider({ children }) {
         setIsAuthenticated(true);
         return { success: true };
       }
+      return { success: false, message: data.message || 'Verification failed. Please try again.' };
     } catch (error) {
-      return { success: false, message: error.response?.data?.message || 'Verification failed' };
+      return { success: false, message: getUserFriendlyError(error, 'auth_otp') };
     }
   };
 
@@ -93,7 +94,7 @@ export function AuthProvider({ children }) {
       const { data } = await apiClient.post('/auth/resend-otp', { email, purpose });
       return { success: true, message: data.message };
     } catch (error) {
-      return { success: false, message: error.response?.data?.message || 'Failed to resend OTP' };
+      return { success: false, message: getUserFriendlyError(error, 'auth_otp') };
     }
   };
 
@@ -103,11 +104,9 @@ export function AuthProvider({ children }) {
       if (data.success) {
         return { success: true, message: data.message };
       }
+      return { success: false, message: data.message || 'Unable to request password reset. Please try again.' };
     } catch (error) {
-      if (error.response) {
-        return { success: false, message: error.response.data?.message || 'Failed to send reset email' };
-      }
-      return { success: false, message: 'Unable to connect to StudyArena. Please check your internet connection.' };
+      return { success: false, message: getUserFriendlyError(error, 'auth_login') };
     }
   };
 
@@ -115,18 +114,15 @@ export function AuthProvider({ children }) {
     try {
       const { data } = await apiClient.post('/auth/reset-password', { email, otp, newPassword });
       if (data.success) {
-        // Reset password logs user in
         localStorage.setItem('studyarena_token', data.data.token);
         apiClient.defaults.headers.common['Authorization'] = `Bearer ${data.data.token}`;
         setUser(data.data.user);
         setIsAuthenticated(true);
         return { success: true };
       }
+      return { success: false, message: data.message || 'Failed to reset password. Please try again.' };
     } catch (error) {
-      if (error.response) {
-        return { success: false, message: error.response.data?.message || 'Failed to reset password' };
-      }
-      return { success: false, message: 'Unable to connect to StudyArena. Please check your internet connection.' };
+      return { success: false, message: getUserFriendlyError(error, 'auth_otp') };
     }
   };
 
@@ -134,7 +130,7 @@ export function AuthProvider({ children }) {
     try {
       await apiClient.post('/auth/logout');
     } catch (e) {
-      // ignore
+      console.error('[AuthContext] Logout request error:', e);
     }
     localStorage.removeItem('studyarena_token');
     delete apiClient.defaults.headers.common['Authorization'];
@@ -149,8 +145,9 @@ export function AuthProvider({ children }) {
         setUser(data.data);
         return { success: true };
       }
+      return { success: false, message: data.message || 'We couldn\'t save your profile. Please try again.' };
     } catch (error) {
-      return { success: false, message: error.response?.data?.message || 'Update failed' };
+      return { success: false, message: getUserFriendlyError(error, 'profile_update') };
     }
   };
 
@@ -158,7 +155,7 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider value={{ 
       user, isAuthenticated, isLoading, 
       login, register, verifyEmail, resendOtp, forgotPassword, resetPassword, 
-      logout, updateProfile 
+      logout, updateProfile, refreshUser: checkAuth 
     }}>
       {children}
     </AuthContext.Provider>

@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { Moon, Sun, Trophy, ToggleLeft, ToggleRight, Camera, Bell, BellOff, ShieldAlert, CheckCircle } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useSubscribePush, uploadFile } from "../services/apiHooks.js";
+import { useGetPortalStatus } from "../services/portalHooks.js";
 import apiClient from "../services/apiClient.js";
 import Shell from "../components/Shell.jsx";
 import {
@@ -36,10 +37,18 @@ export default function SettingsPage() {
   const [form, setForm] = useState({
     name: user?.name || "",
     university: user?.university || "",
+    registrationNumber: user?.registrationNumber || "",
     degree: user?.degree || "",
     branch: user?.branch || "",
+    section: user?.section || "",
     semester: String(user?.semester || "1"),
   });
+
+  const statusQuery = useGetPortalStatus();
+  const isSynced = statusQuery.data?.isConnected;
+  const lastSyncDate = statusQuery.data?.lastSuccessfulSync 
+    ? new Date(statusQuery.data.lastSuccessfulSync).toLocaleString() 
+    : "Recently";
 
   const [profileImageUrl, setProfileImageUrl] = useState(user?.profileImageUrl || "");
   const [profileImagePublicId, setProfileImagePublicId] = useState(user?.profileImagePublicId || "");
@@ -47,6 +56,22 @@ export default function SettingsPage() {
 
   const [saved, setSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setForm((prev) => ({
+        ...prev,
+        name: user.name || "",
+        university: user.university || "",
+        registrationNumber: user.registrationNumber || "",
+        degree: user.degree || "",
+        branch: user.branch || "",
+        section: user.section || "",
+        semester: String(user.semester || "1"),
+      }));
+    }
+  }, [user]);
+
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   // Push notification state
@@ -123,6 +148,12 @@ export default function SettingsPage() {
     if (res.success) {
       setSaved(true);
       setTimeout(() => setSaved(false), 1800);
+    } else {
+      toast({
+        title: 'Save Failed',
+        description: res.message || 'We couldn\'t save your profile. Please try again.',
+        variant: 'destructive',
+      });
     }
     setIsSaving(false);
   };
@@ -359,28 +390,53 @@ export default function SettingsPage() {
               </div>
             </div>
             <form onSubmit={save} className="mt-7 space-y-5">
-              <Field label="Name">
-                <input
-                  className={inputClass}
-                  value={form.name}
-                  onChange={(e) => set("name", e.target.value)}
-                  data-testid="input-profile-name"
-                />
-              </Field>
+              {isSynced && (
+                <div className="rounded-xl border border-accent/20 bg-accent/10 p-4 text-sm text-foreground">
+                  <div className="flex items-center gap-2 font-medium">
+                    <CheckCircle size={16} className="text-accent" />
+                    Profile synced with SRM AP Portal
+                  </div>
+                  <div className="mt-1 ml-6 text-xs text-muted-foreground">
+                    Last synced: {lastSyncDate}
+                  </div>
+                </div>
+              )}
+              <div className="grid gap-5 sm:grid-cols-2">
+                <Field label="Name">
+                  <input
+                    className={inputClass}
+                    value={form.name}
+                    onChange={(e) => set("name", e.target.value)}
+                    disabled={isSynced || isSaving}
+                    data-testid="input-profile-name"
+                  />
+                </Field>
+                <Field label="Registration Number">
+                  <input
+                    className={inputClass}
+                    value={form.registrationNumber}
+                    onChange={(e) => set("registrationNumber", e.target.value)}
+                    disabled={isSynced || isSaving}
+                    placeholder="E.g. AP24110010000"
+                  />
+                </Field>
+              </div>
               <Field label="University">
                 <input
                   className={inputClass}
                   value={form.university}
                   onChange={(e) => set("university", e.target.value)}
+                  disabled={isSynced || isSaving}
                   data-testid="input-profile-university"
                 />
               </Field>
-              <div className="grid gap-5 sm:grid-cols-3">
+              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
                 <Field label="Degree">
                   <input
                     className={inputClass}
                     value={form.degree}
                     onChange={(e) => set("degree", e.target.value)}
+                    disabled={isSynced || isSaving}
                     data-testid="input-profile-degree"
                   />
                 </Field>
@@ -389,7 +445,17 @@ export default function SettingsPage() {
                     className={inputClass}
                     value={form.branch}
                     onChange={(e) => set("branch", e.target.value)}
+                    disabled={isSynced || isSaving}
                     data-testid="input-profile-branch"
+                  />
+                </Field>
+                <Field label="Section">
+                  <input
+                    className={inputClass}
+                    value={form.section}
+                    onChange={(e) => set("section", e.target.value)}
+                    disabled={isSynced || isSaving}
+                    placeholder="E.g. Sec D"
                   />
                 </Field>
                 <Field label="Semester">
@@ -397,6 +463,7 @@ export default function SettingsPage() {
                     className={inputClass}
                     value={form.semester}
                     onChange={(e) => set("semester", e.target.value)}
+                    disabled={isSynced || isSaving}
                     data-testid="select-profile-semester"
                   >
                     {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (

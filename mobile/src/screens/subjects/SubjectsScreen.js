@@ -34,6 +34,7 @@ import { PageHeading } from '../../components/ui/PageHeading';
 import { Card } from '../../components/ui/Card';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { QueryState } from '../../components/ui/QueryState';
+import { formatSemester } from '../../utils/semester';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Field } from '../../components/ui/Field';
@@ -320,7 +321,7 @@ const SubjectsScreen = ({ navigation }) => {
                   <Text style={styles.cardAccentBadgeText}>{item.credits} CREDITS</Text>
                 </View>
                 <View style={styles.cardAccentBadge}>
-                  <Text style={styles.cardAccentBadgeText}>SEM {item.semester || 1}</Text>
+                  <Text style={styles.cardAccentBadgeText}>{formatSemester(item.semester)}</Text>
                 </View>
               </View>
 

@@ -11,8 +11,10 @@ const publicUser = (user) => ({
   email: user.email,
   collegeId: user.collegeId || null,
   university: user.university || '',
+  registrationNumber: user.registrationNumber || '',
   degree: user.degree || '',
   branch: user.branch || '',
+  section: user.section || '',
   batch: user.batch || '',
   semester: user.semester || 1,
   profileImageUrl: user.profileImageUrl || '',
@@ -67,10 +69,11 @@ export async function register(req, res) {
   await user.save();
 
   try {
-    await sendVerificationEmail(user.email, otp);
+    await sendVerificationEmail({ email: user.email, name: user.name, otp });
   } catch (error) {
-    await User.deleteOne({ _id: user._id });
-    return res.status(500).json({ success: false, message: error.message || 'Failed to send verification email' });
+    console.error('[AuthController] Registration email dispatch failed:', error);
+    await User.deleteOne({ _id: user._id }).catch(err => console.error('[AuthController] Failed to cleanup user record:', err.message));
+    return res.status(500).json({ success: false, message: 'We couldn\'t send the verification email. Please try again shortly.' });
   }
 
   res.status(201).json({ success: true, message: 'Verification email sent' });
@@ -126,9 +129,9 @@ export async function resendOtp(req, res) {
     await user.save();
 
     try {
-      await sendVerificationEmail(user.email, otp);
+      await sendVerificationEmail({ email: user.email, name: user.name, otp });
     } catch (error) {
-      return res.status(500).json({ success: false, message: error.message || 'Failed to send verification email' });
+      return res.status(500).json({ success: false, message: error.message || 'Unable to send verification email' });
     }
 
     return res.json({ success: true, message: 'A new verification code has been sent' });
@@ -143,9 +146,10 @@ export async function resendOtp(req, res) {
     await user.save();
 
     try {
-      await sendPasswordResetEmail(user.email, otp);
+      await sendPasswordResetEmail({ email: user.email, name: user.name, otp });
     } catch (error) {
       console.error('[AuthController] Failed to send password reset email:', error.message);
+      return res.status(500).json({ success: false, message: error.message || 'Unable to send password reset email' });
     }
 
     return res.json({ success: true, message: 'If an account exists, a reset code was sent' });
@@ -225,8 +229,10 @@ export async function updateProfile(req, res) {
     name, 
     collegeId, 
     university, 
+    registrationNumber,
     degree, 
     branch, 
+    section,
     batch, 
     semester, 
     profileImageUrl, 
@@ -266,12 +272,20 @@ export async function updateProfile(req, res) {
     user.university = typeof university === 'string' ? university.trim() : '';
   }
 
+  if (registrationNumber !== undefined) {
+    user.registrationNumber = typeof registrationNumber === 'string' ? registrationNumber.trim() : '';
+  }
+
   if (degree !== undefined) {
     user.degree = typeof degree === 'string' ? degree.trim() : '';
   }
 
   if (branch !== undefined) {
     user.branch = typeof branch === 'string' ? branch.trim() : '';
+  }
+
+  if (section !== undefined) {
+    user.section = typeof section === 'string' ? section.trim() : '';
   }
 
   if (batch !== undefined) {

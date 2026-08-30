@@ -6,6 +6,7 @@ import { PageHeading } from '../../components/ui/PageHeading';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { typography, spacing, radii, useAppTheme, useStyles } from '../../theme/theme';
+import { formatSemester } from '../../utils/semester';
 
 const getInitials = (name) => {
   if (!name || typeof name !== 'string') return 'U';
@@ -57,8 +58,8 @@ const ProfileScreen = ({ navigation }) => {
             <Text style={styles.detailValue}>{user?.branch || 'Not specified'}</Text>
           </View>
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Semester</Text>
-            <Text style={styles.detailValue}>{user?.semester ? `Semester ${user.semester}` : 'Not specified'}</Text>
+            <Text style={styles.detailLabel}>Current Semester</Text>
+            <Text style={styles.detailValue}>{formatSemester(user?.semester)}</Text>
           </View>
 
           <Button style={styles.editBtn} variant="outline" onPress={() => navigation.navigate('Settings')}>

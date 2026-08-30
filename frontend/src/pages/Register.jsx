@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { Button, Field, inputClass } from '../components/shared.jsx';
+import { CollegePicker } from '../components/CollegePicker.jsx';
 import { GraduationCap, Eye, EyeOff, Check, X } from 'lucide-react';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -30,6 +31,8 @@ function calculatePasswordStrength(password) {
 
 export default function Register() {
   const [form, setForm] = useState({ name: '', email: '', password: '', confirmPassword: '' });
+  const [collegeId, setCollegeId] = useState(null);
+  const [collegeName, setCollegeName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
@@ -65,6 +68,8 @@ export default function Register() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
     const validationError = validate();
     if (validationError) {
       setError(validationError);
@@ -78,6 +83,8 @@ export default function Register() {
       name: form.name.trim(),
       email: form.email.trim().toLowerCase(),
       password: form.password,
+      university: collegeName.trim(),
+      ...(collegeId ? { collegeId } : {}),
     };
 
     const res = await register(payload);
@@ -123,6 +130,19 @@ export default function Register() {
               value={form.email} 
               onChange={e => set('email', e.target.value)} 
               placeholder="Enter your email address" 
+              disabled={isSubmitting}
+            />
+          </Field>
+          
+          <Field label="College / University" hint="Where are you currently studying?">
+            <CollegePicker
+              collegeId={collegeId}
+              collegeName={collegeName}
+              onSelect={({ collegeId: cid, collegeName: cname }) => {
+                setCollegeId(cid);
+                setCollegeName(cname);
+                if (error) setError('');
+              }}
               disabled={isSubmitting}
             />
           </Field>
@@ -222,3 +242,4 @@ export default function Register() {
     </div>
   );
 }
+

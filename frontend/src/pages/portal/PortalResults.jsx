@@ -3,6 +3,7 @@ import { Award, ArrowLeft, CheckCircle2, XCircle } from 'lucide-react';
 import Shell from '../../components/Shell.jsx';
 import { LoadingBlock, QueryState, cx } from '../../components/shared.jsx';
 import { useGetPortalStatus } from '../../services/portalHooks.js';
+import { formatSemester } from '../../utils/semester.js';
 
 export default function PortalResults() {
   const statusQuery = useGetPortalStatus();
@@ -71,7 +72,7 @@ export default function PortalResults() {
                     const isPass = /PASS|P/i.test(row.result);
                     return (
                       <tr key={idx} className="hover:bg-muted/30">
-                        <td className="p-4 font-mono font-bold">{row.semester}</td>
+                        <td className="p-4 font-mono font-bold">{formatSemester(row.semester)}</td>
                         <td className="p-4 font-mono text-accent font-bold">{row.subject_code}</td>
                         <td className="p-4 font-medium">{row.subject_description}</td>
                         <td className="p-4 text-center font-mono">{row.credit}</td>

@@ -11,6 +11,7 @@ import {
 import { ArrowLeft, RefreshCw, ShieldCheck } from 'lucide-react-native';
 import { useAppTheme, useStyles } from '../../theme/theme';
 import { getPortalStatus, syncPortalData } from '../../api/portal';
+import { getUserFriendlyError } from '../../utils/errorUtils';
 
 const PortalExamsScreen = ({ navigation }) => {
   const { colors, typography, spacing, radii } = useAppTheme();
@@ -43,7 +44,7 @@ const PortalExamsScreen = ({ navigation }) => {
       Alert.alert('Synced', 'Official SRM marks synchronized successfully.');
       loadStatus();
     } catch (err) {
-      Alert.alert('Sync Failed', err.message || 'Could not sync SRM portal data.');
+      Alert.alert('Sync Failed', getUserFriendlyError(err, 'portal_sync'));
     } finally {
       setSyncing(false);
     }

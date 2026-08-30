@@ -5,6 +5,8 @@ import * as cheerio from 'cheerio';
 import { DateTime } from 'luxon';
 import { createWorker } from 'tesseract.js';
 import SrmPortalAccount from '../../models/SrmPortalAccount.js';
+import User from '../../models/User.js';
+import Subject from '../../models/Subject.js';
 import { encryptPortalSecret, decryptPortalSecret } from '../../utils/portalCrypto.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -462,6 +464,89 @@ async function scrapeAndStoreData(account, sessionId) {
     account.connectionStatus = 'connected';
 
     await account.save();
+
+    // Synchronize to StudyArena User profile
+    const user = await User.findById(account.userId);
+    if (user && profile) {
+      let updated = false;
+      if (profile.studentName && user.name !== profile.studentName) { user.name = profile.studentName; updated = true; }
+      
+      const regNoToSave = profile.registerNo || account.srmUsername;
+      if (regNoToSave && user.registrationNumber !== regNoToSave) { user.registrationNumber = regNoToSave; updated = true; }
+      
+      if (profile.institution && user.university !== profile.institution) { user.university = profile.institution; updated = true; }
+      if (profile.program && user.degree !== profile.program) { user.degree = profile.program; updated = true; }
+      if (profile.specialization && user.branch !== profile.specialization) { user.branch = profile.specialization; updated = true; }
+      if (profile.section && user.section !== profile.section) { user.section = profile.section; updated = true; }
+      
+      if (profile.semester) {
+        const romanMap = { i: 1, ii: 2, iii: 3, iv: 4, v: 5, vi: 6, vii: 7, viii: 8, ix: 9, x: 10, xi: 11, xii: 12 };
+        let semStr = profile.semester.toLowerCase().replace(/semester|sem/gi, '').trim();
+        let semNum = parseInt(semStr, 10);
+        if (isNaN(semNum) && romanMap[semStr]) semNum = romanMap[semStr];
+        if (isNaN(semNum)) {
+          const digitMatch = profile.semester.match(/\b([1-9]|1[0-2])\b/);
+          if (digitMatch) semNum = parseInt(digitMatch[1], 10);
+        }
+        if (!isNaN(semNum) && semNum >= 1 && semNum <= 12) {
+          if (user.semester !== semNum) {
+            user.semester = semNum;
+            updated = true;
+          }
+          // Normalize profileCache.semester to clean format "Semester N"
+          profile.semester = `Semester ${semNum}`;
+        }
+      }
+      
+      if (updated) {
+        await user.save();
+      }
+    }
+
+    // Automatically Upsert Subjects
+    try {
+      if (subjectDetails && subjectDetails.length > 0) {
+        for (const sub of subjectDetails) {
+          if (!sub.code || !sub.name) continue;
+
+          const existingSubject = await Subject.findOne({ user: account.userId, code: sub.code });
+          
+          if (existingSubject) {
+            // Upsert: Safe update of core fields without wiping custom user fields (like progress, syllabus)
+            let subjectUpdated = false;
+            
+            if (sub.name && existingSubject.name !== sub.name) { existingSubject.name = sub.name; subjectUpdated = true; }
+            if (sub.credit) {
+              const numCredit = Number(sub.credit);
+              if (!isNaN(numCredit) && existingSubject.credits !== numCredit) { existingSubject.credits = numCredit; subjectUpdated = true; }
+            }
+            if (sub.faculty && existingSubject.faculty !== sub.faculty) { existingSubject.faculty = sub.faculty; subjectUpdated = true; }
+            if (sub.semester) {
+              const numSem = Number(sub.semester);
+              if (!isNaN(numSem) && existingSubject.semester !== numSem) { existingSubject.semester = numSem; subjectUpdated = true; }
+            }
+
+            if (subjectUpdated) {
+              await existingSubject.save();
+            }
+          } else {
+            // Create new subject
+            await Subject.create({
+              user: account.userId,
+              code: sub.code,
+              name: sub.name,
+              credits: Number(sub.credit) || 3, // fallback if invalid
+              faculty: sub.faculty || '',
+              semester: Number(sub.semester) || 1,
+            });
+          }
+        }
+      }
+    } catch (subjectErr) {
+      console.error('Failed to automatically sync subjects:', subjectErr.message);
+      // We log but do NOT fail the portal sync so other features still work.
+    }
+
     return true;
   } catch (err) {
     console.error('[PortalService] Error scraping SRM portal data:', err.message);

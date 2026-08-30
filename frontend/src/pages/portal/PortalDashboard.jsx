@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext.jsx';
 import {
   GraduationCap,
   RefreshCw,
@@ -25,6 +26,8 @@ import {
   useDisconnectPortal,
 } from '../../services/portalHooks.js';
 import { useToast } from '../../components/ui/use-toast.js';
+import { formatSemester } from '../../utils/semester.js';
+import { getUserFriendlyError } from '../../utils/errorUtils.js';
 
 // Portal features (Course Resources removed per requirements)
 const PORTAL_FEATURES = [
@@ -62,6 +65,7 @@ const PORTAL_FEATURES = [
 
 export default function PortalDashboard() {
   const { toast } = useToast();
+  const { refreshUser } = useAuth();
   const statusQuery = useGetPortalStatus();
   const connectMutation = useConnectPortal();
   const syncMutation = useSyncPortal();
@@ -92,13 +96,15 @@ export default function PortalDashboard() {
         srmPassword,
       });
 
+      await refreshUser(); // refresh global auth state to populate Settings profile fields
+
       toast({ title: 'Portal Connected!', description: 'SRM Portal linked and data synchronized successfully.' });
       setShowConnectModal(false);
       setSrmPassword('');
     } catch (err) {
       toast({
         title: 'Connection Failed',
-        description: err.message || 'Unable to connect to the SRM AP portal. Please verify your registration number and password.',
+        description: getUserFriendlyError(err, 'portal_connect'),
         variant: 'destructive',
       });
     }
@@ -109,7 +115,7 @@ export default function PortalDashboard() {
       await syncMutation.mutateAsync();
       toast({ title: 'Synced Successfully', description: 'Latest portal data fetched from SRM.' });
     } catch (err) {
-      toast({ title: 'Sync Failed', description: err.message, variant: 'destructive' });
+      toast({ title: 'Sync Failed', description: getUserFriendlyError(err, 'portal_sync'), variant: 'destructive' });
     }
   };
 
@@ -119,7 +125,7 @@ export default function PortalDashboard() {
         await disconnectMutation.mutateAsync();
         toast({ title: 'Disconnected', description: 'SRM Portal account unlinked.' });
       } catch (err) {
-        toast({ title: 'Error', description: err.message, variant: 'destructive' });
+        toast({ title: 'Disconnect Failed', description: getUserFriendlyError(err, 'portal_sync'), variant: 'destructive' });
       }
     }
   };
@@ -238,7 +244,7 @@ export default function PortalDashboard() {
                 </div>
                 <div>
                   <span className="text-[11px] font-semibold text-muted-foreground uppercase">Current Semester</span>
-                  <div className="font-bold text-base">Semester {profile.semester || '1'}</div>
+                  <div className="font-bold text-base">{formatSemester(profile.semester || 1)}</div>
                 </div>
               </div>
             </div>

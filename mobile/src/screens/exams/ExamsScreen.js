@@ -23,6 +23,7 @@ import {
   MapPin,
   FileText,
 } from 'lucide-react-native';
+import { getUserFriendlyError } from '../../utils/errorUtils';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { getExams, createExam, deleteExam, updateExam } from '../../api/exams';
 import { getSubjects } from '../../api/subjects';
@@ -269,7 +270,7 @@ const ExamsScreen = ({ route, navigation }) => {
         await loadData();
       }
     } catch (e) {
-      Alert.alert('Error', e?.response?.data?.message || 'Failed to save exam performance.');
+      Alert.alert('Error', getUserFriendlyError(e, 'exam_save'));
     } finally {
       setSubmitting(false);
     }

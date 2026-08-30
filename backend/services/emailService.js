@@ -1,7 +1,7 @@
 /**
  * Central Transactional Email Service for StudyArena
- * Uses Brevo HTTPS REST API (api.brevo.com/v3/smtp/email)
- * Eliminates SMTP port blocking on Render and serverless environments.
+ * Uses Brevo HTTPS REST API (https://api.brevo.com/v3/smtp/email)
+ * Exclusively uses Brevo HTTPS API (No SMTP / Nodemailer).
  */
 
 const BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email';
@@ -76,45 +76,55 @@ function buildOtpHtml({ title, subtitle, otp, expiryMinutes = 15 }) {
 }
 
 /**
- * Sends a transactional email using the Brevo HTTPS REST API.
+ * Sends a transactional email using the Brevo HTTPS REST API exclusively.
  * 
  * @param {Object} options
  * @param {string} options.to - Recipient email address
+ * @param {string} [options.name] - Recipient full name
  * @param {string} options.subject - Email subject line
  * @param {string} [options.text] - Plain text email content
  * @param {string} [options.html] - HTML email content
- * @returns {Promise<Object>} Brevo API response data (e.g. { messageId: '...' })
+ * @returns {Promise<Object>} Brevo API response data ({ messageId: '...' })
  */
-export const sendEmail = async ({ to, subject, text, html }) => {
+export const sendEmail = async ({ to, name = '', subject, text, html }) => {
   const apiKey = process.env.BREVO_API_KEY;
+  const fromEmail = process.env.BREVO_FROM_EMAIL;
+  const fromName = process.env.BREVO_FROM_NAME || 'StudyArena';
+
+  // Strict config checks
   if (!apiKey) {
     console.error('[EmailService] BREVO_API_KEY is not configured in environment variables.');
-    throw new Error('Brevo API key is not configured.');
+    throw new Error('Email service configuration error: BREVO_API_KEY is missing.');
   }
-
-  const fromEmail = process.env.BREVO_FROM_EMAIL || 'creatorhub.studios07@gmail.com';
-  const fromName = process.env.BREVO_FROM_NAME || 'StudyArena';
+  if (!fromEmail) {
+    console.error('[EmailService] BREVO_FROM_EMAIL is not configured in environment variables.');
+    throw new Error('Email service configuration error: BREVO_FROM_EMAIL is missing.');
+  }
 
   // Ensure recipient is valid
   if (!to || typeof to !== 'string' || !to.includes('@')) {
     throw new Error('Invalid recipient email address.');
   }
 
-  // Format HTML if plain text was provided without HTML
+  const recipientEmail = to.trim().toLowerCase();
+  const recipientName = (name && typeof name === 'string' && name.trim()) 
+    ? name.trim() 
+    : recipientEmail.split('@')[0];
+
+  // Extract OTP for html template generation if plain text was provided without HTML
   let finalHtml = html;
   if (!finalHtml && text) {
     const otpMatch = text.match(/\b\d{6}\b/);
-    const otp = otpMatch ? otpMatch[0] : '';
-    const isVerification = subject.toLowerCase().includes('verify');
+    const extractedOtp = otpMatch ? otpMatch[0] : null;
     const isPasswordReset = subject.toLowerCase().includes('password');
 
-    if (otp) {
+    if (extractedOtp) {
       finalHtml = buildOtpHtml({
         title: isPasswordReset ? 'Password Reset Code' : 'Verify Your Email',
         subtitle: isPasswordReset
           ? 'Enter this verification code to reset your StudyArena account password.'
           : 'Enter this verification code to complete your StudyArena registration.',
-        otp,
+        otp: extractedOtp,
         expiryMinutes: 15,
       });
     } else {
@@ -125,11 +135,12 @@ export const sendEmail = async ({ to, subject, text, html }) => {
   const requestBody = {
     sender: {
       name: fromName,
-      email: fromEmail,
+      email: fromEmail.trim(),
     },
     to: [
       {
-        email: to.trim().toLowerCase(),
+        email: recipientEmail,
+        name: recipientName,
       },
     ],
     subject: subject || 'StudyArena Notification',
@@ -154,51 +165,60 @@ export const sendEmail = async ({ to, subject, text, html }) => {
 
     clearTimeout(timeoutId);
 
+    const data = await response.json().catch(() => ({}));
+
     if (!response.ok) {
-      let errorMessage = `HTTP ${response.status} (${response.statusText})`;
-      try {
-        const errorData = await response.json();
-        if (errorData?.message) {
-          errorMessage = `${errorMessage} - ${errorData.message}`;
-        }
-      } catch (_) {
-        // Response wasn't JSON
-      }
-      console.error(`[EmailService] Brevo API email request failed: ${errorMessage}`);
-      throw new Error('Unable to send verification email. Please try again shortly.');
+      console.error('[EmailService] Brevo API request failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        code: data?.code,
+        message: data?.message,
+      });
+      throw new Error(data?.message || `Unable to send verification email. (HTTP ${response.status})`);
     }
 
-    const data = await response.json().catch(() => ({}));
-    return { success: true, messageId: data.messageId };
+    if (!data?.messageId) {
+      console.error('[EmailService] Brevo accepted request without returning a message ID:', data);
+      throw new Error('Brevo accepted the request without returning a message ID.');
+    }
+
+    console.log(`[EmailService] Brevo email delivered to ${recipientEmail} (MessageId: ${data.messageId})`);
+    return data;
   } catch (error) {
     if (error.name === 'AbortError') {
       console.error(`[EmailService] Brevo API email request timed out after ${REQUEST_TIMEOUT_MS / 1000}s`);
       throw new Error('Email service timed out. Please try again shortly.');
     }
-    // Re-throw sanitized error for caller
-    if (error.message.startsWith('Unable to send') || error.message.startsWith('Email service')) {
-      throw error;
+    
+    // Log unexpected errors cleanly without revealing API key
+    if (!error.message.startsWith('Unable to send') && !error.message.startsWith('Email service') && !error.message.startsWith('Brevo')) {
+      console.error(`[EmailService] Unexpected error sending email: ${error.message}`);
     }
-    console.error(`[EmailService] Unexpected error sending email: ${error.message}`);
-    throw new Error('Unable to send verification email. Please try again shortly.');
+    
+    throw error;
   }
 };
 
 /**
- * Sends an email verification OTP.
+ * Central function to send an email verification OTP.
  */
-export const sendVerificationEmail = async (email, otp) => {
+export const sendVerificationEmail = async ({ email, name, otp }) => {
+  const recipientEmail = typeof email === 'string' ? email : email?.email;
+  const recipientName = typeof email === 'object' ? email?.name : name;
+  const otpCode = typeof email === 'object' ? email?.otp : otp;
+
   const html = buildOtpHtml({
     title: 'Verify Your Email',
     subtitle: 'Welcome to StudyArena! Enter the verification code below to activate your account.',
-    otp,
+    otp: otpCode,
     expiryMinutes: 15,
   });
 
   return sendEmail({
-    to: email,
-    subject: 'StudyArena - Email Verification OTP',
-    text: `Your verification code is: ${otp}. It expires in 15 minutes.`,
+    to: recipientEmail,
+    name: recipientName,
+    subject: 'Verify your StudyArena account',
+    text: `Your StudyArena verification code is: ${otpCode}. It expires in 15 minutes.`,
     html,
   });
 };
@@ -206,18 +226,23 @@ export const sendVerificationEmail = async (email, otp) => {
 /**
  * Sends a password reset OTP.
  */
-export const sendPasswordResetEmail = async (email, otp) => {
+export const sendPasswordResetEmail = async ({ email, name, otp }) => {
+  const recipientEmail = typeof email === 'string' ? email : email?.email;
+  const recipientName = typeof email === 'object' ? email?.name : name;
+  const otpCode = typeof email === 'object' ? email?.otp : otp;
+
   const html = buildOtpHtml({
     title: 'Reset Your Password',
     subtitle: 'We received a request to reset your StudyArena password. Enter the code below to proceed.',
-    otp,
+    otp: otpCode,
     expiryMinutes: 15,
   });
 
   return sendEmail({
-    to: email,
+    to: recipientEmail,
+    name: recipientName,
     subject: 'StudyArena - Password Reset OTP',
-    text: `Your password reset code is: ${otp}. It expires in 15 minutes.`,
+    text: `Your StudyArena password reset code is: ${otpCode}. It expires in 15 minutes.`,
     html,
   });
 };
@@ -225,9 +250,9 @@ export const sendPasswordResetEmail = async (email, otp) => {
 /**
  * Generic OTP dispatcher helper.
  */
-export const sendOtpEmail = async (email, otp, purpose = 'registration') => {
+export const sendOtpEmail = async ({ email, name, otp, purpose = 'registration' }) => {
   if (purpose === 'password_reset') {
-    return sendPasswordResetEmail(email, otp);
+    return sendPasswordResetEmail({ email, name, otp });
   }
-  return sendVerificationEmail(email, otp);
+  return sendVerificationEmail({ email, name, otp });
 };
