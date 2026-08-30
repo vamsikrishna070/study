@@ -343,8 +343,12 @@ export async function getTimetable(userId) {
   const rawSubjects = account.subjectsCache || [];
 
   const subjectMap = new Map();
+  const normalizeCode = (c) => (c || '').replace(/\s+/g, ' ').trim().toUpperCase();
   rawSubjects.forEach((sub) => {
-    if (sub.code) subjectMap.set(sub.code, sub);
+    if (sub.code && sub.isSrmActive !== false) {
+      subjectMap.set(sub.code, sub);
+      subjectMap.set(normalizeCode(sub.code), sub);
+    }
   });
 
   const daysMap = {
@@ -368,13 +372,14 @@ export async function getTimetable(userId) {
         };
 
         if (code && code !== '-' && code !== 'NIL') {
-          const subInfo = subjectMap.get(code) || {};
+          const norm = normalizeCode(code);
+          const subInfo = subjectMap.get(code) || subjectMap.get(norm) || {};
           daysMap[dayKey].push({
             hour: hourNum,
             startTime: slot.startTime,
             endTime: slot.endTime,
             subjectCode: code,
-            subjectName: subInfo.name || code,
+            subjectName: subInfo.name || subInfo.subjectName || code,
             faculty: subInfo.faculty || '',
             room: subInfo.classrooms || 'AB1',
             type: subInfo.ltp?.includes('P') ? 'PRACTICAL' : 'LECTURE',

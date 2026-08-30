@@ -90,7 +90,10 @@ export async function updateSubjectProgressHelper(subjectId, userId) {
 }
 
 export async function getSubjects(req, res) {
-  const subjects = await Subject.find({ user: req.user._id }).sort({
+  const subjects = await Subject.find({
+    user: req.user._id,
+    isSrmActive: { $ne: false },
+  }).sort({
     createdAt: -1,
   });
   const allTopics = await Topic.find({ user: req.user._id }).select("subject status");

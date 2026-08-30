@@ -357,12 +357,14 @@ async function scrapeAndStoreData(account, sessionId) {
     });
     const pic = $original("div.profile_pic img").attr("src");
     if (pic) profile.picture = `https://student.srmap.edu.in${pic}`;
-
     // CGPA
     const cgpaDiv = $cgpa("div[style*='float: right'][style*='font-size']");
     const cgpa = {
       cgpa: cgpaDiv.length ? cgpaDiv.text().split(":")[1]?.trim() || "0" : "0",
     };
+
+    // Helper to normalize subject codes (strips extra spaces, upper case)
+    const normalizeCode = (c) => (c || '').replace(/\s+/g, ' ').trim().toUpperCase();
 
     // 1. Subject Map from Report Page 2 ($subjects)
     const subjectMap = {};
@@ -374,21 +376,26 @@ async function scrapeAndStoreData(account, sessionId) {
         const name = td.eq(2).text().trim();
         const credit = td.eq(3).text().trim();
         if (code && sem && !/code|semester/i.test(code)) {
-          subjectMap[code] = { semester: sem, name, credit };
+          subjectMap[normalizeCode(code)] = { code, name, semester: sem, credit };
         }
       }
     });
 
-    // 2. Attendance List & Subject Map from Report Page 3 ($attendance)
+    // 2. Attendance List & Authoritative Active Subjects Set from Report Page 3 ($attendance)
     const attendance = [];
     const attendanceSubjectsMap = new Map();
+    const activeCodesSet = new Set();
+
     $attendance("table tr").each((_, row) => {
       const td = $attendance(row).find("td");
       if (td.length >= 7) {
         const code = td.eq(0).text().trim();
         const name = td.eq(1).text().trim();
         if (code && name && !/code|subject|conducted/i.test(code)) {
-          attendanceSubjectsMap.set(code, name);
+          const normCode = normalizeCode(code);
+          activeCodesSet.add(normCode);
+          attendanceSubjectsMap.set(normCode, { code, name });
+
           if (td.length >= 9) {
             attendance.push({
               subject_code: code,
@@ -429,20 +436,23 @@ async function scrapeAndStoreData(account, sessionId) {
         const secondCol = td.eq(1).text().trim();
 
         // If first column looks like a course code (e.g. CSE302, 21CSC302J, MAT101, etc.)
-        if (/^[A-Z0-9]{3,15}$/i.test(firstCol) && !/day|s\.?no|code|hour|monday|tuesday|wednesday|thursday|friday|saturday/i.test(firstCol)) {
+        if (/^[A-Z0-9\s]{3,15}$/i.test(firstCol) && !/day|s\.?no|code|hour|monday|tuesday|wednesday|thursday|friday|saturday/i.test(firstCol)) {
           const code = firstCol;
-          const name = secondCol || attendanceSubjectsMap.get(code) || subjectMap[code]?.name || code;
+          const normCode = normalizeCode(code);
+          const name = secondCol || attendanceSubjectsMap.get(normCode)?.name || subjectMap[normCode]?.name || code;
           const ltp = td.length >= 3 ? td.eq(2).text().trim() : '';
           const faculty = td.length >= 4 ? td.eq(3).text().trim() : '';
           const classrooms = td.length >= 5 ? td.eq(4).text().trim() : '';
           const cabinLocation = faculty ? getFacultyCabin(faculty) : null;
 
-          legendSubjectsMap.set(code, {
+          legendSubjectsMap.set(normCode, {
             code,
             name,
+            subjectCode: code,
+            subjectName: name,
             ltp,
-            credit: subjectMap[code]?.credit || '',
-            semester: subjectMap[code]?.semester || profile.semester || '',
+            credit: subjectMap[normCode]?.credit || '',
+            semester: subjectMap[normCode]?.semester || profile.semester || '',
             faculty,
             classrooms,
             facultyCabin: cabinLocation ? { name: faculty, location: cabinLocation } : null,
@@ -451,23 +461,23 @@ async function scrapeAndStoreData(account, sessionId) {
       }
     });
 
-    // 4. Multi-Source Merger: Combine Legend + Attendance + SubjectMap
+    // 4. Multi-Source Merger: Reconcile Legend + Attendance + SubjectMap
     const mergedSubjectsMap = new Map();
 
-    // Add legend subjects first
-    legendSubjectsMap.forEach((sub, code) => {
-      mergedSubjectsMap.set(code, sub);
+    legendSubjectsMap.forEach((sub, normCode) => {
+      mergedSubjectsMap.set(normCode, sub);
     });
 
-    // Add attendance subjects if missing
-    attendanceSubjectsMap.forEach((name, code) => {
-      if (!mergedSubjectsMap.has(code)) {
-        mergedSubjectsMap.set(code, {
-          code,
-          name,
+    attendanceSubjectsMap.forEach((info, normCode) => {
+      if (!mergedSubjectsMap.has(normCode)) {
+        mergedSubjectsMap.set(normCode, {
+          code: info.code,
+          name: info.name,
+          subjectCode: info.code,
+          subjectName: info.name,
           ltp: '',
-          credit: subjectMap[code]?.credit || '',
-          semester: subjectMap[code]?.semester || profile.semester || '',
+          credit: subjectMap[normCode]?.credit || '',
+          semester: subjectMap[normCode]?.semester || profile.semester || '',
           faculty: '',
           classrooms: '',
           facultyCabin: null,
@@ -475,12 +485,13 @@ async function scrapeAndStoreData(account, sessionId) {
       }
     });
 
-    // Add subjectMap subjects if missing
-    Object.entries(subjectMap).forEach(([code, info]) => {
-      if (!mergedSubjectsMap.has(code)) {
-        mergedSubjectsMap.set(code, {
-          code,
-          name: info.name || code,
+    Object.entries(subjectMap).forEach(([normCode, info]) => {
+      if (!mergedSubjectsMap.has(normCode)) {
+        mergedSubjectsMap.set(normCode, {
+          code: info.code,
+          name: info.name || info.code,
+          subjectCode: info.code,
+          subjectName: info.name || info.code,
           ltp: '',
           credit: info.credit || '',
           semester: info.semester || profile.semester || '',
@@ -491,9 +502,22 @@ async function scrapeAndStoreData(account, sessionId) {
       }
     });
 
-    const subjectDetails = Array.from(mergedSubjectsMap.values());
-    console.log(`[SRM SYNC] Scraped Subjects Count: ${subjectDetails.length}`);
-    console.log(`[SRM SYNC] Subject Codes: [${subjectDetails.map((s) => s.code).join(', ')}]`);
+    // 5. Authoritative Active Subject Filtering
+    const allScrapedSubjects = Array.from(mergedSubjectsMap.values());
+    const activeSubjectDetails = [];
+
+    allScrapedSubjects.forEach((sub) => {
+      const normCode = normalizeCode(sub.code);
+      const isActive = activeCodesSet.size > 0 ? activeCodesSet.has(normCode) : true;
+      sub.isSrmActive = isActive;
+      sub.isSrmManaged = true;
+      if (isActive) {
+        activeSubjectDetails.push(sub);
+      }
+    });
+
+    console.log(`[SRM SYNC] Total Scraped: ${allScrapedSubjects.length}, Authoritative Active (Attendance-bearing): ${activeSubjectDetails.length}`);
+    console.log(`[SRM SYNC] Active Subject Codes: [${activeSubjectDetails.map((s) => s.code).join(', ')}]`);
 
     // Internal Marks (Exams)
     // PRESERVE NULL FOR UNPUBLISHED MARKS. NEVER DEFAULT UNPUBLISHED MARKS TO 0.
@@ -571,7 +595,7 @@ async function scrapeAndStoreData(account, sessionId) {
     account.cgpaCache = cgpa;
     account.attendanceCache = attendance;
     account.timetableCache = timetable;
-    account.subjectsCache = subjectDetails;
+    account.subjectsCache = activeSubjectDetails;
     account.examsCache = exams;
     account.resultsCache = results;
     account.lastSuccessfulSync = new Date();
@@ -617,47 +641,79 @@ async function scrapeAndStoreData(account, sessionId) {
       }
     }
 
-    // Automatically Upsert Subjects
+    // Automatically Upsert & Reconcile Subjects in MongoDB
     try {
-      if (subjectDetails && subjectDetails.length > 0) {
-        for (const sub of subjectDetails) {
+      if (allScrapedSubjects.length > 0) {
+        for (const sub of allScrapedSubjects) {
           if (!sub.code || !sub.name) continue;
 
-          const existingSubject = await Subject.findOne({ user: account.userId, code: sub.code });
-          
+          const cleanCode = sub.code.trim().toUpperCase();
+          const cleanName = sub.name.trim();
+
+          let existingSubject = await Subject.findOne({ user: account.userId, code: cleanCode });
+          if (!existingSubject) {
+            existingSubject = await Subject.findOne({ user: account.userId, code: sub.code });
+          }
+
           if (existingSubject) {
-            // Upsert: Safe update of core fields without wiping custom user fields (like progress, syllabus)
             let subjectUpdated = false;
-            
-            if (sub.name && existingSubject.name !== sub.name) { existingSubject.name = sub.name; subjectUpdated = true; }
+
+            if (cleanName && existingSubject.name !== cleanName) {
+              existingSubject.name = cleanName;
+              subjectUpdated = true;
+            }
             if (sub.credit) {
               const numCredit = Number(sub.credit);
-              if (!isNaN(numCredit) && existingSubject.credits !== numCredit) { existingSubject.credits = numCredit; subjectUpdated = true; }
+              if (!isNaN(numCredit) && numCredit > 0 && existingSubject.credits !== numCredit) {
+                existingSubject.credits = numCredit;
+                subjectUpdated = true;
+              }
             }
-            if (sub.faculty && existingSubject.faculty !== sub.faculty) { existingSubject.faculty = sub.faculty; subjectUpdated = true; }
-            if (sub.semester) {
-              const numSem = Number(sub.semester);
-              if (!isNaN(numSem) && existingSubject.semester !== numSem) { existingSubject.semester = numSem; subjectUpdated = true; }
+            if (sub.faculty && existingSubject.faculty !== sub.faculty) {
+              existingSubject.faculty = sub.faculty;
+              subjectUpdated = true;
+            }
+            existingSubject.isSrmManaged = true;
+
+            // Only update active state if Attendance Details was successfully retrieved
+            if (activeCodesSet.size > 0 && existingSubject.isSrmActive !== sub.isSrmActive) {
+              existingSubject.isSrmActive = sub.isSrmActive;
+              subjectUpdated = true;
             }
 
             if (subjectUpdated) {
               await existingSubject.save();
             }
-          } else {
-            // Create new subject
+          } else if (sub.isSrmActive !== false) {
+            // Create new active subject
             await Subject.create({
               user: account.userId,
-              code: sub.code,
-              name: sub.name,
-              credits: Number(sub.credit) || 3, // fallback if invalid
+              code: cleanCode,
+              name: cleanName,
+              credits: Number(sub.credit) || 3,
               faculty: sub.faculty || '',
               semester: Number(sub.semester) || 1,
+              isSrmManaged: true,
+              isSrmActive: true,
             });
+          }
+        }
+
+        // Reconcile obsolete SRM subjects not present in current Attendance Details
+        if (activeCodesSet.size > 0) {
+          const userSrmSubjects = await Subject.find({ user: account.userId, isSrmManaged: true });
+          for (const s of userSrmSubjects) {
+            const norm = normalizeCode(s.code);
+            if (!activeCodesSet.has(norm) && s.isSrmActive !== false) {
+              s.isSrmActive = false;
+              await s.save();
+              console.log(`[SRM RECONCILE] Marked non-attendance subject as inactive: ${s.code} - ${s.name}`);
+            }
           }
         }
       }
     } catch (subjectErr) {
-      console.error('Failed to automatically sync subjects:', subjectErr.message);
+      console.error('[SRM SYNC] Failed to reconcile subjects:', subjectErr.message);
       // We log but do NOT fail the portal sync so other features still work.
     }
 
@@ -677,7 +733,7 @@ export async function getPortalAccountData(userId) {
 
   let userSubjectsCount = 0;
   try {
-    userSubjectsCount = await Subject.countDocuments({ user: userId });
+    userSubjectsCount = await Subject.countDocuments({ user: userId, isSrmActive: { $ne: false } });
   } catch (cntErr) {
     console.warn('[PortalService] Unable to count user subjects:', cntErr.message);
   }

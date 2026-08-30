@@ -12,6 +12,8 @@ const subjectSchema = new mongoose.Schema({
   progress: { type: Number, min: 0, max: 100, default: 0 },
   targetGrade: { type: String, trim: true, default: '' },
   color: { type: String, default: '#d46c52' },
+  isSrmManaged: { type: Boolean, default: false },
+  isSrmActive: { type: Boolean, default: true },
   syllabusFile: {
     url: { type: String, default: '' },
     publicId: { type: String, default: '' },
