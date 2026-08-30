@@ -1,6 +1,6 @@
 const appVersionConfig = {
-  latestVersion: '1.0.6',
-  latestVersionCode: 7,
+  latestVersion: '1.0.7',
+  latestVersionCode: 8,
 
   minimumSupportedVersionCode: 1,
 

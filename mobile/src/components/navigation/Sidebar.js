@@ -15,15 +15,18 @@ import {
   TrendingUp,
   Settings,
   Timer,
-  RotateCcwClock
+  RotateCcwClock,
+  GraduationCap
 } from 'lucide-react-native';
 import { DrawerContentScrollView } from '@react-navigation/drawer';
 import { DrawerActions } from '@react-navigation/native';
 import { AuthContext } from '../../context/AuthContext';
 import { typography, spacing, radii, useAppTheme, useStyles } from '../../theme/theme';
+import { isSrmApStudent } from '../../utils/srmAp';
 
 const navItems = [
   { href: 'OverviewTab', label: 'Overview', icon: LayoutDashboard },
+  { href: 'PortalDashboard', label: 'SRM Portal', icon: GraduationCap },
   { href: 'StudySessions', label: 'Study Sessions', icon: Timer },
   { href: 'SubjectsTab', label: 'Subjects', icon: BookOpen },
   { href: 'Syllabus', label: 'Syllabus', icon: FileStack },
@@ -41,6 +44,11 @@ const Sidebar = (props) => {
   const styles = useStyles(createStyles);
   const { state, navigation } = props;
   const { user, logout } = useContext(AuthContext);
+
+  // Only show SRM Portal to SRM AP students
+  const visibleNavItems = navItems.filter(
+    (item) => item.href !== 'PortalDashboard' || isSrmApStudent(user)
+  );
 
   const tabScreens = ['OverviewTab', 'SubjectsTab', 'TasksTab', 'ExamsTab'];
 
@@ -89,7 +97,7 @@ const Sidebar = (props) => {
         <Text style={styles.sectionHeader}>WORKSPACE</Text>
 
         <View style={styles.navSection}>
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const isActive = false;
 
             return (

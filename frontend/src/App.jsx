@@ -5,6 +5,7 @@ import { Toaster } from './components/ui/toaster.jsx';
 import { TooltipProvider } from './components/ui/tooltip.jsx';
 import { AuthProvider } from './context/AuthContext.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
+import SrmApRoute from './components/SrmApRoute.jsx';
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
 import VerifyEmail from './pages/VerifyEmail.jsx';
@@ -26,6 +27,12 @@ import Recordings from './pages/Recordings.jsx';
 import Reminders from './pages/Reminders.jsx';
 import Calendar from './pages/Calendar.jsx';
 import Search from './pages/Search.jsx';
+import PortalDashboard from './pages/portal/PortalDashboard.jsx';
+import PortalAttendance from './pages/portal/PortalAttendance.jsx';
+import PortalTimetable from './pages/portal/PortalTimetable.jsx';
+import PortalExams from './pages/portal/PortalExams.jsx';
+import PortalResults from './pages/portal/PortalResults.jsx';
+import PortalCalendar from './pages/portal/PortalCalendar.jsx';
 
 const queryClient = new QueryClient();
 
@@ -38,6 +45,12 @@ function Router() {
     <Route path="/forgot-password" element={<ForgotPassword />} />
     <Route path="/reset-password" element={<ResetPassword />} />
     <Route path="/" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+    <Route path="/portal" element={<ProtectedRoute><SrmApRoute><PortalDashboard /></SrmApRoute></ProtectedRoute>} />
+    <Route path="/portal/attendance" element={<ProtectedRoute><SrmApRoute><PortalAttendance /></SrmApRoute></ProtectedRoute>} />
+    <Route path="/portal/timetable" element={<ProtectedRoute><SrmApRoute><PortalTimetable /></SrmApRoute></ProtectedRoute>} />
+    <Route path="/portal/exams" element={<ProtectedRoute><SrmApRoute><PortalExams /></SrmApRoute></ProtectedRoute>} />
+    <Route path="/portal/results" element={<ProtectedRoute><SrmApRoute><PortalResults /></SrmApRoute></ProtectedRoute>} />
+    <Route path="/portal/calendar" element={<ProtectedRoute><SrmApRoute><PortalCalendar /></SrmApRoute></ProtectedRoute>} />
     <Route path="/subjects" element={<ProtectedRoute><SubjectsPage /></ProtectedRoute>} />
     <Route path="/subjects/:id" element={<ProtectedRoute><SubjectDetail /></ProtectedRoute>} />
     <Route path="/syllabus" element={<ProtectedRoute><Syllabus /></ProtectedRoute>} />

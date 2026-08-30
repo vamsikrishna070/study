@@ -1,0 +1,12 @@
+.env
+next-env.d.ts
+.DS_Store
+/.next
+__pycache__
+node_modules
+package-lock.json
+public/sw.js
+workbox-*.js
+venv
+*.tsbuildinfo
+empty_classrooms.json

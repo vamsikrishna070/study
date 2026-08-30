@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Target, ChevronRight, Sparkles, Settings as SettingsIcon, MoreHorizontal, LayoutDashboard, BookOpen, FileText, ListChecks, CalendarDays, Library, TrendingUp, Bell, FileStack, History } from 'lucide-react';
+import { Target, ChevronRight, Sparkles, Settings as SettingsIcon, MoreHorizontal, LayoutDashboard, BookOpen, FileText, ListChecks, CalendarDays, Library, TrendingUp, Bell, FileStack, History, GraduationCap } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { cx } from './shared.jsx';
+import { isSrmApStudent } from '../utils/srmAp.js';
 
 const navItems = [
   { href: '/', label: 'Overview', icon: LayoutDashboard },
+  { href: '/portal', label: 'SRM Portal', icon: GraduationCap },
   { href: '/subjects', label: 'Subjects', icon: BookOpen },
   { href: '/study-log', label: 'Study Log', icon: History },
   { href: '/syllabus', label: 'Syllabus', icon: FileStack },
@@ -21,6 +23,11 @@ export default function Shell({ children }) {
   const { pathname: location } = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user } = useAuth();
+
+  // Filter nav items: only show SRM Portal for SRM AP students
+  const visibleNavItems = navItems.filter(
+    (item) => item.href !== '/portal' || isSrmApStudent(user)
+  );
   
   if (!user) return children;
 
@@ -54,7 +61,7 @@ export default function Shell({ children }) {
           </Link>
           <div className="mb-3 px-3 font-mono text-[9px] uppercase tracking-[.2em] opacity-45">Workspace</div>
           <nav className="space-y-1">
-            {navItems.map(({ href, label, icon: Icon }) => (
+            {visibleNavItems.map(({ href, label, icon: Icon }) => (
               <Link key={href} to={href} onClick={() => setMobileOpen(false)} className={cx('group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors', location === href ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-sidebar-foreground/65 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground')} data-testid={`link-nav-${label.toLowerCase()}`}>
                 <Icon size={17} className={location === href ? 'text-sidebar-primary' : 'opacity-75'} />
                 <span>{label}</span>

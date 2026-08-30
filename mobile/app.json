@@ -2,14 +2,14 @@
   "expo": {
     "name": "StudyArena",
     "slug": "study-arena",
-    "version": "1.0.6",
+    "version": "1.0.7",
     "updates": {
       "url": "https://u.expo.dev/decf8b1a-27c1-4ad3-bea5-fe2d49828a06",
       "enabled": true,
       "checkAutomatically": "ON_LOAD",
       "fallbackToCacheTimeout": 0
     },
-    "runtimeVersion": "1.0.6",
+    "runtimeVersion": "1.0.7",
     "web": {
       "favicon": "./assets/favicon.png"
     },

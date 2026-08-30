@@ -19,6 +19,7 @@ import searchRoutes from './searchRoutes.js';
 import uploadRoutes from './uploadRoutes.js';
 import collegeRoutes from './collegeRoutes.js';
 import appRoutes from './appRoutes.js';
+import portalRoutes from './portalRoutes.js';
 
 import mongoose from 'mongoose';
 
@@ -35,6 +36,7 @@ router.get('/health', (_req, res) => {
 });
 router.use('/app', appRoutes);
 router.use('/auth', authRoutes);
+router.use('/portal', portalRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/subjects', subjectRoutes);
 router.use('/subjects/:id/syllabus', syllabusRoutes);
