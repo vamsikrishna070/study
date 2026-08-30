@@ -19,6 +19,7 @@ export const useGetPortalStatus = (options) =>
   useQuery({
     queryKey: getPortalStatusQueryKey(),
     queryFn: getPortalStatus,
+    staleTime: 5 * 60 * 1000,
     ...options,
   });
 
@@ -69,6 +70,7 @@ export const useGetTodayAttendance = (options) =>
   useQuery({
     queryKey: getTodayAttendanceQueryKey(),
     queryFn: getTodayAttendance,
+    staleTime: 5 * 60 * 1000,
     ...options,
   });
 
@@ -87,5 +89,6 @@ export const useGetTimetable = (options) =>
   useQuery({
     queryKey: getTimetableQueryKey(),
     queryFn: getTimetableData,
+    staleTime: 5 * 60 * 1000,
     ...options,
   });

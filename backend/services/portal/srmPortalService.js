@@ -692,6 +692,16 @@ export async function getPortalAccountData(userId) {
     totalEnrolledCount > 0
   );
 
+    const isStaleOrEmpty =
+    !account.lastSuccessfulSync ||
+    (Date.now() - new Date(account.lastSuccessfulSync).getTime() > 10 * 60 * 1000) ||
+    cachedSubjectsCount === 0 ||
+    attendanceCount === 0;
+
+  if (isStaleOrEmpty && account.connectionStatus === 'connected') {
+    triggerBackgroundSync(userId);
+  }
+
   return {
     isConnected: true,
     hasStoredPortalData: hasStoredData,
@@ -709,6 +719,33 @@ export async function getPortalAccountData(userId) {
     exams: account.examsCache || [],
     results: account.resultsCache || [],
   };
+}
+
+const activeSyncPromises = new Map();
+
+export async function triggerBackgroundSync(userId) {
+  if (!userId) return null;
+  const userKey = String(userId);
+
+  if (activeSyncPromises.has(userKey)) {
+    console.log(`[PORTAL] Background sync already active for user ${userKey}. Sharing task.`);
+    return activeSyncPromises.get(userKey);
+  }
+
+  const syncTask = (async () => {
+    try {
+      console.log(`[PORTAL] Starting background auto-sync for user ${userKey}...`);
+      await reSyncPortalData(userId);
+      console.log(`[PORTAL] Background auto-sync completed for user ${userKey}.`);
+    } catch (err) {
+      console.warn(`[PORTAL] Background auto-sync error for user ${userKey}:`, err.message);
+    } finally {
+      activeSyncPromises.delete(userKey);
+    }
+  })();
+
+  activeSyncPromises.set(userKey, syncTask);
+  return syncTask;
 }
 
 // 5. Re-sync portal data (called on user request)

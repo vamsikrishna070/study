@@ -39,17 +39,11 @@ export default function PortalAttendance() {
 
   const isConnected = data?.isConnected;
   const attendanceList = data?.attendance || [];
+  const subjectsList = data?.subjects || [];
+  const enrolledCount = data?.enrolledSubjectsCount ?? Math.max(subjectsList.length, attendanceList.length);
   const lastSynced = data?.lastSuccessfulSync
     ? new Date(data.lastSuccessfulSync).toLocaleString('en-IN')
     : null;
-
-  let totalClasses = 0;
-  let totalPresent = 0;
-  attendanceList.forEach((item) => {
-    totalClasses += Number(item.classes_conducted) || 0;
-    totalPresent += Number(item.present) || 0;
-  });
-  const overallPercentage = totalClasses > 0 ? ((totalPresent / totalClasses) * 100).toFixed(1) : '0.0';
 
   const lowAttendanceItems = attendanceList.filter((item) => {
     const pct = parseFloat(item.attendance_percentage || '0');
@@ -101,7 +95,7 @@ export default function PortalAttendance() {
         <div className="grid gap-5 sm:grid-cols-2">
           <div className="rounded-2xl border border-card-border bg-card p-6">
             <span className="font-mono text-xs text-muted-foreground uppercase tracking-wider">Enrolled Subjects</span>
-            <div className="mt-2 font-display text-4xl font-bold">{attendanceList.length}</div>
+            <div className="mt-2 font-display text-4xl font-bold">{enrolledCount}</div>
             <p className="mt-1 text-xs text-muted-foreground">Active course modules</p>
           </div>
 
@@ -117,7 +111,9 @@ export default function PortalAttendance() {
           <h2 className="font-display text-xl font-bold">Subject Wise Log</h2>
           {attendanceList.length === 0 ? (
             <div className="rounded-2xl border border-card-border bg-card p-8 text-center text-sm text-muted-foreground">
-              No attendance records found. Connect your SRM Portal to import subject logs.
+              {isConnected
+                ? 'No attendance records found yet. Click Sync to import subject attendance logs from your SRM Portal.'
+                : 'No attendance records found. Connect your SRM Portal to import subject logs.'}
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2">
