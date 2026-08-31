@@ -12,12 +12,13 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { 
   Calendar as CalendarIcon, 
   Clock, 
-  FaceSlightlySmiling, 
-  FaceNeutral, 
-  FaceSlightlyFrowning, 
-  Save, 
   BookOpen, 
   PenLine 
+} from 'lucide-react-native';
+import { 
+  Smile, 
+  Meh, 
+  Frown 
 } from 'lucide-react-native';
 import { Header } from '../../components/ui/Header';
 import { PageHeading } from '../../components/ui/PageHeading';
@@ -197,8 +198,8 @@ export default function LogSessionScreen({ navigation }) {
                   onPress={() => setProductivity('productive')}
                   activeOpacity={0.7}
                 >
-                  <FaceSlightlySmiling
-                    size={22}
+                  <Smile
+                    size={20}
                     color={productivity === 'productive' ? colors.accent : colors.mutedForeground}
                   />
                   <Text
@@ -219,8 +220,8 @@ export default function LogSessionScreen({ navigation }) {
                   onPress={() => setProductivity('average')}
                   activeOpacity={0.7}
                 >
-                  <FaceNeutral
-                    size={22}
+                  <Meh
+                    size={20}
                     color={productivity === 'average' ? colors.accent : colors.mutedForeground}
                   />
                   <Text
@@ -241,8 +242,8 @@ export default function LogSessionScreen({ navigation }) {
                   onPress={() => setProductivity('difficult')}
                   activeOpacity={0.7}
                 >
-                  <FaceSlightlyFrowning
-                    size={22}
+                  <Frown
+                    size={20}
                     color={productivity === 'difficult' ? colors.accent : colors.mutedForeground}
                   />
                   <Text

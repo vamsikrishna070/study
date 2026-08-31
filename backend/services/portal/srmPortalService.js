@@ -441,8 +441,13 @@ async function scrapeAndStoreData(account, sessionId) {
           const normCode = normalizeCode(code);
           const name = secondCol || attendanceSubjectsMap.get(normCode)?.name || subjectMap[normCode]?.name || code;
           const ltp = td.length >= 3 ? td.eq(2).text().trim() : '';
-          const faculty = td.length >= 4 ? td.eq(3).text().trim() : '';
+          const rawFaculty = td.length >= 4 ? td.eq(3).text().trim() : '';
           const classrooms = td.length >= 5 ? td.eq(4).text().trim() : '';
+
+          const idMatch = rawFaculty.match(/\((?:id:?\s*)?(\d+)\)/i) || rawFaculty.match(/(\d{4,6})/);
+          const facultyId = idMatch ? idMatch[1] : '';
+          const faculty = rawFaculty.replace(/\(.*?\)/g, '').replace(/\s+/g, ' ').trim();
+
           const cabinLocation = faculty ? getFacultyCabin(faculty) : null;
 
           legendSubjectsMap.set(normCode, {
@@ -454,6 +459,7 @@ async function scrapeAndStoreData(account, sessionId) {
             credit: subjectMap[normCode]?.credit || '',
             semester: subjectMap[normCode]?.semester || profile.semester || '',
             faculty,
+            facultyId,
             classrooms,
             facultyCabin: cabinLocation ? { name: faculty, location: cabinLocation } : null,
           });
@@ -479,6 +485,7 @@ async function scrapeAndStoreData(account, sessionId) {
           credit: subjectMap[normCode]?.credit || '',
           semester: subjectMap[normCode]?.semester || profile.semester || '',
           faculty: '',
+          facultyId: '',
           classrooms: '',
           facultyCabin: null,
         });
@@ -496,6 +503,7 @@ async function scrapeAndStoreData(account, sessionId) {
           credit: info.credit || '',
           semester: info.semester || profile.semester || '',
           faculty: '',
+          facultyId: '',
           classrooms: '',
           facultyCabin: null,
         });
@@ -503,11 +511,23 @@ async function scrapeAndStoreData(account, sessionId) {
     });
 
     // 5. Authoritative Active Subject Filtering
+    const blacklistKeywords = ['internship', 'photography', 'co-curricular', 'extra-curricular', 'community service', 'audit course'];
     const allScrapedSubjects = Array.from(mergedSubjectsMap.values());
     const activeSubjectDetails = [];
 
     allScrapedSubjects.forEach((sub) => {
       const normCode = normalizeCode(sub.code);
+      const nameLower = (sub.name || '').toLowerCase();
+      const codeLower = (sub.code || '').toLowerCase();
+
+      // Check if it matches any blacklist keywords
+      const isBlacklisted = blacklistKeywords.some(kw => nameLower.includes(kw) || codeLower.includes(kw));
+      // If it is blacklisted AND not present in the weekly timetable legend, filter it out
+      if (isBlacklisted && !legendSubjectsMap.has(normCode)) {
+        console.log(`[SRM SYNC] Filtering out non-academic/unrelated subject: ${sub.code} - ${sub.name}`);
+        return;
+      }
+
       const isActive = activeCodesSet.size > 0 ? activeCodesSet.has(normCode) : true;
       sub.isSrmActive = isActive;
       sub.isSrmManaged = true;
@@ -607,7 +627,16 @@ async function scrapeAndStoreData(account, sessionId) {
     const user = await User.findById(account.userId);
     if (user && profile) {
       let updated = false;
-      if (profile.studentName && user.name !== profile.studentName) { user.name = profile.studentName; updated = true; }
+      if (profile.studentName) {
+        if (user.officialName !== profile.studentName) {
+          user.officialName = profile.studentName;
+          updated = true;
+        }
+        if (!user.name || user.name === 'Student') {
+          user.name = profile.studentName;
+          updated = true;
+        }
+      }
       
       const regNoToSave = profile.registerNo || account.srmUsername;
       if (regNoToSave && user.registrationNumber !== regNoToSave) { user.registrationNumber = regNoToSave; updated = true; }

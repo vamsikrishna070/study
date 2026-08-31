@@ -15,7 +15,8 @@ import {
   TrendingUp,
   Settings,
   Timer,
-  RotateCcwClock,
+  Clock,
+  RotateCcw,
   GraduationCap
 } from 'lucide-react-native';
 import { DrawerContentScrollView } from '@react-navigation/drawer';
@@ -36,7 +37,7 @@ const navItems = [
   { href: 'Resources', label: 'Resources', icon: Library },
   { href: 'TasksTab', label: 'Tasks', icon: ListChecks },
   { href: 'ExamsTab', label: 'Exams', icon: CalendarDays },
-  { href: 'StudyHistory', label: 'Study History', icon: RotateCcwClock },
+  { href: 'StudyHistory', label: 'Study History', icon: RotateCcw },
   { href: 'Reminders', label: 'Reminders', icon: Bell },
   { href: 'Progress', label: 'Progress', icon: TrendingUp },
 ];
@@ -138,7 +139,7 @@ const Sidebar = (props) => {
             </View>
           )}
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName} numberOfLines={1}>{user?.name || 'Student'}</Text>
+            <Text style={styles.profileName} numberOfLines={1}>{user?.displayName || user?.officialName || user?.name || 'Student'}</Text>
             <Text style={styles.profileDegree} numberOfLines={1}>
               {user?.degree || 'Degree'} {user?.branch ? `/ ${user.branch}` : ''}
             </Text>

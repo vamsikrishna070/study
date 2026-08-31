@@ -4,10 +4,13 @@ import { ArrowLeft, CheckCircle2, XCircle } from 'lucide-react-native';
 import { useAppTheme, useStyles } from '../../theme/theme';
 import { formatSemester } from '../../utils/semester';
 import { getPortalStatus } from '../../api/portal';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ScreenHeader } from '../../components/ui/ScreenHeader';
 
 const PortalResultsScreen = ({ navigation }) => {
   const { colors, typography, spacing, radii } = useAppTheme();
   const styles = useStyles(createStyles);
+  const insets = useSafeAreaInsets();
 
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
@@ -37,13 +40,18 @@ const PortalResultsScreen = ({ navigation }) => {
   const cgpa = data?.cgpa?.cgpa || '0.00';
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-      <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-        <ArrowLeft size={16} color={colors.accent} />
-        <Text style={styles.backBtnText}>Back to Dashboard</Text>
-      </TouchableOpacity>
-
-      <Text style={styles.title}>Semester Results</Text>
+    <View style={styles.container}>
+      <ScreenHeader title="Semester Results" showBack={true} />
+      <ScrollView 
+        contentContainerStyle={[
+          styles.scrollContent, 
+          { 
+            paddingTop: spacing.md,
+            paddingBottom: Math.max(insets.bottom, 20) + 100,
+          }
+        ]}
+      >
+        <Text style={styles.title}>Semester Results</Text>
 
       {/* CGPA Summary */}
       <View style={styles.cgpaCard}>
@@ -80,6 +88,7 @@ const PortalResultsScreen = ({ navigation }) => {
         )}
       </View>
     </ScrollView>
+    </View>
   );
 };
 

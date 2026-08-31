@@ -33,10 +33,12 @@ import {
 } from '../../api/portal';
 import { AuthContext } from '../../context/AuthContext';
 import { useAppDialog } from '../../components/ui/AppDialog';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const PortalDashboardScreen = ({ navigation }) => {
   const { colors, typography, spacing, radii } = useAppTheme();
   const styles = useStyles(createStyles);
+  const insets = useSafeAreaInsets();
 
   const { refreshUser } = useContext(AuthContext);
   const { showSuccess, showError, showDialog } = useAppDialog();
@@ -160,7 +162,16 @@ const PortalDashboardScreen = ({ navigation }) => {
     : 'Not synced';
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+    <ScrollView 
+      style={styles.container} 
+      contentContainerStyle={[
+        styles.scrollContent, 
+        { 
+          paddingTop: Math.max(insets.top, 16) + spacing.md,
+          paddingBottom: Math.max(insets.bottom, 20) + 80,
+        }
+      ]}
+    >
       {/* Header */}
       <View style={styles.header}>
         <View>

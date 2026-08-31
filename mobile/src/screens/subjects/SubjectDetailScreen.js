@@ -10,17 +10,24 @@ import {
   RefreshControl,
 } from 'react-native';
 import {
+  ArrowLeft,
+  Trash2,
+  Edit2,
+  FileText,
   BookOpen,
+  CalendarDays,
+  CheckCircle,
+  Plus,
+  MoreVertical,
+  Upload,
+  Calendar,
   NotebookText,
   FolderOpen,
   ListChecks,
-  CalendarClock,
   ChevronRight,
   ChevronDown,
-  ArrowLeft,
   CircleCheck,
   Circle,
-  FileText,
   Sparkles,
   Layers,
   CloudUpload,
@@ -35,6 +42,7 @@ import { updateSubject, getSubjects } from '../../api/subjects';
 import { pickAndUploadDocument } from '../../utils/fileUploader';
 import { useAppDialog } from '../../components/ui/AppDialog';
 import { typography, spacing, radii, useAppTheme, useStyles } from '../../theme/theme';
+import { ScreenHeader } from '../../components/ui/ScreenHeader';
 
 const SubjectDetailScreen = ({ route, navigation }) => {
   const { colors, typography, spacing, radii } = useAppTheme();
@@ -266,7 +274,7 @@ const SubjectDetailScreen = ({ route, navigation }) => {
     {
       title: 'Exams',
       desc: 'Subject exam preparation',
-      icon: CalendarClock,
+      icon: Calendar,
       route: 'Exams',
       params: { subjectId },
     },
@@ -274,16 +282,7 @@ const SubjectDetailScreen = ({ route, navigation }) => {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: Math.max(insets.top, spacing.lg) }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <ArrowLeft size={24} color={colors.foreground} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>
-          {subject.name || 'Subject Details'}
-        </Text>
-        <View style={{ width: 40 }} />
-      </View>
+      <ScreenHeader title={subject.name || 'Subject Details'} showBack={true} />
 
       <ScrollView
         contentContainerStyle={styles.scroll}

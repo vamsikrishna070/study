@@ -8,16 +8,15 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
-import {
-  ChartBar,
-  Flame,
-  Clock,
-  BookOpen,
-  Trophy,
-  Calendar,
-  Sparkles,
-  Play,
-  TrendingUp,
+import { 
+  BarChart2, 
+  Flame, 
+  Target, 
+  Clock, 
+  Award, 
+  TrendingUp, 
+  CalendarDays, 
+  Sparkles 
 } from 'lucide-react-native';
 import { Header } from '../../components/ui/Header';
 import { PageHeading } from '../../components/ui/PageHeading';
@@ -100,7 +99,7 @@ export default function StudyAnalyticsScreen({ navigation }) {
           </View>
         ) : !hasData ? (
           <EmptyState
-            icon={ChartBar}
+            icon={BarChart2}
             title="No study data yet"
             detail="Start your first study session to see your progress here."
             action={

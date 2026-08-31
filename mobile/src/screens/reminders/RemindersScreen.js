@@ -53,13 +53,19 @@ const PRIORITY_OPTIONS = [
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const formatDate = (date) => {
-  return new Date(date).toLocaleDateString(undefined, {
+  if (!date) return 'No date set';
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return 'No date set';
+  return d.toLocaleDateString(undefined, {
     weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
   });
 };
 
 const formatTime = (date) => {
-  return new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (!date) return 'No time set';
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return 'No time set';
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 };
 
 const isUpcoming = (remindAt) => new Date(remindAt) > new Date();

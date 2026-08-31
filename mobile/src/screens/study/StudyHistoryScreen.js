@@ -10,19 +10,19 @@ import {
   ScrollView,
 } from 'react-native';
 import {
-  RotateCcwClock,
+  RotateCcw,
   Play,
   PenLine,
-  ChartBar,
+  BarChart2,
   BookOpen,
   Clock,
   Trash2,
   X,
   Target,
   Sparkles,
-  FaceSlightlySmiling,
-  FaceNeutral,
-  FaceSlightlyFrowning,
+  Smile,
+  Meh,
+  Frown,
   CircleCheck,
   CalendarDays,
 } from 'lucide-react-native';
@@ -140,11 +140,11 @@ export default function StudyHistoryScreen({ navigation }) {
   const getProductivityBadge = (rating) => {
     switch (rating) {
       case 'productive':
-        return { label: 'Productive', color: colors.accent, icon: FaceSlightlySmiling };
+        return { label: 'Productive', color: colors.accent, icon: Smile };
       case 'average':
-        return { label: 'Average', color: colors.mutedForeground, icon: FaceNeutral };
+        return { label: 'Average', color: colors.mutedForeground, icon: Meh };
       case 'difficult':
-        return { label: 'Difficult', color: '#f59e0b', icon: FaceSlightlyFrowning };
+        return { label: 'Difficult', color: '#f59e0b', icon: Frown };
       default:
         return null;
     }
@@ -192,7 +192,7 @@ export default function StudyHistoryScreen({ navigation }) {
                     onPress={() => navigation.navigate('StudyAnalytics')}
                     activeOpacity={0.7}
                   >
-                    <ChartBar size={18} color={colors.accent} />
+                    <BarChart2 size={18} color={colors.accent} />
                   </TouchableOpacity>
                 </View>
               }
@@ -203,7 +203,7 @@ export default function StudyHistoryScreen({ navigation }) {
         ListEmptyComponent={
           !loading && !error ? (
             <EmptyState
-              icon={RotateCcwClock}
+              icon={RotateCcw}
               title="No study sessions yet"
               detail="Start a focus timer session or log your hours to see your study record here."
               action={

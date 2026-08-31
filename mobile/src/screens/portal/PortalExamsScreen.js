@@ -12,10 +12,13 @@ import { ArrowLeft, RefreshCw, ShieldCheck } from 'lucide-react-native';
 import { useAppTheme, useStyles } from '../../theme/theme';
 import { getPortalStatus, syncPortalData } from '../../api/portal';
 import { getUserFriendlyError } from '../../utils/errorUtils';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ScreenHeader } from '../../components/ui/ScreenHeader';
 
 const PortalExamsScreen = ({ navigation }) => {
   const { colors, typography, spacing, radii } = useAppTheme();
   const styles = useStyles(createStyles);
+  const insets = useSafeAreaInsets();
 
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
@@ -63,22 +66,26 @@ const PortalExamsScreen = ({ navigation }) => {
     ? new Date(data.lastSuccessfulSync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : 'Not synced';
 
+  const syncButton = (
+    <TouchableOpacity style={styles.syncBtn} onPress={handleSyncNow} disabled={syncing}>
+      <RefreshCw size={12} color={colors.accentForeground} />
+      <Text style={styles.syncBtnText}>{syncing ? 'Syncing...' : 'Sync'}</Text>
+    </TouchableOpacity>
+  );
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-      {/* Top Header */}
-      <View style={styles.topHeader}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <ArrowLeft size={16} color={colors.accent} />
-          <Text style={styles.backBtnText}>Dashboard</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.syncBtn} onPress={handleSyncNow} disabled={syncing}>
-          <RefreshCw size={12} color={colors.accentForeground} />
-          <Text style={styles.syncBtnText}>{syncing ? 'Syncing...' : 'Sync Now'}</Text>
-        </TouchableOpacity>
-      </View>
-
-      <Text style={styles.title}>Exams & Assessment Marks</Text>
+    <View style={styles.container}>
+      <ScreenHeader title="Exams & Performance" rightElement={syncButton} />
+      <ScrollView 
+        contentContainerStyle={[
+          styles.scrollContent, 
+          { 
+            paddingTop: spacing.md,
+            paddingBottom: Math.max(insets.bottom, 20) + 100,
+          }
+        ]}
+      >
+        <Text style={styles.title}>Exams & Assessment Marks</Text>
 
       {/* Official SRM Marks List */}
       <View style={styles.stack}>
@@ -136,7 +143,8 @@ const PortalExamsScreen = ({ navigation }) => {
           })
         )}
       </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 };
 

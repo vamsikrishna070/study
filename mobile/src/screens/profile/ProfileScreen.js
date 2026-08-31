@@ -18,6 +18,8 @@ const ProfileScreen = ({ navigation }) => {
   const styles = useStyles(createStyles);
   const { user, logout } = useContext(AuthContext);
 
+  const displayName = user?.displayName || user?.officialName || user?.name || 'Student';
+
   return (
     <View style={styles.container}>
       <Header />
@@ -35,15 +37,22 @@ const ProfileScreen = ({ navigation }) => {
                 <Image source={{ uri: user.profileImageUrl }} style={styles.avatarImage} />
               ) : (
                 <View style={styles.avatarPlaceholder}>
-                  <Text style={styles.avatarText}>{getInitials(user?.name)}</Text>
+                  <Text style={styles.avatarText}>{getInitials(displayName)}</Text>
                 </View>
               )}
             </View>
             <View style={styles.infoContainer}>
-              <Text style={styles.name}>{user?.name || 'Student'}</Text>
+              <Text style={styles.name}>{displayName}</Text>
               <Text style={styles.email}>{user?.email || 'email@domain.com'}</Text>
             </View>
           </View>
+
+          {Boolean(user?.displayName) && Boolean(user?.officialName) && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Official SRM Name</Text>
+              <Text style={styles.detailValue}>{user.officialName}</Text>
+            </View>
+          )}
 
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>College / University</Text>

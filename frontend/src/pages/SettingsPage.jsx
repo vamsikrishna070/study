@@ -35,7 +35,8 @@ export default function SettingsPage() {
   const fileInputRef = useRef(null);
 
   const [form, setForm] = useState({
-    name: user?.name || "",
+    displayName: user?.displayName || "",
+    name: user?.officialName || user?.name || "",
     university: user?.university || "",
     registrationNumber: user?.registrationNumber || "",
     degree: user?.degree || "",
@@ -61,7 +62,8 @@ export default function SettingsPage() {
     if (user) {
       setForm((prev) => ({
         ...prev,
-        name: user.name || "",
+        displayName: user.displayName || "",
+        name: user.officialName || user.name || "",
         university: user.university || "",
         registrationNumber: user.registrationNumber || "",
         degree: user.degree || "",
@@ -402,7 +404,18 @@ export default function SettingsPage() {
                 </div>
               )}
               <div className="grid gap-5 sm:grid-cols-2">
-                <Field label="Name">
+                <Field label="Display Name" hint="Appears across StudyArena. Leave blank to use official SRM name.">
+                  <input
+                    className={inputClass}
+                    value={form.displayName}
+                    onChange={(e) => set("displayName", e.target.value)}
+                    disabled={isSaving}
+                    maxLength={60}
+                    placeholder="E.g. Vamsi"
+                    data-testid="input-profile-display-name"
+                  />
+                </Field>
+                <Field label="Official SRM Name">
                   <input
                     className={inputClass}
                     value={form.name}
@@ -411,16 +424,16 @@ export default function SettingsPage() {
                     data-testid="input-profile-name"
                   />
                 </Field>
-                <Field label="Registration Number">
-                  <input
-                    className={inputClass}
-                    value={form.registrationNumber}
-                    onChange={(e) => set("registrationNumber", e.target.value)}
-                    disabled={isSynced || isSaving}
-                    placeholder="E.g. AP24110010000"
-                  />
-                </Field>
               </div>
+              <Field label="Registration Number">
+                <input
+                  className={inputClass}
+                  value={form.registrationNumber}
+                  onChange={(e) => set("registrationNumber", e.target.value)}
+                  disabled={isSynced || isSaving}
+                  placeholder="E.g. AP24110010000"
+                />
+              </Field>
               <Field label="University">
                 <input
                   className={inputClass}

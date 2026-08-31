@@ -414,7 +414,9 @@ const NotesScreen = ({ route, navigation }) => {
           const noteId = item._id || item.id;
           const priorityColor = getPriorityBadgeColor(item.priority);
           const atts = item.attachments || [];
-          const displaySubject = item.customSubject || item.subject?.name || item.subject;
+          const displaySubject = item.customSubject 
+            ? item.customSubject 
+            : (item.subjectCode ? `${item.subjectCode} - ${item.subject}` : (item.subject?.name || item.subject));
 
           return (
             <View style={styles.card}>

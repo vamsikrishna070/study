@@ -21,7 +21,7 @@ import {
   CheckCircle2,
   XCircle,
 } from 'lucide-react-native';
-import { Header } from '../../components/ui/Header';
+import { ScreenHeader } from '../../components/ui/ScreenHeader';
 import { PageHeading } from '../../components/ui/PageHeading';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -103,7 +103,7 @@ export default function AttendanceScreen({ navigation }) {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <Header />
+      <ScreenHeader title="Attendance & Conduct" showBack={true} />
       <ScrollView
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
@@ -266,6 +266,7 @@ export default function AttendanceScreen({ navigation }) {
                 <View style={styles.statsRow}>
                   <Text style={styles.statLabel}>Present: {sub.present}</Text>
                   <Text style={styles.statLabel}>Absent: {sub.absent}</Text>
+                  <Text style={styles.statLabel}>OD/ML: {sub.odMl || 0}</Text>
                   <Text style={styles.statLabel}>Total: {sub.conducted}</Text>
                 </View>
               </Card>
@@ -280,7 +281,7 @@ export default function AttendanceScreen({ navigation }) {
 const createStyles = ({ colors, typography, spacing, radii }) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
-    scroll: { padding: spacing.lg, paddingBottom: 40 },
+    scroll: { padding: spacing.lg, paddingBottom: 100 },
     card: { padding: spacing.lg, marginBottom: spacing.lg },
     cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 },
     cardHeaderLeft: { flex: 1 },

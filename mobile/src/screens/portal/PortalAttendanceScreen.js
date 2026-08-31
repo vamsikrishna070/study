@@ -3,10 +3,12 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity
 import { BookOpen, AlertTriangle, ArrowLeft } from 'lucide-react-native';
 import { useAppTheme, useStyles } from '../../theme/theme';
 import { getPortalStatus } from '../../api/portal';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const PortalAttendanceScreen = ({ navigation }) => {
   const { colors, typography, spacing, radii } = useAppTheme();
   const styles = useStyles(createStyles);
+  const insets = useSafeAreaInsets();
 
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
@@ -44,14 +46,24 @@ const PortalAttendanceScreen = ({ navigation }) => {
   const lowAttendance = attendanceList.filter((i) => parseFloat(i.attendance_percentage || '0') < 75);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+    <ScrollView 
+      style={styles.container} 
+      contentContainerStyle={[
+        styles.scrollContent, 
+        { 
+          paddingTop: Math.max(insets.top, 16) + spacing.md,
+          paddingBottom: Math.max(insets.bottom, 20) + 80,
+        }
+      ]}
+    >
       {/* Header */}
-      <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-        <ArrowLeft size={16} color={colors.accent} />
-        <Text style={styles.backBtnText}>Back to Dashboard</Text>
-      </TouchableOpacity>
-
-      <Text style={styles.title}>Subject Attendance</Text>
+      <View style={styles.headerContainer}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <ArrowLeft size={16} color={colors.accent} />
+          <Text style={styles.backBtnText}>Back to Dashboard</Text>
+        </TouchableOpacity>
+        <Text style={styles.title}>Subject Attendance</Text>
+      </View>
 
       {/* Warning */}
       {lowAttendance.length > 0 && (
@@ -66,7 +78,9 @@ const PortalAttendanceScreen = ({ navigation }) => {
       {/* Metric summary */}
       <View style={styles.metricCard}>
         <Text style={styles.metricLabel}>ENROLLED SUBJECTS</Text>
-        <Text style={styles.metricValue}>{attendanceList.length}</Text>
+        <Text style={styles.metricValue}>
+          {data?.enrolledSubjectsCount ?? Math.max(data?.subjects?.length || 0, attendanceList.length)}
+        </Text>
         <Text style={styles.metricSub}>Active course modules</Text>
       </View>
 
@@ -80,9 +94,9 @@ const PortalAttendanceScreen = ({ navigation }) => {
           return (
             <View key={idx} style={styles.itemCard}>
               <View style={styles.itemHeader}>
-                <View style={{ flex: 1 }}>
+                <View style={{ flex: 1, minWidth: 0, marginRight: 8 }}>
                   <Text style={styles.codeText}>{item.subject_code}</Text>
-                  <Text style={styles.nameText} numberOfLines={1}>{item.subject_name}</Text>
+                  <Text style={styles.nameText} numberOfLines={2} ellipsizeMode="tail">{item.subject_name}</Text>
                 </View>
                 <View style={[styles.badge, isLow ? styles.badgeLow : styles.badgeGood]}>
                   <Text style={[styles.badgeText, isLow ? styles.badgeTextLow : styles.badgeTextGood]}>
@@ -141,6 +155,9 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
       justifyContent: 'center',
       alignItems: 'center',
       backgroundColor: colors.background,
+    },
+    headerContainer: {
+      marginBottom: spacing.md,
     },
     backBtn: {
       flexDirection: 'row',

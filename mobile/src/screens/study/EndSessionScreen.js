@@ -14,9 +14,9 @@ import {
   Sparkles, 
   Clock, 
   BookOpen, 
-  FaceSlightlySmiling, 
-  FaceNeutral, 
-  FaceSlightlyFrowning, 
+  Smile, 
+  Meh, 
+  Frown, 
   Save, 
   ChevronRight 
 } from 'lucide-react-native';
@@ -154,20 +154,20 @@ export default function EndSessionScreen({ navigation, route }) {
             <View style={styles.productivityGrid}>
               <TouchableOpacity
                 style={[
-                  styles.productivityCard,
-                  productivity === 'productive' && styles.productivityCardActive,
+                  styles.productivityBtn,
+                  productivity === 'productive' && { borderColor: colors.accent, backgroundColor: colors.accent + '15' },
                 ]}
                 onPress={() => setProductivity('productive')}
                 activeOpacity={0.7}
               >
-                <FaceSlightlySmiling
+                <Smile
                   size={24}
                   color={productivity === 'productive' ? colors.accent : colors.mutedForeground}
                 />
                 <Text
                   style={[
-                    styles.productivityLabel,
-                    productivity === 'productive' && styles.productivityLabelActive,
+                    styles.productivityText,
+                    productivity === 'productive' && { color: colors.accent, fontWeight: typography.weights.bold },
                   ]}
                 >
                   Productive
@@ -176,20 +176,20 @@ export default function EndSessionScreen({ navigation, route }) {
 
               <TouchableOpacity
                 style={[
-                  styles.productivityCard,
-                  productivity === 'average' && styles.productivityCardActive,
+                  styles.productivityBtn,
+                  productivity === 'average' && { borderColor: colors.primary, backgroundColor: colors.muted },
                 ]}
                 onPress={() => setProductivity('average')}
                 activeOpacity={0.7}
               >
-                <FaceNeutral
+                <Meh
                   size={24}
-                  color={productivity === 'average' ? colors.accent : colors.mutedForeground}
+                  color={productivity === 'average' ? colors.foreground : colors.mutedForeground}
                 />
                 <Text
                   style={[
-                    styles.productivityLabel,
-                    productivity === 'average' && styles.productivityLabelActive,
+                    styles.productivityText,
+                    productivity === 'average' && { color: colors.foreground, fontWeight: typography.weights.bold },
                   ]}
                 >
                   Average
@@ -198,13 +198,13 @@ export default function EndSessionScreen({ navigation, route }) {
 
               <TouchableOpacity
                 style={[
-                  styles.productivityCard,
-                  productivity === 'difficult' && styles.productivityCardActive,
+                  styles.productivityBtn,
+                  productivity === 'difficult' && { borderColor: '#f59e0b', backgroundColor: '#f59e0b15' },
                 ]}
                 onPress={() => setProductivity('difficult')}
                 activeOpacity={0.7}
               >
-                <FaceSlightlyFrowning
+                <Frown
                   size={24}
                   color={productivity === 'difficult' ? colors.accent : colors.mutedForeground}
                 />

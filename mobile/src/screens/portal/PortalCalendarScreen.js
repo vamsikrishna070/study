@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import { ArrowLeft, Calendar as CalendarIcon, PartyPopper } from 'lucide-react-native';
 import { useAppTheme, useStyles } from '../../theme/theme';
 import { getAcademicCalendar } from '../../api/portal';
+import { ScreenHeader } from '../../components/ui/ScreenHeader';
 
 const PortalCalendarScreen = ({ navigation }) => {
   const { colors, typography, spacing, radii } = useAppTheme();
@@ -43,13 +44,17 @@ const PortalCalendarScreen = ({ navigation }) => {
   const holidays = activeTab === 'odd' ? data?.oddSemesterHolidays || [] : data?.evenSemesterHolidays || [];
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-      <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-        <ArrowLeft size={16} color={colors.accent} />
-        <Text style={styles.backBtnText}>Back to Dashboard</Text>
-      </TouchableOpacity>
-
-      <Text style={styles.title}>Academic Calendar</Text>
+    <View style={styles.container}>
+      <ScreenHeader title="Academic Calendar" showBack={true} />
+      <ScrollView 
+        contentContainerStyle={[
+          styles.scrollContent, 
+          { 
+            paddingBottom: 100,
+          }
+        ]}
+      >
+        <Text style={styles.title}>Academic Calendar</Text>
 
       {/* Tabs */}
       <View style={styles.tabRow}>
@@ -105,6 +110,7 @@ const PortalCalendarScreen = ({ navigation }) => {
         </>
       )}
     </ScrollView>
+    </View>
   );
 };
 

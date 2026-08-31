@@ -32,8 +32,8 @@ import StudyAnalyticsScreen from '../screens/study/StudyAnalyticsScreen';
 
 // SRM Portal Screens
 import PortalDashboardScreen from '../screens/portal/PortalDashboardScreen';
-import PortalAttendanceScreen from '../screens/portal/PortalAttendanceScreen';
-import PortalTimetableScreen from '../screens/portal/PortalTimetableScreen';
+import AttendanceScreen from '../screens/attendance/AttendanceScreen';
+import TimetableScreen from '../screens/timetable/TimetableScreen';
 import PortalExamsScreen from '../screens/portal/PortalExamsScreen';
 import PortalResultsScreen from '../screens/portal/PortalResultsScreen';
 import PortalCalendarScreen from '../screens/portal/PortalCalendarScreen';
@@ -100,8 +100,8 @@ const DrawerNavigator = () => {
     >
       <Drawer.Screen name="HomeDrawer" component={TabNavigator} />
       <Drawer.Screen name="PortalDashboard" component={PortalDashboardScreen} />
-      <Drawer.Screen name="PortalAttendance" component={PortalAttendanceScreen} />
-      <Drawer.Screen name="PortalTimetable" component={PortalTimetableScreen} />
+      <Drawer.Screen name="PortalAttendance" component={AttendanceScreen} />
+      <Drawer.Screen name="PortalTimetable" component={TimetableScreen} />
       <Drawer.Screen name="PortalExams" component={PortalExamsScreen} />
       <Drawer.Screen name="PortalResults" component={PortalResultsScreen} />
       <Drawer.Screen name="PortalCalendar" component={PortalCalendarScreen} />
@@ -130,8 +130,8 @@ const MainNavigator = () => {
       <Stack.Screen name="DrawerRoot" component={DrawerNavigator} />
       <Stack.Screen name="Onboarding" component={OnboardingScreen} />
       <Stack.Screen name="PortalDashboard" component={PortalDashboardScreen} />
-      <Stack.Screen name="PortalAttendance" component={PortalAttendanceScreen} />
-      <Stack.Screen name="PortalTimetable" component={PortalTimetableScreen} />
+      <Stack.Screen name="PortalAttendance" component={AttendanceScreen} />
+      <Stack.Screen name="PortalTimetable" component={TimetableScreen} />
       <Stack.Screen name="PortalExams" component={PortalExamsScreen} />
       <Stack.Screen name="PortalResults" component={PortalResultsScreen} />
       <Stack.Screen name="PortalCalendar" component={PortalCalendarScreen} />

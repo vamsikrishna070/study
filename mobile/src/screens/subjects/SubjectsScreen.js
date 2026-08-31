@@ -332,6 +332,7 @@ const SubjectsScreen = ({ navigation }) => {
               {/* Card Body */}
               <View style={styles.cardBody}>
                 <Text style={styles.cardTitle}>{item.name}</Text>
+                <Text style={styles.cardSubCode}>Code: {item.code}</Text>
                 {!!item.faculty && (
                   <Text style={styles.cardFaculty}>Faculty: {item.faculty}</Text>
                 )}
@@ -613,6 +614,13 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
       fontSize: 22,
       color: colors.foreground,
       marginTop: 2,
+    },
+    cardSubCode: {
+      fontFamily: typography.sans.semiBold,
+      fontSize: 12,
+      color: colors.accent,
+      marginTop: 2,
+      marginBottom: 2,
     },
     cardFaculty: {
       fontFamily: typography.sans.medium,

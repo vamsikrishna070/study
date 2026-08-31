@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useContext } from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Bell, ListChecks, BookOpen, Play, Flame, Clock, ArrowRight, Sparkles } from 'lucide-react-native';
 import { getReminders } from '../../api/reminders';
 import { getExams } from '../../api/exams';
@@ -14,6 +15,45 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { QueryState } from '../../components/ui/QueryState';
 import { Button } from '../../components/ui/Button';
 import { typography, spacing, radii, useAppTheme, useStyles } from '../../theme/theme';
+
+const isTaskCompleted = (t) => {
+  if (!t) return false;
+  if (t.status === 'completed' || t.status === 'done') return true;
+  if (t.isCompleted === true || t.isCompleted === 'true') return true;
+  if (t.completed === true || t.completed === 'true') return true;
+  return false;
+};
+
+const safeFormatDate = (dateVal, fallbackText = 'No date set') => {
+  if (!dateVal) return fallbackText;
+  try {
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return fallbackText;
+    return d.toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+  } catch (_) {
+    return fallbackText;
+  }
+};
+
+const safeFormatDateTime = (dateVal, fallbackText = 'Scheduled') => {
+  if (!dateVal) return fallbackText;
+  try {
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return fallbackText;
+    return d.toLocaleString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch (_) {
+    return fallbackText;
+  }
+};
 
 const DashboardScreen = ({ navigation }) => {
   const { colors, typography, spacing, radii, theme } = useAppTheme();
@@ -62,7 +102,12 @@ const DashboardScreen = ({ navigation }) => {
     }
   };
 
-  useEffect(() => { loadData(); }, []);
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [])
+  );
+
   const onRefresh = useCallback(() => { setRefreshing(true); loadData(); }, []);
 
   if (loading) {
@@ -96,7 +141,7 @@ const DashboardScreen = ({ navigation }) => {
       >
         <PageHeading 
           eyebrow="Dashboard" 
-          title={`${getGreeting()}, ${user?.name?.split(' ')[0] || 'Student'}`} 
+          title={`${getGreeting()}, ${user?.displayName || user?.officialName || user?.name || 'Student'}`} 
           detail="Here is an overview of your academic progress."
         />
 
@@ -185,9 +230,11 @@ const DashboardScreen = ({ navigation }) => {
                 />
               ) : (
                 data.reminders.map(r => (
-                  <Card key={r._id || Math.random()} style={styles.card}>
+                  <Card key={r._id || r.id || Math.random()} style={styles.card}>
                     <Text style={styles.cardTitle}>{r.title}</Text>
-                    <Text style={styles.cardDetail}>{new Date(r.date).toLocaleString()}</Text>
+                    <Text style={styles.cardDetail}>
+                      {safeFormatDateTime(r.remindAt || r.date || r.time || r.createdAt)}
+                    </Text>
                   </Card>
                 ))
               )}
@@ -196,20 +243,26 @@ const DashboardScreen = ({ navigation }) => {
             {/* Pending Tasks */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Pending Tasks</Text>
-              {data.tasks.length === 0 ? (
-                <EmptyState 
-                  icon={ListChecks} 
-                  title="No pending tasks" 
-                  detail="You are all caught up with your tasks." 
-                />
-              ) : (
-                data.tasks.filter(t => !t.completed).map(t => (
-                  <Card key={t._id || Math.random()} style={styles.card}>
+              {(() => {
+                const pendingTasks = (data.tasks || []).filter(t => !isTaskCompleted(t));
+                if (pendingTasks.length === 0) {
+                  return (
+                    <EmptyState 
+                      icon={ListChecks} 
+                      title="No pending tasks" 
+                      detail="You are all caught up with your tasks." 
+                    />
+                  );
+                }
+                return pendingTasks.map(t => (
+                  <Card key={t._id || t.id || Math.random()} style={styles.card}>
                     <Text style={styles.cardTitle}>{t.title}</Text>
-                    <Text style={styles.cardDetail}>Due: {new Date(t.dueDate).toLocaleDateString()}</Text>
+                    <Text style={styles.cardDetail}>
+                      Due: {safeFormatDate(t.dueDate || t.date || t.createdAt)}
+                    </Text>
                   </Card>
-                ))
-              )}
+                ));
+              })()}
             </View>
 
             {/* Subjects & Progress */}
@@ -254,7 +307,7 @@ const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.crea
   },
   scroll: { 
     padding: spacing.md, 
-    paddingBottom: spacing.xxl 
+    paddingBottom: 100,
   },
   content: {
     gap: spacing.xl,

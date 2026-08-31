@@ -373,7 +373,10 @@ const ExamsScreen = ({ route, navigation }) => {
         }
         renderItem={({ item }) => {
           const examId = item._id || item.id;
-          const daysLeft = item.daysLeft !== undefined ? item.daysLeft : Math.ceil((new Date(item.date) - new Date()) / 86400000);
+          const examDate = new Date(item.date);
+          const daysLeft = item.daysLeft !== undefined 
+            ? item.daysLeft 
+            : (isNaN(examDate.getTime()) ? 999 : Math.ceil((examDate - new Date()) / 86400000));
           const isUrgent = !item.completed && daysLeft >= 0 && daysLeft <= 7;
           const isPast = daysLeft < 0 || item.completed;
 
@@ -393,7 +396,7 @@ const ExamsScreen = ({ route, navigation }) => {
                   </View>
                   <Text style={styles.cardTitle}>{item.name}</Text>
                   <Text style={styles.cardSubject}>
-                    {item.subject?.name || item.subject || 'General Subject'}
+                    {item.subjectCode ? `${item.subjectCode} - ` : ''}{item.subject?.name || item.subject || 'General Subject'}
                   </Text>
                 </View>
 
@@ -427,12 +430,16 @@ const ExamsScreen = ({ route, navigation }) => {
                 <View style={styles.detailRow}>
                   <CalendarIcon size={14} color={colors.accent} />
                   <Text style={styles.detailText}>
-                    {new Date(item.date).toLocaleDateString(undefined, {
-                      weekday: 'short',
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
-                    })}
+                    {(() => {
+                      const d = new Date(item.date);
+                      if (isNaN(d.getTime())) return 'No date set';
+                      return d.toLocaleDateString(undefined, {
+                        weekday: 'short',
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      });
+                    })()}
                   </Text>
                 </View>
 

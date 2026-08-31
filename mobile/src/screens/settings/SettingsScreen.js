@@ -38,7 +38,8 @@ const SettingsScreen = ({ navigation }) => {
 
   const { user, logout, setUser } = useContext(AuthContext);
   const [form, setForm] = useState({
-    name: user?.name || '',
+    displayName: user?.displayName || '',
+    name: user?.officialName || user?.name || '',
     collegeId: user?.collegeId || null,
     university: user?.university || '',
     registrationNumber: user?.registrationNumber || '',
@@ -52,7 +53,8 @@ const SettingsScreen = ({ navigation }) => {
     if (user) {
       setForm((f) => ({
         ...f,
-        name: user.name || '',
+        displayName: user.displayName || '',
+        name: user.officialName || user.name || '',
         collegeId: user.collegeId || null,
         university: user.university || '',
         registrationNumber: user.registrationNumber || '',
@@ -214,11 +216,21 @@ const SettingsScreen = ({ navigation }) => {
               </View>
             )}
 
-            <Field label="Full Name">
+            <Field label="Display Name" hint="Appears across StudyArena. Leave empty for official name.">
+              <Input
+                value={form.displayName}
+                onChangeText={t => setFormValue('displayName', t)}
+                placeholder="E.g. Vamsi"
+                maxLength={60}
+                editable={!isSaving}
+              />
+            </Field>
+
+            <Field label="Official SRM Name">
               <Input
                 value={form.name}
                 onChangeText={t => setFormValue('name', t)}
-                placeholder="Enter your full name"
+                placeholder="Official student name"
                 editable={!isSaving && !isSynced}
               />
             </Field>

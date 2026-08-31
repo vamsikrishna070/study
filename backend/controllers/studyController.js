@@ -63,6 +63,10 @@ const serialize = (doc) => {
 
   const taskStatus = value.status === 'in-progress' ? 'in_progress' : (value.status || 'pending');
 
+  const subjectObj = value.subject && typeof value.subject === 'object' ? value.subject : null;
+  const subjectCode = subjectObj?.code || '';
+  const subjectColor = subjectObj?.color || '';
+
   return {
     ...value,
     id: id(doc),
@@ -70,6 +74,8 @@ const serialize = (doc) => {
     attachments,
     subjectId: subjId,
     subject: subjectName(value.subject, value.customSubject),
+    subjectCode,
+    subjectColor,
     customSubject: value.customSubject || "",
     status: taskStatus,
     addedAt: value.createdAt,

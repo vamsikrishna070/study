@@ -139,7 +139,8 @@ export async function getCurrentAttendance(userId) {
       const conducted = parseInt(td.eq(2).text().trim(), 10) || 0;
       const present = parseInt(td.eq(3).text().trim(), 10) || 0;
       const absent = parseInt(td.eq(4).text().trim(), 10) || 0;
-      const pctStr = td.eq(6).text().trim().replace('%', '');
+      const odMl = td.length >= 6 ? (parseInt(td.eq(5).text().trim(), 10) || 0) : 0;
+      const pctStr = (td.length >= 9 ? td.eq(8) : td.eq(6)).text().trim().replace('%', '');
       const pct = parseFloat(pctStr) || 0;
 
       if (code && name) {
@@ -149,6 +150,7 @@ export async function getCurrentAttendance(userId) {
           conducted,
           present,
           absent,
+          odMl,
           percentage: pct,
         });
       }
@@ -190,10 +192,67 @@ export async function getCurrentAttendance(userId) {
           faculty: subDetails.faculty || '',
           room: subDetails.classrooms || 'AB1',
           status: 'NOT MARKED',
+          facultyCabin: subDetails.facultyCabin || null,
         });
       }
     });
   }
+
+  // Scan Daily Conduct to update statuses of today's classes
+  const normalizeCode = (c) => (c || '').replace(/\s+/g, ' ').trim().toUpperCase();
+  const todayDateStrVariations = [
+    todayIst.toFormat('dd-MM-yyyy'),
+    todayIst.toFormat('dd-MMM-yyyy'),
+    todayIst.toFormat('d-MMM-yyyy'),
+    todayIst.toFormat('dd/MM/yyyy'),
+    todayIst.toFormat('yyyy-MM-dd'),
+    todayIst.toFormat('dd-MM-yy'),
+    todayIst.toFormat('dd-MMM-yy'),
+  ].map(s => s.toLowerCase());
+
+  $('table tr').each((_, row) => {
+    const td = $(row).find('td');
+    if (td.length >= 5) {
+      let dateColIdx = -1;
+      for (let i = 0; i < td.length; i++) {
+        const text = td.eq(i).text().trim().toLowerCase();
+        if (todayDateStrVariations.some(v => text.includes(v))) {
+          dateColIdx = i;
+          break;
+        }
+      }
+
+      if (dateColIdx !== -1) {
+        const offset = dateColIdx; 
+        const hourText = td.eq(offset + 1).text().trim();
+        const parsedHour = parseInt(hourText, 10);
+        
+        if (!isNaN(parsedHour) && parsedHour >= 1 && parsedHour <= 10) {
+          const subjectCode = normalizeCode(td.eq(offset + 2).text().trim());
+          let status = '';
+
+          for (let i = offset + 3; i < td.length; i++) {
+            const txt = td.eq(i).text().trim().toUpperCase();
+            if (txt.includes('PRESENT') || txt.includes('ABSENT') || txt.includes('OD') || txt.includes('ML') || txt.includes('LATE') || txt.includes('NOT MARKED')) {
+              status = txt;
+              break;
+            }
+          }
+
+          if (parsedHour && subjectCode) {
+            const match = todayClasses.find(c => c.hour === parsedHour && normalizeCode(c.subjectCode) === subjectCode);
+            if (match) {
+              if (status.includes('PRESENT')) match.status = 'PRESENT';
+              else if (status.includes('ABSENT')) match.status = 'ABSENT';
+              else if (status.includes('OD') || status.includes('ML')) match.status = 'OD/ML';
+              else if (status.includes('NOT MARKED')) match.status = 'NOT MARKED';
+              else match.status = status;
+            }
+          }
+        }
+      }
+    }
+  });
 
   // Update account attendanceCache & history
   account.attendanceCache = subjectAttendanceList;
@@ -381,8 +440,10 @@ export async function getTimetable(userId) {
             subjectCode: code,
             subjectName: subInfo.name || subInfo.subjectName || code,
             faculty: subInfo.faculty || '',
+            facultyId: subInfo.facultyId || '',
             room: subInfo.classrooms || 'AB1',
             type: subInfo.ltp?.includes('P') ? 'PRACTICAL' : 'LECTURE',
+            facultyCabin: subInfo.facultyCabin || null,
           });
         }
       });

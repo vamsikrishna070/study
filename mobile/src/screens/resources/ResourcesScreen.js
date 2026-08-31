@@ -588,9 +588,9 @@ const ResourcesScreen = ({ route, navigation }) => {
 
               {/* Subject chip & Rating */}
               <View style={styles.metaRow}>
-                {!!(item.subject?.name || item.subject) && (
+                {!!(item.subjectCode ? `${item.subjectCode} - ${item.subject}` : (item.subject?.name || item.subject)) && (
                   <Text style={styles.subjectChip}>
-                    {item.subject?.name || item.subject}
+                    {item.subjectCode ? `${item.subjectCode} - ${item.subject}` : (item.subject?.name || item.subject)}
                   </Text>
                 )}
                 {item.rating > 0 && (

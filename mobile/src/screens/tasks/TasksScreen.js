@@ -456,6 +456,7 @@ const TasksScreen = ({ route, navigation }) => {
   const formatDueDate = (dateObj, dueTimeStr) => {
     if (!dateObj) return 'No scheduled time';
     const d = new Date(dateObj);
+    if (isNaN(d.getTime())) return 'No scheduled time';
     const today = new Date();
     const isToday = d.toDateString() === today.toDateString();
     const dateFormatted = isToday ? 'Today' : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -624,7 +625,7 @@ const TasksScreen = ({ route, navigation }) => {
                     {item.subject && (
                       <View style={styles.subjectBadge}>
                         <Text style={styles.subjectBadgeText}>
-                          {item.subject?.name || item.subject}
+                          {item.subjectCode ? `${item.subjectCode} - ` : ''}{item.subject?.name || item.subject}
                         </Text>
                       </View>
                     )}

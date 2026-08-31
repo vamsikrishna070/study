@@ -242,7 +242,10 @@ export default function PortalDashboard() {
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5 pt-2">
                 <div>
                   <span className="text-[11px] font-semibold text-muted-foreground uppercase">Student Name</span>
-                  <div className="font-bold text-base">{profile.studentName || '—'}</div>
+                  <div className="font-bold text-base">{user?.displayName || profile.studentName || user?.name || '—'}</div>
+                  {user?.displayName && profile.studentName && (
+                    <div className="text-[10px] text-muted-foreground">Official SRM: {profile.studentName}</div>
+                  )}
                 </div>
                 <div>
                   <span className="text-[11px] font-semibold text-muted-foreground uppercase">Registration No</span>

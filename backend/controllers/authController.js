@@ -5,26 +5,35 @@ import College from '../models/College.js';
 import { generateToken } from '../utils/generateToken.js';
 import { sendVerificationEmail, sendPasswordResetEmail } from '../services/emailService.js';
 
-const publicUser = (user) => ({
-  id: user._id,
-  name: user.name,
-  email: user.email,
-  collegeId: user.collegeId || null,
-  university: user.university || '',
-  registrationNumber: user.registrationNumber || '',
-  degree: user.degree || '',
-  branch: user.branch || '',
-  section: user.section || '',
-  batch: user.batch || '',
-  semester: user.semester || 1,
-  profileImageUrl: user.profileImageUrl || '',
-  profileImagePublicId: user.profileImagePublicId || '',
-  notificationPreferences: user.notificationPreferences || { email: true, push: true },
-  isVerified: user.isVerified || false,
-  currentStreak: user.currentStreak || 0,
-  longestStreak: user.longestStreak || 0,
-  lastActiveDate: user.lastActiveDate || '',
-});
+const publicUser = (user) => {
+  const effectiveDisplayName = (user.displayName && user.displayName.trim())
+    ? user.displayName.trim()
+    : ((user.officialName && user.officialName.trim()) ? user.officialName.trim() : user.name);
+
+  return {
+    id: user._id,
+    name: effectiveDisplayName,
+    displayName: user.displayName || '',
+    officialName: user.officialName || user.name || '',
+    effectiveDisplayName,
+    email: user.email,
+    collegeId: user.collegeId || null,
+    university: user.university || '',
+    registrationNumber: user.registrationNumber || '',
+    degree: user.degree || '',
+    branch: user.branch || '',
+    section: user.section || '',
+    batch: user.batch || '',
+    semester: user.semester || 1,
+    profileImageUrl: user.profileImageUrl || '',
+    profileImagePublicId: user.profileImagePublicId || '',
+    notificationPreferences: user.notificationPreferences || { email: true, push: true },
+    isVerified: user.isVerified || false,
+    currentStreak: user.currentStreak || 0,
+    longestStreak: user.longestStreak || 0,
+    lastActiveDate: user.lastActiveDate || '',
+  };
+};
 
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -230,6 +239,7 @@ export async function me(req, res) {
 export async function updateProfile(req, res) {
   const { 
     name, 
+    displayName,
     collegeId, 
     university, 
     registrationNumber,
@@ -244,7 +254,17 @@ export async function updateProfile(req, res) {
 
   const user = await User.findById(req.user._id);
   if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-  
+
+  if (displayName !== undefined) {
+    if (typeof displayName === 'string') {
+      const trimmed = displayName.trim();
+      if (trimmed.length > 60) {
+        return res.status(400).json({ success: false, message: 'Display Name cannot exceed 60 characters.' });
+      }
+      user.displayName = trimmed;
+    }
+  }
+
   if (name !== undefined) {
     if (typeof name === 'string' && name.trim()) {
       user.name = name.trim();
