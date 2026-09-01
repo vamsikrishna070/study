@@ -17,7 +17,8 @@ import {
   ListTodo,
   Clock,
   Check,
-  X
+  X,
+  RotateCcw
 } from 'lucide-react-native';
 import { Header } from '../../components/ui/Header';
 import { Card } from '../../components/ui/Card';
@@ -141,7 +142,11 @@ export default function EndSessionScreen({ navigation, route }) {
 
       discardSession();
       showSuccess('Session Saved', 'Great work! Your study session and syllabus progress have been updated.');
-      navigation.replace('StudyHistory');
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      } else {
+        navigation.navigate('StudyHistory');
+      }
     } catch (err) {
       console.error('[EndSession] Save error:', err);
       showError('Save Failed', err?.response?.data?.message || err?.message || 'Failed to save your session. Please check your connection.');
@@ -221,42 +226,54 @@ export default function EndSessionScreen({ navigation, route }) {
               </View>
             </Field>
 
-            <Field label="How did you finish these topics?" hint="Completed syllabus topics automatically update your syllabus progress">
-              <View style={styles.modeColumn}>
-                <TouchableOpacity
-                  style={[styles.modeBtn, completionMode === 'all' && styles.modeBtnActive]}
-                  onPress={() => setCompletionMode('all')}
-                  activeOpacity={0.7}
-                >
-                  <CheckCircle2 size={16} color={completionMode === 'all' ? colors.primaryForeground : colors.mutedForeground} style={{ marginRight: 8 }} />
-                  <Text style={[styles.modeBtnText, completionMode === 'all' && styles.modeBtnTextActive]}>
-                    All Topics Completed
+            {studyType === 'revision' ? (
+              <View style={styles.revisionNoticeCard}>
+                <RotateCcw size={16} color={colors.accent} style={{ marginRight: 8, marginTop: 2 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.revisionNoticeTitle}>Revision Session Completed</Text>
+                  <Text style={styles.revisionNoticeText}>
+                    These topics are already completed in your syllabus. Saving this session will log your revision time in Study History without altering syllabus completion.
                   </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.modeBtn, completionMode === 'partial' && styles.modeBtnActive]}
-                  onPress={() => setCompletionMode('partial')}
-                  activeOpacity={0.7}
-                >
-                  <ListTodo size={16} color={completionMode === 'partial' ? colors.primaryForeground : colors.mutedForeground} style={{ marginRight: 8 }} />
-                  <Text style={[styles.modeBtnText, completionMode === 'partial' && styles.modeBtnTextActive]}>
-                    Select Completed Topics
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.modeBtn, completionMode === 'none' && styles.modeBtnActive]}
-                  onPress={() => setCompletionMode('none')}
-                  activeOpacity={0.7}
-                >
-                  <Clock size={16} color={completionMode === 'none' ? colors.primaryForeground : colors.mutedForeground} style={{ marginRight: 8 }} />
-                  <Text style={[styles.modeBtnText, completionMode === 'none' && styles.modeBtnTextActive]}>
-                    Keep All Topics Pending
-                  </Text>
-                </TouchableOpacity>
+                </View>
               </View>
-            </Field>
+            ) : (
+              <Field label="How did you finish these topics?" hint="Completed syllabus topics automatically update your syllabus progress">
+                <View style={styles.modeColumn}>
+                  <TouchableOpacity
+                    style={[styles.modeBtn, completionMode === 'all' && styles.modeBtnActive]}
+                    onPress={() => setCompletionMode('all')}
+                    activeOpacity={0.7}
+                  >
+                    <CheckCircle2 size={16} color={completionMode === 'all' ? colors.primaryForeground : colors.mutedForeground} style={{ marginRight: 8 }} />
+                    <Text style={[styles.modeBtnText, completionMode === 'all' && styles.modeBtnTextActive]}>
+                      All Topics Completed
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.modeBtn, completionMode === 'partial' && styles.modeBtnActive]}
+                    onPress={() => setCompletionMode('partial')}
+                    activeOpacity={0.7}
+                  >
+                    <ListTodo size={16} color={completionMode === 'partial' ? colors.primaryForeground : colors.mutedForeground} style={{ marginRight: 8 }} />
+                    <Text style={[styles.modeBtnText, completionMode === 'partial' && styles.modeBtnTextActive]}>
+                      Select Completed Topics
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.modeBtn, completionMode === 'none' && styles.modeBtnActive]}
+                    onPress={() => setCompletionMode('none')}
+                    activeOpacity={0.7}
+                  >
+                    <Clock size={16} color={completionMode === 'none' ? colors.primaryForeground : colors.mutedForeground} style={{ marginRight: 8 }} />
+                    <Text style={[styles.modeBtnText, completionMode === 'none' && styles.modeBtnTextActive]}>
+                      Keep All Topics Pending
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </Field>
+            )}
 
             {completionMode === 'partial' && (
               <StudyTopicSelector
@@ -431,5 +448,27 @@ const createStyles = (theme) =>
     saveBtn: {
       marginTop: theme.spacing.sm,
       height: 48,
+    },
+    revisionNoticeCard: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      backgroundColor: theme.colors.background,
+      borderRadius: theme.radii.lg,
+      padding: theme.spacing.md,
+      borderWidth: 1,
+      borderColor: theme.colors.cardBorder,
+      marginVertical: theme.spacing.sm,
+    },
+    revisionNoticeTitle: {
+      fontFamily: theme.typography.sans.semiBold,
+      fontSize: 13,
+      color: theme.colors.foreground,
+      marginBottom: 2,
+    },
+    revisionNoticeText: {
+      fontFamily: theme.typography.sans.regular,
+      fontSize: 12,
+      color: theme.colors.mutedForeground,
+      lineHeight: 16,
     },
   });

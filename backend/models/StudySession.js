@@ -30,7 +30,7 @@ const studySessionSchema = new mongoose.Schema({
   task: { type: mongoose.Schema.Types.ObjectId, ref: 'Task', default: null },
   exam: { type: mongoose.Schema.Types.ObjectId, ref: 'Exam', default: null },
   sessionType: { type: String, enum: ['timer', 'manual'], default: 'timer' },
-  studyType: { type: String, enum: ['syllabus', 'outside_syllabus'], default: 'syllabus' },
+  studyType: { type: String, enum: ['syllabus', 'revision', 'outside_syllabus'], default: 'syllabus' },
   status: { type: String, enum: ['active', 'paused', 'completed', 'cancelled'], default: 'completed' },
   startedAt: { type: Date, required: true },
   endedAt: { type: Date, default: null },

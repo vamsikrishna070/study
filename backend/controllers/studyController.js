@@ -1102,6 +1102,7 @@ async function syncStudySessionSyllabus(userId, previousCompletedTopicIds = []) 
   const affectedSubjectIds = new Set();
 
   allCompletedSessions.forEach((sess) => {
+    if (sess.studyType === 'revision') return;
     if (Array.isArray(sess.subjects)) {
       sess.subjects.forEach((sub) => {
         if (sub.subjectId) affectedSubjectIds.add(sub.subjectId.toString());

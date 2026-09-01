@@ -156,7 +156,6 @@ const MainNavigator = () => {
       <Stack.Screen name="FocusSession" component={FocusSessionScreen} />
       <Stack.Screen name="EndSession" component={EndSessionScreen} />
       <Stack.Screen name="LogSession" component={LogSessionScreen} />
-      <Stack.Screen name="StudyHistory" component={StudyHistoryScreen} />
       <Stack.Screen name="StudyAnalytics" component={StudyAnalyticsScreen} />
     </Stack.Navigator>
   );

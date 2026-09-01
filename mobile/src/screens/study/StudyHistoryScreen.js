@@ -353,6 +353,13 @@ export default function StudyHistoryScreen({ navigation }) {
                           </View>
                         )}
 
+                        {session.studyType === 'revision' && (
+                          <View style={styles.revisionBadge}>
+                            <RotateCcw size={11} color={colors.accent} style={{ marginRight: 4 }} />
+                            <Text style={styles.revisionBadgeText}>Revision</Text>
+                          </View>
+                        )}
+
                         {prodBadge && (
                           <View style={[styles.prodBadge, { borderColor: prodBadge.color + '40' }]}>
                             <prodBadge.icon size={12} color={prodBadge.color} style={{ marginRight: 4 }} />
@@ -694,6 +701,21 @@ const createStyles = (theme) =>
       borderColor: `${theme.colors.accent}30`,
     },
     outsideBadgeText: {
+      fontSize: 10,
+      fontWeight: '600',
+      color: theme.colors.accent,
+    },
+    revisionBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: theme.radii.sm,
+      backgroundColor: `${theme.colors.accent}15`,
+      borderWidth: 1,
+      borderColor: `${theme.colors.accent}30`,
+    },
+    revisionBadgeText: {
       fontSize: 10,
       fontWeight: '600',
       color: theme.colors.accent,

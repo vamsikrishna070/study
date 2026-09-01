@@ -118,7 +118,11 @@ export default function LogSessionScreen({ navigation }) {
 
       await createStudySession(payload);
       showSuccess('Session Logged', 'Your manual study session and syllabus progress have been updated.');
-      navigation.replace('StudyHistory');
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      } else {
+        navigation.navigate('StudyHistory');
+      }
     } catch (err) {
       console.error('[LogSession] Save error:', err);
       showError('Save Failed', 'Failed to log study session. Please try again.');
@@ -129,7 +133,7 @@ export default function LogSessionScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <Header />
+      <Header showBack={true} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
