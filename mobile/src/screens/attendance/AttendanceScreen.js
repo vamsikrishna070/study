@@ -313,7 +313,7 @@ export default function AttendanceScreen({ navigation }) {
     >
       <ScreenHeader
         title="Attendance & Conduct"
-        showBack={true}
+        showDrawer={true}
         rightElement={syncButton}
       />
 

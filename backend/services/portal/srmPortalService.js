@@ -616,9 +616,7 @@ async function scrapeAndStoreData(account, sessionId) {
         });
     });
 
-    if (todayConductClasses.length > 0) {
-      account.todayAttendanceCache = todayConductClasses;
-    }
+    account.todayAttendanceCache = todayConductClasses;
 
     const rawTimetable = [];
     $timetable("tr").each((_, row) => {

@@ -178,7 +178,7 @@ export default function FocusSessionScreen({ navigation }) {
 
         <View style={styles.subjectCard}>
           <View style={styles.subjectHeader}>
-            <BookOpen size={16} color={colors.accent} style={{ marginRight: 6 }} />
+            <BookOpen size={15} color={colors.accent} style={{ marginRight: 6 }} />
             <Text style={styles.subjectName} numberOfLines={1}>
               {activeSession.subjectName || 'General Study'}
             </Text>
@@ -192,7 +192,7 @@ export default function FocusSessionScreen({ navigation }) {
 
           {Boolean(activeSession.goal) && (
             <View style={styles.goalRow}>
-              <Target size={14} color={colors.mutedForeground} style={{ marginRight: 6 }} />
+              <Target size={13} color={colors.mutedForeground} style={{ marginRight: 6 }} />
               <Text style={styles.goalText} numberOfLines={2}>
                 Goal: {activeSession.goal}
               </Text>
@@ -204,7 +204,7 @@ export default function FocusSessionScreen({ navigation }) {
             onPress={handleOpenTopicModal}
             activeOpacity={0.7}
           >
-            <Plus size={14} color={colors.accent} style={{ marginRight: 4 }} />
+            <Plus size={13} color={colors.accent} style={{ marginRight: 4 }} />
             <Text style={styles.addTopicBtnText}>Add / Edit Topics</Text>
           </TouchableOpacity>
         </View>
@@ -218,7 +218,7 @@ export default function FocusSessionScreen({ navigation }) {
               onPress={resumeSession}
               activeOpacity={0.8}
             >
-              <Play size={22} color={colors.primaryForeground} fill={colors.primaryForeground} />
+              <Play size={20} color={colors.primaryForeground} fill={colors.primaryForeground} />
               <Text style={styles.resumeBtnText}>Resume</Text>
             </TouchableOpacity>
           ) : (
@@ -227,7 +227,7 @@ export default function FocusSessionScreen({ navigation }) {
               onPress={pauseSession}
               activeOpacity={0.8}
             >
-              <Pause size={22} color={colors.foreground} />
+              <Pause size={20} color={colors.foreground} />
               <Text style={styles.pauseBtnText}>Pause</Text>
             </TouchableOpacity>
           )}
@@ -237,7 +237,7 @@ export default function FocusSessionScreen({ navigation }) {
             onPress={handleEnd}
             activeOpacity={0.8}
           >
-            <CircleCheck size={22} color={colors.primaryForeground} />
+            <CircleCheck size={20} color={colors.primaryForeground} />
             <Text style={styles.endBtnText}>End Session</Text>
           </TouchableOpacity>
         </View>
@@ -254,7 +254,7 @@ export default function FocusSessionScreen({ navigation }) {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Add / Edit Live Topics</Text>
               <TouchableOpacity onPress={() => setEditModalVisible(false)}>
-                <X size={20} color={colors.mutedForeground} />
+                <X size={18} color={colors.mutedForeground} />
               </TouchableOpacity>
             </View>
 
@@ -292,15 +292,15 @@ const createStyles = (theme) =>
       justifyContent: 'space-between',
       alignItems: 'center',
       paddingHorizontal: theme.spacing.lg,
-      paddingTop: theme.spacing.md,
+      paddingTop: theme.spacing.sm,
     },
     brandRow: {
       flexDirection: 'row',
       alignItems: 'center',
     },
     brandText: {
-      fontSize: 12,
-      fontWeight: '800',
+      fontFamily: theme.typography.mono.medium,
+      fontSize: 11,
       letterSpacing: 1.2,
       color: theme.colors.accent,
     },
@@ -318,28 +318,28 @@ const createStyles = (theme) =>
       alignItems: 'center',
       backgroundColor: theme.colors.card,
       borderWidth: 1,
-      borderColor: theme.colors.border,
-      paddingHorizontal: 14,
-      paddingVertical: 6,
-      borderRadius: 20,
-      marginBottom: theme.spacing.xl,
+      borderColor: theme.colors.cardBorder,
+      paddingHorizontal: 12,
+      paddingVertical: 4,
+      borderRadius: theme.radii.round,
+      marginBottom: theme.spacing.lg,
     },
     statusBadgePaused: {
       borderColor: '#F59E0B',
     },
     statusDot: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
+      width: 7,
+      height: 7,
+      borderRadius: 3.5,
       backgroundColor: '#10B981',
-      marginRight: 8,
+      marginRight: 6,
     },
     statusDotPaused: {
       backgroundColor: '#F59E0B',
     },
     statusText: {
-      fontSize: 11,
-      fontWeight: '700',
+      fontFamily: theme.typography.mono.medium,
+      fontSize: 10,
       letterSpacing: 1,
       color: theme.colors.foreground,
     },
@@ -347,11 +347,11 @@ const createStyles = (theme) =>
       color: '#F59E0B',
     },
     timerWrapper: {
-      marginBottom: theme.spacing.xl,
+      marginBottom: theme.spacing.lg,
     },
     timerText: {
-      fontSize: 56,
-      fontWeight: '300',
+      fontFamily: theme.typography.mono.medium,
+      fontSize: 48,
       fontVariant: ['tabular-nums'],
       color: theme.colors.foreground,
       letterSpacing: 1,
@@ -361,8 +361,8 @@ const createStyles = (theme) =>
       backgroundColor: theme.colors.card,
       borderRadius: theme.radii.xl,
       borderWidth: 1,
-      borderColor: theme.colors.border,
-      padding: theme.spacing.lg,
+      borderColor: theme.colors.cardBorder,
+      padding: theme.spacing.md,
       alignItems: 'center',
       gap: theme.spacing.xs,
     },
@@ -371,21 +371,23 @@ const createStyles = (theme) =>
       alignItems: 'center',
     },
     subjectName: {
-      fontSize: 16,
-      fontWeight: '700',
+      fontFamily: theme.typography.sans.semiBold,
+      fontSize: 15,
       color: theme.colors.foreground,
     },
     topicText: {
-      fontSize: 14,
+      fontFamily: theme.typography.sans.regular,
+      fontSize: 13,
       color: theme.colors.mutedForeground,
       textAlign: 'center',
     },
     goalRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginTop: 4,
+      marginTop: 2,
     },
     goalText: {
+      fontFamily: theme.typography.sans.regular,
       fontSize: 12,
       color: theme.colors.mutedForeground,
       fontStyle: 'italic',
@@ -393,22 +395,22 @@ const createStyles = (theme) =>
     addTopicBtn: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginTop: 8,
-      paddingHorizontal: 12,
-      paddingVertical: 6,
+      marginTop: 6,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
       borderRadius: theme.radii.md,
       backgroundColor: theme.colors.background,
       borderWidth: 1,
-      borderColor: theme.colors.border,
+      borderColor: theme.colors.cardBorder,
     },
     addTopicBtnText: {
+      fontFamily: theme.typography.sans.medium,
       fontSize: 12,
-      fontWeight: '600',
       color: theme.colors.accent,
     },
     bottomControls: {
       paddingHorizontal: theme.spacing.lg,
-      paddingBottom: theme.spacing.xl,
+      paddingBottom: theme.spacing.lg,
     },
     controlsRow: {
       flexDirection: 'row',
@@ -416,37 +418,37 @@ const createStyles = (theme) =>
     },
     actionBtn: {
       flex: 1,
-      height: 56,
+      height: 48,
       borderRadius: theme.radii.xl,
       flexDirection: 'row',
       justifyContent: 'center',
       alignItems: 'center',
-      gap: 8,
+      gap: 6,
     },
     pauseBtn: {
       backgroundColor: theme.colors.card,
       borderWidth: 1,
-      borderColor: theme.colors.border,
+      borderColor: theme.colors.cardBorder,
     },
     pauseBtnText: {
-      fontSize: 16,
-      fontWeight: '700',
+      fontFamily: theme.typography.sans.semiBold,
+      fontSize: 14,
       color: theme.colors.foreground,
     },
     resumeBtn: {
       backgroundColor: theme.colors.primary,
     },
     resumeBtnText: {
-      fontSize: 16,
-      fontWeight: '700',
+      fontFamily: theme.typography.sans.semiBold,
+      fontSize: 14,
       color: theme.colors.primaryForeground,
     },
     endBtn: {
       backgroundColor: theme.colors.accent,
     },
     endBtnText: {
-      fontSize: 16,
-      fontWeight: '700',
+      fontFamily: theme.typography.sans.semiBold,
+      fontSize: 14,
       color: theme.colors.primaryForeground,
     },
     modalOverlay: {
@@ -468,8 +470,8 @@ const createStyles = (theme) =>
       marginBottom: theme.spacing.md,
     },
     modalTitle: {
+      fontFamily: theme.typography.serif.medium,
       fontSize: 18,
-      fontWeight: '700',
       color: theme.colors.foreground,
     },
   });

@@ -16,7 +16,11 @@ import {
   Award,
   TrendingUp,
   CalendarDays,
-  Sparkles
+  Sparkles,
+  Play,
+  BookOpen,
+  RotateCcw,
+  ChevronRight
 } from 'lucide-react-native';
 import { Header } from '../../components/ui/Header';
 import { PageHeading } from '../../components/ui/PageHeading';
@@ -25,7 +29,7 @@ import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { QueryState } from '../../components/ui/QueryState';
 import { getStudyStats } from '../../api/studySessions';
-import { typography, spacing, radii, useAppTheme, useStyles } from '../../theme/theme';
+import { useAppTheme, useStyles } from '../../theme/theme';
 
 export default function StudyAnalyticsScreen({ navigation }) {
   const { colors, typography, spacing, radii } = useAppTheme();
@@ -60,7 +64,7 @@ export default function StudyAnalyticsScreen({ navigation }) {
     loadStats();
   };
 
-  const hasData = stats && stats.total?.minutes > 0;
+  const hasData = Boolean(stats && (stats.total?.minutes > 0 || stats.total?.sessionsCount > 0));
   const maxWeeklyHours = Math.max(
     1,
     ...(stats?.weeklyChart?.map((d) => d.hours) || [1])
@@ -68,7 +72,7 @@ export default function StudyAnalyticsScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <Header />
+      <Header showBack={true} />
       <ScrollView
         refreshControl={
           <RefreshControl
@@ -81,11 +85,11 @@ export default function StudyAnalyticsScreen({ navigation }) {
       >
         <PageHeading
           eyebrow="Time & Focus"
-          title="Study Analytics"
+          title="Study Statistics"
           detail="Clear, data-backed visibility into your study habits, streaks, and subject balance."
           action={
             <Button onPress={() => navigation.navigate('StartSession')}>
-              <Play size={16} color={colors.primaryForeground} style={{ marginRight: 6 }} />
+              <Play size={15} color={colors.primaryForeground} style={{ marginRight: 6 }} />
               Start Session
             </Button>
           }
@@ -101,19 +105,17 @@ export default function StudyAnalyticsScreen({ navigation }) {
           <EmptyState
             icon={BarChart2}
             title="No study data yet"
-            detail="Start your first study session to see your progress here."
+            detail="Start your first study session to see your statistics here."
             action={
               <Button onPress={() => navigation.navigate('StartSession')}>
-                <Play size={16} color={colors.primaryForeground} style={{ marginRight: 6 }} />
+                <Play size={15} color={colors.primaryForeground} style={{ marginRight: 6 }} />
                 Start Studying
               </Button>
             }
           />
         ) : (
           <View style={styles.content}>
-
             <View style={styles.metricsGrid}>
-
               <View style={[styles.metricCard, { backgroundColor: colors.card }]}>
                 <Text style={styles.metricEyebrow}>Today</Text>
                 <Text style={styles.metricValue}>{stats.today?.formatted || '0m'}</Text>
@@ -130,9 +132,9 @@ export default function StudyAnalyticsScreen({ navigation }) {
                 </View>
                 <Text style={[styles.metricValue, { color: colors.primaryForeground }]}>
                   {user?.currentStreak !== undefined && user?.currentStreak !== null ? user.currentStreak : (stats.streak || 0)}{' '}
-                  <Text style={{ fontSize: 18 }}>day{(user?.currentStreak ?? stats.streak) !== 1 ? 's' : ''}</Text>
+                  <Text style={{ fontSize: 16 }}>day{(user?.currentStreak ?? stats.streak) !== 1 ? 's' : ''}</Text>
                 </Text>
-                <Text style={[styles.metricDetail, { color: colors.primaryForeground, opacity: 0.7 }]}>
+                <Text style={[styles.metricDetail, { color: colors.primaryForeground, opacity: 0.8 }]}>
                   Consecutive focus
                 </Text>
               </View>
@@ -195,7 +197,7 @@ export default function StudyAnalyticsScreen({ navigation }) {
                         <Text
                           style={[
                             styles.chartDayLabel,
-                            isToday && { color: colors.accent, fontFamily: typography.mono.bold },
+                            isToday && { color: colors.accent, fontFamily: typography.mono.semiBold },
                           ]}
                         >
                           {dayItem.day}
@@ -298,8 +300,8 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
       paddingBottom: spacing.xxl,
     },
     content: {
-      gap: spacing.lg,
-      marginTop: spacing.md,
+      gap: spacing.md,
+      marginTop: spacing.sm,
     },
     metricsGrid: {
       flexDirection: 'row',
@@ -309,7 +311,7 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
     metricCard: {
       flex: 1,
       minWidth: '45%',
-      padding: spacing.lg,
+      padding: spacing.md,
       borderRadius: radii.xl,
       borderWidth: 1,
       borderColor: colors.cardBorder,
@@ -320,22 +322,22 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
       marginBottom: spacing.xs,
     },
     streakBadgeText: {
-      fontFamily: typography.mono.bold,
+      fontFamily: typography.mono.semiBold,
       fontSize: 10,
       textTransform: 'uppercase',
       letterSpacing: 1,
       color: colors.primaryForeground,
     },
     metricEyebrow: {
-      fontFamily: typography.mono.regular,
+      fontFamily: typography.mono.medium,
       fontSize: 10,
       textTransform: 'uppercase',
-      letterSpacing: 1.5,
+      letterSpacing: 1.2,
       color: colors.mutedForeground,
     },
     metricValue: {
       fontFamily: typography.serif.medium,
-      fontSize: 26,
+      fontSize: 22,
       color: colors.foreground,
       marginVertical: spacing.xs,
     },
@@ -345,16 +347,16 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
       color: colors.mutedForeground,
     },
     chartCard: {
-      padding: spacing.lg,
+      padding: spacing.md,
     },
     sectionHeader: {
-      marginBottom: spacing.md,
+      marginBottom: spacing.sm,
     },
     sectionEyebrow: {
-      fontFamily: typography.mono.regular,
+      fontFamily: typography.mono.medium,
       fontSize: 10,
       textTransform: 'uppercase',
-      letterSpacing: 2,
+      letterSpacing: 1.5,
       color: colors.accent,
       marginBottom: 2,
     },
@@ -367,7 +369,7 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'flex-end',
-      height: 140,
+      height: 130,
       paddingTop: spacing.md,
     },
     chartCol: {
@@ -377,13 +379,13 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
       justifyContent: 'flex-end',
     },
     chartValueLabel: {
-      fontFamily: typography.mono.regular,
-      fontSize: 10,
+      fontFamily: typography.mono.medium,
+      fontSize: 9,
       color: colors.mutedForeground,
       marginBottom: 4,
     },
     barTrack: {
-      width: 14,
+      width: 12,
       flex: 1,
       backgroundColor: colors.muted + '40',
       borderRadius: radii.round,
@@ -401,42 +403,45 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
       marginTop: 6,
     },
     highlightsCard: {
-      padding: spacing.lg,
+      padding: spacing.md,
     },
     highlightRow: {
       flexDirection: 'row',
       gap: spacing.md,
-      marginBottom: spacing.md,
+      marginBottom: spacing.sm,
     },
     highlightItem: {
       flex: 1,
-      backgroundColor: colors.muted + '30',
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
       padding: spacing.md,
       borderRadius: radii.lg,
     },
     highlightLabel: {
-      fontFamily: typography.sans.regular,
-      fontSize: 12,
+      fontFamily: typography.mono.medium,
+      fontSize: 10,
+      textTransform: 'uppercase',
       color: colors.mutedForeground,
     },
     highlightValue: {
-      fontFamily: typography.sans.bold,
-      fontSize: 18,
+      fontFamily: typography.sans.semiBold,
+      fontSize: 16,
       color: colors.foreground,
       marginTop: 4,
     },
     topSubjectBox: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: colors.accent + '10',
+      backgroundColor: `${colors.accent}12`,
       padding: spacing.md,
       borderRadius: radii.lg,
       borderWidth: 1,
-      borderColor: colors.accent + '30',
+      borderColor: `${colors.accent}30`,
     },
     topSubjectTitle: {
       fontFamily: typography.sans.semiBold,
-      fontSize: 14,
+      fontSize: 13,
       color: colors.foreground,
     },
     topSubjectDetail: {
@@ -446,10 +451,10 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
       marginTop: 2,
     },
     distributionCard: {
-      padding: spacing.lg,
+      padding: spacing.md,
     },
     distributionList: {
-      gap: spacing.md,
+      gap: spacing.sm,
     },
     distItem: {
       width: '100%',
@@ -460,18 +465,19 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
       marginBottom: 4,
     },
     distName: {
-      fontFamily: typography.sans.semiBold,
+      fontFamily: theme => theme.typography.sans.medium,
+      fontFamily: typography.sans.medium,
       fontSize: 13,
       color: colors.foreground,
       flex: 1,
     },
     distValue: {
-      fontFamily: typography.mono.regular,
+      fontFamily: typography.mono.medium,
       fontSize: 11,
       color: colors.mutedForeground,
     },
     distTrack: {
-      height: 8,
+      height: 6,
       backgroundColor: colors.muted,
       borderRadius: radii.round,
       overflow: 'hidden',

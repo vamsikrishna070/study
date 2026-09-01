@@ -13,7 +13,11 @@ import {
   Smile,
   Meh,
   Frown,
-  Save
+  CheckCircle2,
+  ListTodo,
+  Clock,
+  Check,
+  X
 } from 'lucide-react-native';
 import { Header } from '../../components/ui/Header';
 import { Card } from '../../components/ui/Card';
@@ -42,6 +46,7 @@ export default function EndSessionScreen({ navigation, route }) {
 
   const [availableSubjects, setAvailableSubjects] = useState([]);
   const [studyType, setStudyType] = useState(summary.studyType || 'syllabus');
+  const [completionMode, setCompletionMode] = useState('all');
   const [subjects, setSubjects] = useState(summary.subjects || []);
   const [outsideSyllabus, setOutsideSyllabus] = useState(summary.outsideSyllabus || []);
 
@@ -50,6 +55,36 @@ export default function EndSessionScreen({ navigation, route }) {
       .then((res) => setAvailableSubjects(res.data || res || []))
       .catch(() => setAvailableSubjects([]));
   }, []);
+
+  useEffect(() => {
+    if (completionMode === 'all') {
+      setSubjects((prev) =>
+        prev.map((sub) => ({
+          ...sub,
+          topics: (sub.topics || []).map((top) => ({ ...top, completed: true })),
+        }))
+      );
+      setOutsideSyllabus((prev) =>
+        prev.map((out) => ({
+          ...out,
+          topics: (out.topics || []).map((top) => ({ ...top, completed: true })),
+        }))
+      );
+    } else if (completionMode === 'none') {
+      setSubjects((prev) =>
+        prev.map((sub) => ({
+          ...sub,
+          topics: (sub.topics || []).map((top) => ({ ...top, completed: false })),
+        }))
+      );
+      setOutsideSyllabus((prev) =>
+        prev.map((out) => ({
+          ...out,
+          topics: (out.topics || []).map((top) => ({ ...top, completed: false })),
+        }))
+      );
+    }
+  }, [completionMode]);
 
   const formatDetailedTime = (sec = 0) => {
     const mins = Math.floor(sec / 60);
@@ -125,12 +160,12 @@ export default function EndSessionScreen({ navigation, route }) {
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <View style={styles.header}>
             <View style={styles.badge}>
-              <Sparkles size={16} color={colors.accent} style={{ marginRight: 6 }} />
+              <Sparkles size={14} color={colors.accent} style={{ marginRight: 6 }} />
               <Text style={styles.badgeText}>Session Finished</Text>
             </View>
             <Text style={styles.title}>Great study block!</Text>
             <Text style={styles.subtitle}>
-              Review your study duration, select completed topics, and reflect on what you accomplished.
+              Confirm topic completion to automatically sync progress with your syllabus.
             </Text>
           </View>
 
@@ -156,7 +191,7 @@ export default function EndSessionScreen({ navigation, route }) {
                   onPress={() => setProductivity('productive')}
                   activeOpacity={0.7}
                 >
-                  <Smile size={20} color={productivity === 'productive' ? colors.accent : colors.mutedForeground} />
+                  <Smile size={18} color={productivity === 'productive' ? colors.accent : colors.mutedForeground} />
                   <Text style={[styles.prodText, productivity === 'productive' && styles.prodTextActive]}>
                     Productive
                   </Text>
@@ -167,7 +202,7 @@ export default function EndSessionScreen({ navigation, route }) {
                   onPress={() => setProductivity('average')}
                   activeOpacity={0.7}
                 >
-                  <Meh size={20} color={productivity === 'average' ? colors.accent : colors.mutedForeground} />
+                  <Meh size={18} color={productivity === 'average' ? colors.accent : colors.mutedForeground} />
                   <Text style={[styles.prodText, productivity === 'average' && styles.prodTextActive]}>
                     Average
                   </Text>
@@ -178,7 +213,7 @@ export default function EndSessionScreen({ navigation, route }) {
                   onPress={() => setProductivity('difficult')}
                   activeOpacity={0.7}
                 >
-                  <Frown size={20} color={productivity === 'difficult' ? '#F59E0B' : colors.mutedForeground} />
+                  <Frown size={18} color={productivity === 'difficult' ? '#F59E0B' : colors.mutedForeground} />
                   <Text style={[styles.prodText, productivity === 'difficult' && styles.prodTextActive]}>
                     Difficult
                   </Text>
@@ -186,25 +221,64 @@ export default function EndSessionScreen({ navigation, route }) {
               </View>
             </Field>
 
-            <StudyTopicSelector
-              studyType={studyType}
-              onStudyTypeChange={setStudyType}
-              availableSubjects={availableSubjects}
-              selectedSubjects={subjects}
-              onSelectedSubjectsChange={setSubjects}
-              outsideSyllabus={outsideSyllabus}
-              onOutsideSyllabusChange={setOutsideSyllabus}
-              showCompletionCheckboxes={true}
-            />
+            <Field label="How did you finish these topics?" hint="Completed syllabus topics automatically update your syllabus progress">
+              <View style={styles.modeColumn}>
+                <TouchableOpacity
+                  style={[styles.modeBtn, completionMode === 'all' && styles.modeBtnActive]}
+                  onPress={() => setCompletionMode('all')}
+                  activeOpacity={0.7}
+                >
+                  <CheckCircle2 size={16} color={completionMode === 'all' ? colors.primaryForeground : colors.mutedForeground} style={{ marginRight: 8 }} />
+                  <Text style={[styles.modeBtnText, completionMode === 'all' && styles.modeBtnTextActive]}>
+                    All Topics Completed
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.modeBtn, completionMode === 'partial' && styles.modeBtnActive]}
+                  onPress={() => setCompletionMode('partial')}
+                  activeOpacity={0.7}
+                >
+                  <ListTodo size={16} color={completionMode === 'partial' ? colors.primaryForeground : colors.mutedForeground} style={{ marginRight: 8 }} />
+                  <Text style={[styles.modeBtnText, completionMode === 'partial' && styles.modeBtnTextActive]}>
+                    Select Completed Topics
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.modeBtn, completionMode === 'none' && styles.modeBtnActive]}
+                  onPress={() => setCompletionMode('none')}
+                  activeOpacity={0.7}
+                >
+                  <Clock size={16} color={completionMode === 'none' ? colors.primaryForeground : colors.mutedForeground} style={{ marginRight: 8 }} />
+                  <Text style={[styles.modeBtnText, completionMode === 'none' && styles.modeBtnTextActive]}>
+                    Keep All Topics Pending
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </Field>
+
+            {completionMode === 'partial' && (
+              <StudyTopicSelector
+                studyType={studyType}
+                onStudyTypeChange={setStudyType}
+                availableSubjects={availableSubjects}
+                selectedSubjects={subjects}
+                onSelectedSubjectsChange={setSubjects}
+                outsideSyllabus={outsideSyllabus}
+                onOutsideSyllabusChange={setOutsideSyllabus}
+                showCompletionCheckboxes={true}
+              />
+            )}
 
             <Field label="Session Reflection / Notes (Optional)">
               <Input
                 value={reflection}
                 onChangeText={setReflection}
-                placeholder="What did you learn? What needs further review?"
+                placeholder="What did you learn or accomplish during this session?"
                 multiline
                 numberOfLines={3}
-                style={{ height: 80, textAlignVertical: 'top' }}
+                style={{ minHeight: 70 }}
               />
             </Field>
 
@@ -213,8 +287,7 @@ export default function EndSessionScreen({ navigation, route }) {
               loading={saving}
               style={styles.saveBtn}
             >
-              <Save size={18} color={colors.primaryForeground} style={{ marginRight: 8 }} />
-              Save Study Log
+              Save Study Session
             </Button>
           </Card>
         </ScrollView>
@@ -234,36 +307,37 @@ const createStyles = (theme) =>
       paddingBottom: 40,
     },
     header: {
-      alignItems: 'center',
       marginBottom: theme.spacing.lg,
     },
     badge: {
       flexDirection: 'row',
       alignItems: 'center',
+      alignSelf: 'flex-start',
       backgroundColor: theme.colors.card,
       borderWidth: 1,
-      borderColor: theme.colors.border,
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: theme.radii.full,
-      marginBottom: theme.spacing.xs,
+      borderColor: theme.colors.cardBorder,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: theme.radii.round,
+      marginBottom: theme.spacing.sm,
     },
     badgeText: {
-      fontSize: 12,
-      fontWeight: '700',
+      fontFamily: theme.typography.mono.medium,
+      fontSize: 10,
+      letterSpacing: 1.2,
       color: theme.colors.accent,
+      textTransform: 'uppercase',
     },
     title: {
-      fontSize: 24,
-      fontWeight: '800',
+      fontFamily: theme.typography.serif.medium,
+      fontSize: 22,
       color: theme.colors.foreground,
       marginBottom: 4,
     },
     subtitle: {
-      fontSize: 14,
+      fontFamily: theme.typography.sans.regular,
+      fontSize: 13,
       color: theme.colors.mutedForeground,
-      textAlign: 'center',
-      paddingHorizontal: theme.spacing.md,
     },
     summaryCard: {
       padding: theme.spacing.md,
@@ -271,10 +345,12 @@ const createStyles = (theme) =>
     },
     statRow: {
       flexDirection: 'row',
+      alignItems: 'center',
       backgroundColor: theme.colors.background,
       borderRadius: theme.radii.lg,
       padding: theme.spacing.md,
-      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: theme.colors.cardBorder,
     },
     statBox: {
       flex: 1,
@@ -282,36 +358,35 @@ const createStyles = (theme) =>
     },
     divider: {
       width: 1,
-      height: 30,
-      backgroundColor: theme.colors.border,
+      height: 28,
+      backgroundColor: theme.colors.cardBorder,
     },
     statLabel: {
-      fontSize: 11,
-      fontWeight: '600',
-      color: theme.colors.mutedForeground,
+      fontFamily: theme.typography.mono.medium,
+      fontSize: 9,
       textTransform: 'uppercase',
+      color: theme.colors.mutedForeground,
       marginBottom: 2,
     },
     statValue: {
-      fontSize: 16,
-      fontWeight: '700',
+      fontFamily: theme.typography.sans.semiBold,
+      fontSize: 14,
       color: theme.colors.foreground,
     },
     prodRow: {
       flexDirection: 'row',
-      gap: theme.spacing.xs,
+      gap: theme.spacing.sm,
     },
     prodOption: {
       flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      paddingVertical: 10,
-      paddingHorizontal: 8,
+      paddingVertical: 8,
       borderRadius: theme.radii.md,
       backgroundColor: theme.colors.background,
       borderWidth: 1,
-      borderColor: theme.colors.border,
+      borderColor: theme.colors.cardBorder,
       gap: 6,
     },
     prodOptionActive: {
@@ -319,15 +394,42 @@ const createStyles = (theme) =>
       backgroundColor: `${theme.colors.accent}12`,
     },
     prodText: {
+      fontFamily: theme.typography.sans.medium,
       fontSize: 12,
-      fontWeight: '600',
       color: theme.colors.mutedForeground,
     },
     prodTextActive: {
       color: theme.colors.foreground,
+      fontFamily: theme.typography.sans.semiBold,
+    },
+    modeColumn: {
+      gap: theme.spacing.xs,
+    },
+    modeBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      borderRadius: theme.radii.lg,
+      backgroundColor: theme.colors.background,
+      borderWidth: 1,
+      borderColor: theme.colors.cardBorder,
+    },
+    modeBtnActive: {
+      backgroundColor: theme.colors.primary,
+      borderColor: theme.colors.primary,
+    },
+    modeBtnText: {
+      fontFamily: theme.typography.sans.medium,
+      fontSize: 12,
+      color: theme.colors.mutedForeground,
+    },
+    modeBtnTextActive: {
+      color: theme.colors.primaryForeground,
+      fontFamily: theme.typography.sans.semiBold,
     },
     saveBtn: {
       marginTop: theme.spacing.sm,
-      height: 50,
+      height: 48,
     },
   });

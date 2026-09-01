@@ -20,6 +20,7 @@ import {
   Layers,
   CloudUpload,
 } from 'lucide-react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   extractSyllabus,
   updateTopicCompletion,
@@ -105,6 +106,12 @@ const SyllabusScreen = ({ route, navigation }) => {
   useEffect(() => {
     loadData();
   }, [subjectId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [subjectId])
+  );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);

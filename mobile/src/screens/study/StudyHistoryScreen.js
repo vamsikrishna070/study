@@ -270,13 +270,14 @@ export default function StudyHistoryScreen({ navigation }) {
                     <PenLine size={16} color={colors.foreground} style={{ marginRight: 6 }} />
                     Log
                   </Button>
-                  <TouchableOpacity
-                    style={styles.chartIconBtn}
+                  <Button
+                    variant="outline"
                     onPress={() => navigation.navigate('StudyAnalytics')}
-                    activeOpacity={0.7}
+                    style={styles.headerBtn}
                   >
-                    <BarChart2 size={18} color={colors.accent} />
-                  </TouchableOpacity>
+                    <BarChart2 size={16} color={colors.accent} style={{ marginRight: 6 }} />
+                    Stats
+                  </Button>
                 </View>
               }
             />

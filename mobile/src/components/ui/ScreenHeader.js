@@ -14,37 +14,26 @@ const getInitials = (name) => {
 const openNearestDrawer = (navigation) => {
   if (!navigation) return;
 
+  if (typeof navigation.openDrawer === 'function') {
+    navigation.openDrawer();
+    return;
+  }
+
+  const drawerParent = navigation.getParent('AppDrawer') || navigation.getParent();
+  if (drawerParent) {
+    if (typeof drawerParent.openDrawer === 'function') {
+      drawerParent.openDrawer();
+      return;
+    }
+    if (typeof drawerParent.dispatch === 'function') {
+      drawerParent.dispatch(DrawerActions.openDrawer());
+      return;
+    }
+  }
+
   try {
-    const appDrawer = navigation.getParent('AppDrawer');
-    if (appDrawer) {
-      if (typeof appDrawer.openDrawer === 'function') {
-        appDrawer.openDrawer();
-        return;
-      }
-      appDrawer.dispatch(DrawerActions.openDrawer());
-      return;
-    }
+    navigation.dispatch(DrawerActions.openDrawer());
   } catch (_) {}
-
-  let nav = navigation;
-  while (nav) {
-    if (typeof nav.openDrawer === 'function') {
-      nav.openDrawer();
-      return;
-    }
-    const parent = typeof nav.getParent === 'function' ? nav.getParent() : null;
-    if (parent && parent !== nav) {
-      nav = parent;
-    } else {
-      break;
-    }
-  }
-
-  if (nav) {
-    try {
-      nav.dispatch(DrawerActions.openDrawer());
-    } catch (_) {}
-  }
 };
 
 export const ScreenHeader = ({

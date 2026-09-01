@@ -116,10 +116,68 @@ export function computeOverall(stats) {
   };
 }
 
+export function getTodayIndiaDateInfo() {
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  const isoDate = formatter.format(now);
+  const parts = isoDate.split('-');
+  const year = parts[0];
+  const month = parts[1];
+  const day = parts[2];
+
+  return {
+    iso: `${year}-${month}-${day}`,
+    dayNum: parseInt(day, 10),
+    monthNum: parseInt(month, 10),
+    yearNum: parseInt(year, 10),
+  };
+}
+
+export function isDateMatchingTodayIndia(dateStr) {
+  if (!dateStr || typeof dateStr !== 'string') return true;
+  const str = dateStr.trim().toLowerCase();
+  if (!str) return true;
+
+  const today = getTodayIndiaDateInfo();
+  if (str.includes(today.iso)) return true;
+
+  const dNum = today.dayNum;
+  const dPad = String(dNum).padStart(2, '0');
+  const mNum = today.monthNum;
+  const mPad = String(mNum).padStart(2, '0');
+
+  const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+  const monthName = monthNames[mNum - 1];
+
+  if (
+    str.includes(`${today.yearNum}-${mPad}-${dPad}`) ||
+    str.includes(`${dPad}/${mPad}/${today.yearNum}`) ||
+    str.includes(`${dPad}-${mPad}-${today.yearNum}`)
+  ) {
+    return true;
+  }
+
+  if (str.includes(monthName) && (str.includes(dPad) || str.includes(String(dNum)))) {
+    return true;
+  }
+
+  return false;
+}
+
 export function buildTodayClassesFromCache(account) {
   if (!account || !Array.isArray(account.todayAttendanceCache)) return [];
 
-  return account.todayAttendanceCache.map((rec) => {
+  const todayClassesOnly = account.todayAttendanceCache.filter((rec) => {
+    if (!rec || !rec.date) return true;
+    return isDateMatchingTodayIndia(rec.date);
+  });
+
+  return todayClassesOnly.map((rec) => {
     const hour = safeHour(rec.hour) || 1;
     const timeSlot = getHourTime(hour);
     return {

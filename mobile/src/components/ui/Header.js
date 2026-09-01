@@ -36,31 +36,20 @@ export const Header = ({ showBack, navigation: customNavigation }) => {
       return;
     }
 
-    if (typeof navigation.getParent === 'function') {
-      const drawerById = navigation.getParent('AppDrawer');
-      if (drawerById && typeof drawerById.openDrawer === 'function') {
-        drawerById.openDrawer();
-        return;
-      }
-
-      let parent = navigation.getParent();
-      while (parent) {
-        if (typeof parent.openDrawer === 'function') {
-          parent.openDrawer();
-          return;
-        }
-        parent = typeof parent.getParent === 'function' ? parent.getParent() : null;
-      }
-
-      let dispatchParent = navigation.getParent();
-      while (dispatchParent) {
-        try {
-          dispatchParent.dispatch(DrawerActions.openDrawer());
-          return;
-        } catch (_) {}
-        dispatchParent = typeof dispatchParent.getParent === 'function' ? dispatchParent.getParent() : null;
-      }
+    const drawerParent = navigation.getParent('AppDrawer') || navigation.getParent();
+    if (drawerParent && typeof drawerParent.openDrawer === 'function') {
+      drawerParent.openDrawer();
+      return;
     }
+
+    if (drawerParent && typeof drawerParent.dispatch === 'function') {
+      drawerParent.dispatch(DrawerActions.openDrawer());
+      return;
+    }
+
+    try {
+      navigation.dispatch(DrawerActions.openDrawer());
+    } catch (_) {}
 
     if (navigation.canGoBack()) {
       navigation.goBack();

@@ -32,6 +32,7 @@ import {
   Layers,
   CloudUpload,
 } from 'lucide-react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatSemester } from '../../utils/semester';
 import { Button } from '../../components/ui/Button';
@@ -99,6 +100,12 @@ const SubjectDetailScreen = ({ route, navigation }) => {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);
