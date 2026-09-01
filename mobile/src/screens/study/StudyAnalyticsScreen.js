@@ -8,15 +8,15 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
-import { 
-  BarChart2, 
-  Flame, 
-  Target, 
-  Clock, 
-  Award, 
-  TrendingUp, 
-  CalendarDays, 
-  Sparkles 
+import {
+  BarChart2,
+  Flame,
+  Target,
+  Clock,
+  Award,
+  TrendingUp,
+  CalendarDays,
+  Sparkles
 } from 'lucide-react-native';
 import { Header } from '../../components/ui/Header';
 import { PageHeading } from '../../components/ui/PageHeading';
@@ -111,9 +111,9 @@ export default function StudyAnalyticsScreen({ navigation }) {
           />
         ) : (
           <View style={styles.content}>
-            {/* Primary Metrics Grid */}
+
             <View style={styles.metricsGrid}>
-              {/* Today */}
+
               <View style={[styles.metricCard, { backgroundColor: colors.card }]}>
                 <Text style={styles.metricEyebrow}>Today</Text>
                 <Text style={styles.metricValue}>{stats.today?.formatted || '0m'}</Text>
@@ -123,7 +123,6 @@ export default function StudyAnalyticsScreen({ navigation }) {
                 </Text>
               </View>
 
-              {/* Streak */}
               <View style={[styles.metricCard, { backgroundColor: colors.primary }]}>
                 <View style={styles.streakBadge}>
                   <Flame size={14} color="#f97316" style={{ marginRight: 4 }} />
@@ -138,7 +137,6 @@ export default function StudyAnalyticsScreen({ navigation }) {
                 </Text>
               </View>
 
-              {/* This Week */}
               <View style={[styles.metricCard, { backgroundColor: colors.card }]}>
                 <Text style={styles.metricEyebrow}>This Week</Text>
                 <Text style={styles.metricValue}>{stats.thisWeek?.formatted || '0m'}</Text>
@@ -148,7 +146,6 @@ export default function StudyAnalyticsScreen({ navigation }) {
                 </Text>
               </View>
 
-              {/* This Month */}
               <View style={[styles.metricCard, { backgroundColor: colors.card }]}>
                 <Text style={styles.metricEyebrow}>This Month</Text>
                 <Text style={styles.metricValue}>{stats.thisMonth?.formatted || '0m'}</Text>
@@ -159,7 +156,6 @@ export default function StudyAnalyticsScreen({ navigation }) {
               </View>
             </View>
 
-            {/* Weekly Daily Chart */}
             {stats.weeklyChart && stats.weeklyChart.length > 0 && (
               <Card style={styles.chartCard}>
                 <View style={styles.sectionHeader}>
@@ -211,7 +207,6 @@ export default function StudyAnalyticsScreen({ navigation }) {
               </Card>
             )}
 
-            {/* Highlights Card */}
             <Card style={styles.highlightsCard}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionEyebrow}>Performance Overview</Text>
@@ -247,7 +242,6 @@ export default function StudyAnalyticsScreen({ navigation }) {
               )}
             </Card>
 
-            {/* Subject Distribution */}
             {stats.subjectDistribution && stats.subjectDistribution.length > 0 && (
               <Card style={styles.distributionCard}>
                 <View style={styles.sectionHeader}>

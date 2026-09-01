@@ -14,11 +14,6 @@ class HttpError extends Error {
   }
 }
 
-/**
- * @desc Extract syllabus units & topics from uploaded syllabus document (PDF, DOCX, TXT)
- * @route POST /api/syllabus/:id/extract or /api/subjects/:id/syllabus/extract
- * @access Private
- */
 export async function extractSyllabus(req, res) {
   try {
     const subjectId = req.params.id;
@@ -95,7 +90,6 @@ export async function extractSyllabus(req, res) {
       });
     }
 
-    // Map units for frontend & mobile compatibility
     const formattedUnits = units.map((u) => ({
       unitNumber: u.unitNumber,
       unitName: u.unitName || u.name,
@@ -154,11 +148,6 @@ export async function extractSyllabus(req, res) {
   }
 }
 
-/**
- * @desc Confirm and persist reviewed syllabus units & topics
- * @route POST /api/syllabus/:id/confirm or /api/subjects/:id/syllabus/confirm
- * @access Private
- */
 export async function confirmSyllabus(req, res) {
   try {
     const subject = await Subject.findOne({
@@ -176,11 +165,9 @@ export async function confirmSyllabus(req, res) {
         .json({ success: false, message: 'Units array is required' });
     }
 
-    // Delete existing units and topics for this subject
     await Unit.deleteMany({ subject: subject._id, user: req.user._id });
     await Topic.deleteMany({ subject: subject._id, user: req.user._id });
 
-    // Insert Units and Topics
     let unitOrder = 0;
     for (const u of units) {
       unitOrder++;
@@ -210,7 +197,6 @@ export async function confirmSyllabus(req, res) {
       }
     }
 
-    // Recalculate subject progress
     await updateSubjectProgressHelper(subject._id, req.user._id);
 
     res.json({ success: true, message: 'Syllabus successfully saved' });

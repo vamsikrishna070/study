@@ -7,7 +7,7 @@ export const connectPortal = async (payload) => {
 
 export const getPortalStatus = async () => {
   const res = await client.get('/portal/status');
-  return res.data.data;
+  return res.data.data || res.data;
 };
 
 export const syncPortalData = async () => {
@@ -17,7 +17,7 @@ export const syncPortalData = async () => {
 
 export const getAcademicCalendar = async () => {
   const res = await client.get('/portal/calendar');
-  return res.data.data;
+  return res.data.data || res.data;
 };
 
 export const disconnectPortal = async () => {
@@ -27,7 +27,7 @@ export const disconnectPortal = async () => {
 
 export const getTodayAttendance = async () => {
   const res = await client.get('/portal/attendance/today');
-  return res.data.data;
+  return res.data.data || res.data;
 };
 
 export const markAttendanceCode = async (attendanceCode) => {
@@ -37,5 +37,5 @@ export const markAttendanceCode = async (attendanceCode) => {
 
 export const getTimetableData = async () => {
   const res = await client.get('/portal/timetable');
-  return res.data.data;
+  return res.data.data || res.data;
 };

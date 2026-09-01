@@ -208,7 +208,7 @@ export default function SubjectDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [activeTab, setActiveTab] = useState("overview"); // overview | syllabus
+  const [activeTab, setActiveTab] = useState("overview");
 
   const [expandedUnits, setExpandedUnits] = useState({});
   const [openUnitForm, setOpenUnitForm] = useState(false);
@@ -236,7 +236,6 @@ export default function SubjectDetail() {
       setTopics(topicsRes.data.data);
       setImportantPoints(ipRes.data.data);
 
-      // Auto expand first unit
       if (unitsRes.data.data.length > 0) {
         setExpandedUnits({ [unitsRes.data.data[0]._id]: true });
       }
@@ -262,13 +261,13 @@ export default function SubjectDetail() {
       setTopics(updatedTopics);
 
       await apiClient.patch(`/topics/${topicId}`, { status: newStatus });
-      
+
       const subjRes = await apiClient.get(`/subjects/${id}`);
       if (subjRes.data?.data) {
         setSubject(subjRes.data.data);
       }
     } catch (err) {
-      // ignore
+
     }
   };
 
@@ -317,7 +316,7 @@ export default function SubjectDetail() {
         });
         return;
       } catch {
-        // clipboard fallback
+
       }
     }
     try {
@@ -325,7 +324,7 @@ export default function SubjectDetail() {
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 2000);
     } catch {
-      // ignore
+
     }
   };
 
@@ -367,7 +366,6 @@ export default function SubjectDetail() {
         detail={subject.description || "No description provided."}
       />
 
-      {/* TABS */}
       <div className="mb-8 flex space-x-1 rounded-xl bg-muted/50 p-1 w-fit">
         <button
           onClick={() => setActiveTab("overview")}

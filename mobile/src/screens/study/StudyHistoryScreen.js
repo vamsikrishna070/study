@@ -100,7 +100,6 @@ export default function StudyHistoryScreen({ navigation }) {
     return `${hrs} hr ${rem} min`;
   };
 
-  // Group sessions by relative date headers (Today, Yesterday, Date string)
   const groupSessionsByDate = (list) => {
     const groups = {};
     const todayStr = new Date().toDateString();
@@ -286,7 +285,6 @@ export default function StudyHistoryScreen({ navigation }) {
         )}
       />
 
-      {/* Session Details Modal */}
       <Modal
         visible={Boolean(selectedSession)}
         animationType="slide"

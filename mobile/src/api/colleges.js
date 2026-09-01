@@ -1,17 +1,10 @@
 import apiClient from './client';
 
-/**
- * Fetch list of all Indian States & UTs available in the database
- */
 export async function getCollegeStates() {
   const response = await apiClient.get('/colleges/states');
   return response.data?.data || [];
 }
 
-/**
- * Search and filter colleges/universities with debouncing support and pagination
- * @param {Object} params - { state, search, type, page, limit }
- */
 export async function getColleges({ state = '', search = '', type = '', page = 1, limit = 20 } = {}) {
   const params = {};
   if (state && state.trim()) params.state = state.trim();
@@ -24,10 +17,6 @@ export async function getColleges({ state = '', search = '', type = '', page = 1
   return response.data || { success: false, data: [], pagination: {} };
 }
 
-/**
- * Fetch a specific college by ID
- * @param {string} id - College MongoDB ObjectId
- */
 export async function getCollegeById(id) {
   const response = await apiClient.get(`/colleges/${id}`);
   return response.data?.data || null;

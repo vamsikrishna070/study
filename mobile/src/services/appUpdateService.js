@@ -9,9 +9,6 @@ export const UPDATE_STATUS = {
   UNKNOWN: 'UNKNOWN',
 };
 
-/**
- * Get current application version and numeric build code dynamically
- */
 export function getAppVersionInfo() {
   const versionName = Application.nativeApplicationVersion || '1.0.2';
   const rawBuildVersion = Application.nativeBuildVersion || '3';
@@ -26,9 +23,6 @@ export function getAppVersionInfo() {
   };
 }
 
-/**
- * Authoritative function for determining update status strictly by numeric version codes
- */
 export function evaluateUpdateState({
   installedVersionCode,
   latestVersionCode,
@@ -47,7 +41,6 @@ export function evaluateUpdateState({
     };
   }
 
-  // 1. Force update condition: installed build is lower than minimum supported or server forced
   if (installed < minSupported || (serverForceUpdate && latest > installed)) {
     return {
       status: UPDATE_STATUS.FORCE_UPDATE,
@@ -56,7 +49,6 @@ export function evaluateUpdateState({
     };
   }
 
-  // 2. Normal update available: latest build is strictly greater than installed build
   if (latest > installed) {
     return {
       status: UPDATE_STATUS.UPDATE_AVAILABLE,
@@ -65,7 +57,6 @@ export function evaluateUpdateState({
     };
   }
 
-  // 3. Up to date: installed >= latest
   return {
     status: UPDATE_STATUS.UP_TO_DATE,
     updateAvailable: false,
@@ -73,23 +64,6 @@ export function evaluateUpdateState({
   };
 }
 
-/**
- * Check backend for latest direct-APK release information
- * @returns {Promise<{
- *   success: boolean,
- *   status: 'UP_TO_DATE' | 'UPDATE_AVAILABLE' | 'FORCE_UPDATE' | 'UNKNOWN',
- *   isUpdateAvailable: boolean,
- *   isForced: boolean,
- *   latestVersion: string,
- *   latestVersionCode: number,
- *   minimumSupportedVersionCode: number,
- *   installedVersion: string,
- *   installedVersionCode: number,
- *   downloadUrl: string,
- *   releaseNotes: string[],
- *   error?: string
- * }>}
- */
 export async function checkForAppUpdate() {
   const installed = getAppVersionInfo();
 
@@ -111,7 +85,6 @@ export async function checkForAppUpdate() {
       serverForceUpdate,
     });
 
-    // Explicit debug log
     console.log(
       `[APP UPDATE CHECK]\ninstalledVersionName: ${installed.versionName}\ninstalledVersionCode: ${installed.versionCode}\nlatestVersion: ${latestVersion}\nlatestVersionCode: ${latestVersionCode}\nminimumSupportedVersionCode: ${minimumSupportedVersionCode}\nupdateAvailable: ${evaluation.updateAvailable}\nforceUpdate: ${evaluation.forceUpdate}\nstatus: ${evaluation.status}`
     );
@@ -145,10 +118,6 @@ export async function checkForAppUpdate() {
   }
 }
 
-/**
- * Open direct APK download URL securely in Android browser / download manager
- * @param {string} downloadUrl
- */
 export async function openApkDownloadUrl(downloadUrl) {
   if (!downloadUrl || typeof downloadUrl !== 'string') {
     throw new Error('Download URL is not available.');
@@ -156,7 +125,6 @@ export async function openApkDownloadUrl(downloadUrl) {
 
   const trimmedUrl = downloadUrl.trim();
 
-  // Security: only allow HTTPS URLs
   if (!trimmedUrl.startsWith('https://')) {
     throw new Error('Insecure download URL. Updates must use HTTPS.');
   }

@@ -168,7 +168,7 @@ export default function ResourceModal({ onClose }) {
       }
     >
       <div className="space-y-5">
-        {/* Row 1: Resource Type + Title */}
+
         <div className="grid gap-5 sm:grid-cols-2">
           <Field label="Resource type">
             <select
@@ -197,7 +197,6 @@ export default function ResourceModal({ onClose }) {
           </Field>
         </div>
 
-        {/* Row 2: Conditional input based on resource type */}
         {isLinkType && (
           <Field label={urlLabel}>
             <input
@@ -287,7 +286,6 @@ export default function ResourceModal({ onClose }) {
           </Field>
         )}
 
-        {/* Row 3: Subject + Topic */}
         <div className="grid gap-5 sm:grid-cols-2">
           <Field label="Subject (optional)">
             <select className={inputClass} value={form.subjectId} onChange={e => set('subjectId', e.target.value)}>
@@ -300,7 +298,6 @@ export default function ResourceModal({ onClose }) {
           </Field>
         </div>
 
-        {/* Row 4: Rating + Status */}
         <div className="grid gap-5 sm:grid-cols-2">
           <Field label="Rating">
             <select className={inputClass} value={form.rating} onChange={e => set('rating', e.target.value)}>
@@ -320,12 +317,10 @@ export default function ResourceModal({ onClose }) {
           </Field>
         </div>
 
-        {/* Row 5: Tags */}
         <Field label="Tags (optional)" hint="Separate with commas">
           <input className={inputClass} value={form.tags} onChange={e => set('tags', e.target.value)} placeholder="Add tags" />
         </Field>
 
-        {/* Row 6: Description */}
         <Field label="Description (optional)">
           <textarea className={cx(inputClass, 'min-h-[88px] resize-y')} value={form.description} onChange={e => set('description', e.target.value)} placeholder="Add resource description" />
         </Field>

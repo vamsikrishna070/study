@@ -12,7 +12,7 @@ function ExamForm({ onClose, subjects }) {
   const create = useCreateExam();
   const [form, setForm] = useState({ name: '', subjectId: subjects[0]?.id || '', date: today(), time: '', venue: '', type: 'End semester' });
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-  
+
   const submit = (e) => {
     e.preventDefault();
     create.mutate({ data: form }, {
@@ -26,9 +26,9 @@ function ExamForm({ onClose, subjects }) {
 
   return (
     <form id="exam-form" onSubmit={submit} className="flex h-full flex-col">
-      <Modal 
-        title="Add an exam" 
-        eyebrow="Make the date real" 
+      <Modal
+        title="Add an exam"
+        eyebrow="Make the date real"
         onClose={onClose}
         footer={
           <div className="flex justify-end gap-3">
@@ -78,7 +78,7 @@ function ExamForm({ onClose, subjects }) {
 function ExamPerformanceModal({ exam, onClose }) {
   const qc = useQueryClient();
   const update = useUpdateExam();
-  
+
   const [performance, setPerformance] = useState(exam.performance || 'Good');
   const [reflection, setReflection] = useState(exam.reflection || '');
   const [marksPending, setMarksPending] = useState(
@@ -92,7 +92,6 @@ function ExamPerformanceModal({ exam, onClose }) {
   );
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Calculate percentage dynamically
   let percentage = '';
   if (!marksPending && marksObtained !== '' && maxMarks !== '') {
     const ob = Number(marksObtained);
@@ -268,7 +267,7 @@ export default function ExamsPage() {
   const [open, setOpen] = useState(false);
   const [performanceExam, setPerformanceExam] = useState(null);
   const [selectedTab, setSelectedTab] = useState('upcoming');
-  
+
   const qc = useQueryClient();
   const del = useDeleteExam();
 
@@ -292,14 +291,13 @@ export default function ExamsPage() {
 
   return (
     <Shell>
-      <PageHeading 
-        eyebrow="Dates worth respecting" 
-        title="Exams" 
-        detail="A clear countdown turns vague anxiety into a plan." 
+      <PageHeading
+        eyebrow="Dates worth respecting"
+        title="Exams"
+        detail="A clear countdown turns vague anxiety into a plan."
         action={<Button onClick={() => setOpen(true)} testId="button-add-exam"><Plus size={16}/> Add exam</Button>}
       />
 
-      {/* Category Tabs */}
       <div className="mb-6 flex border-b border-border">
         {['upcoming', 'completed'].map((tab) => (
           <button
@@ -316,22 +314,22 @@ export default function ExamsPage() {
           </button>
         ))}
       </div>
-      
+
       {query.isLoading ? (
         <LoadingBlock lines={5}/>
       ) : query.error ? (
         <QueryState error={query.error} onRetry={() => query.refetch()} label="Exams"/>
       ) : !exams?.length ? (
-        <EmptyState 
-          icon={CalendarDays} 
-          title="No exams logged" 
-          detail="Put the dates somewhere you trust. Your future self will thank you." 
+        <EmptyState
+          icon={CalendarDays}
+          title="No exams logged"
+          detail="Put the dates somewhere you trust. Your future self will thank you."
           action={<Button onClick={() => setOpen(true)} testId="button-empty-add-exam"><Plus size={16}/> Add exam</Button>}
         />
       ) : !filteredExams.length ? (
-        <EmptyState 
-          icon={CalendarDays} 
-          title={`No ${selectedTab} exams`} 
+        <EmptyState
+          icon={CalendarDays}
+          title={`No ${selectedTab} exams`}
           detail={`There are no exams currently categorized as ${selectedTab}.`}
         />
       ) : (
@@ -344,7 +342,7 @@ export default function ExamsPage() {
                 </div>
                 <div className="font-display text-3xl">{new Date(e.date).getDate()}</div>
               </div>
-              
+
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="rounded-full bg-accent/15 px-2 py-1 font-mono text-[9px] uppercase text-accent">{e.type}</span>
@@ -359,7 +357,7 @@ export default function ExamsPage() {
                 <p className="mt-1 text-xs text-muted-foreground">
                   {fmtFullDate(e.date)}{e.time && ` · ${e.time}`}{e.venue && ` · ${e.venue}`}
                 </p>
-                
+
                 {e.completed && (
                   <div className="mt-3 space-y-1 rounded-xl bg-background/50 border border-border/40 p-3 text-[11px] leading-relaxed max-w-xl">
                     <div>
@@ -383,7 +381,7 @@ export default function ExamsPage() {
                   </div>
                 )}
               </div>
-              
+
               <div className="flex flex-col items-start sm:items-end justify-between h-full gap-4">
                 <div className="text-left sm:text-right">
                   <div className="font-display text-3xl text-accent">
@@ -426,7 +424,7 @@ export default function ExamsPage() {
           ))}
         </div>
       )}
-      
+
       {open && <ExamForm subjects={subjects} onClose={() => setOpen(false)}/>}
       {performanceExam && <ExamPerformanceModal exam={performanceExam} onClose={() => setPerformanceExam(null)} />}
     </Shell>

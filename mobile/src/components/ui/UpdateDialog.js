@@ -16,10 +16,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Sparkles, CloudDownload, TriangleAlert } from 'lucide-react-native';
 import { useAppTheme, useStyles } from '../../theme/theme';
 
-/**
- * Production-quality, responsive Update Dialog for StudyArena.
- * Displays version details and scrollable release notes with always-visible action buttons.
- */
 export function UpdateDialog({
   visible = false,
   updateInfo,
@@ -55,7 +51,6 @@ export function UpdateDialog({
     }
   }, [visible]);
 
-  // Android hardware back button handling
   useEffect(() => {
     const onBackPress = () => {
       if (visible && !isDownloading && !updateInfo?.isForced) {
@@ -124,7 +119,7 @@ export function UpdateDialog({
             },
           ]}
         >
-          {/* Top Icon Badge */}
+
           <View
             style={[
               styles.iconBadge,
@@ -140,19 +135,16 @@ export function UpdateDialog({
             )}
           </View>
 
-          {/* Title */}
           <Text style={styles.title}>
             {isForced ? 'Update Required' : 'New Version Available'}
           </Text>
 
-          {/* Subtitle */}
           <Text style={styles.subtitle}>
             {isForced
               ? `Your installed version (v${installedVersion}) is no longer supported.`
               : `StudyArena v${version} is now available.`}
           </Text>
 
-          {/* Inner Surface: Scrollable Release Notes */}
           {releaseNotes.length > 0 && (
             <View style={styles.notesSurface}>
               <Text style={styles.notesHeader}>WHAT'S NEW</Text>
@@ -174,12 +166,10 @@ export function UpdateDialog({
             </View>
           )}
 
-          {/* Download Error Notice if any */}
           {Boolean(downloadError) && (
             <Text style={styles.errorText}>{downloadError}</Text>
           )}
 
-          {/* Bottom Action Row (Always Visible) */}
           <View style={styles.actionRow}>
             {!isForced && (
               <TouchableOpacity

@@ -21,7 +21,7 @@ export default function NoteCard({ note, onEdit, onDelete }) {
 
   return (
     <article className="card-lift group flex flex-col rounded-2xl border border-card-border bg-card p-5 transition-all" data-testid={`card-note-${note.id || note._id}`}>
-      {/* Top: Priority badge + actions */}
+
       <div className="mb-3 flex items-start justify-between gap-3">
         <span className={cx('inline-flex items-center rounded-full px-2.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wider', PRIORITY_STYLES[note.priority] || PRIORITY_STYLES.medium)}>
           {PRIORITY_LABELS[note.priority] || note.priority}
@@ -46,17 +46,14 @@ export default function NoteCard({ note, onEdit, onDelete }) {
         </div>
       </div>
 
-      {/* Title */}
       <h2 className="font-display text-xl leading-tight">{note.title}</h2>
 
-      {/* Preview */}
       {preview ? (
         <p className="mt-2 flex-1 text-sm leading-6 text-muted-foreground line-clamp-3">{preview}</p>
       ) : (
         <p className="mt-2 flex-1 text-xs italic text-muted-foreground/60">No additional note text</p>
       )}
 
-      {/* Tags */}
       {note.tags?.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-1.5">
           {note.tags.slice(0, 4).map(tag => (
@@ -71,7 +68,6 @@ export default function NoteCard({ note, onEdit, onDelete }) {
         </div>
       )}
 
-      {/* Footer: meta info */}
       <div className="mt-4 flex items-end justify-between border-t border-border pt-3 text-[11px] text-muted-foreground">
         <div className="flex flex-col gap-1">
           {displaySubject && (

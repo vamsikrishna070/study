@@ -18,7 +18,7 @@ export function SelectPicker({
   label,
   value,
   onValueChange,
-  options = [], // [{ label: 'Option 1', value: 'opt1' }] or strings
+  options = [],
   placeholder = 'Select an option',
   disabled = false,
   searchable = false,

@@ -13,8 +13,7 @@ class AlarmActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
-        // Ensure the activity wakes the screen and shows even when locked
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
@@ -62,7 +61,7 @@ class AlarmActivity : Activity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        // Dismiss alarm on back press
+
         val id = intent.getStringExtra("id")
         val serviceIntent = Intent(this, AlarmService::class.java).apply {
             action = AlarmService.ACTION_DISMISS

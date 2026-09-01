@@ -1,9 +1,4 @@
-/**
- * Table-aware syllabus extraction module.
- * Detects tabular university syllabus layouts, reconstructs multi-line table rows,
- * maintains UNIT boundaries across page continuations, strips metadata columns
- * (contact hours, CLOs, references), and prevents theory/lab contamination.
- */
+
 
 import { parseUnitNumber, cleanOcrTypo } from './normalizer.js';
 
@@ -65,19 +60,14 @@ export function detectTableSchema(lines) {
   return schema;
 }
 
-/**
- * Strips metadata columns (contact hours, CLOs, references, OCR noise) from a table row.
- * Uses schema-based parsing if a schema is provided, falling back to robust regexes.
- */
 export function stripRowMetadata(text, schema = null) {
   if (!text) return '';
   let cleaned = text.trim();
 
-  // If semantic schema is known, pluck trailing metadata directly
   if (schema && schema.isDetected && schema.trailingMetadataCount > 0) {
     const parts = cleaned.split(/\s+/);
     if (parts.length > schema.trailingMetadataCount + (schema.hasUnitPrefix ? 2 : 1)) {
-      // Check if trailing parts look like metadata (digits, short strings, references)
+
       const trailing = parts.slice(-schema.trailingMetadataCount);
       const isMetadataLike = trailing.every(t => /^[\d,\.\[\]\-]+|[A-Z]{1,3}\d*$|^\d+$/.test(t));
       if (isMetadataLike) {
@@ -86,36 +76,31 @@ export function stripRowMetadata(text, schema = null) {
           startIndex = 1;
         }
         cleaned = parts.slice(startIndex, parts.length - schema.trailingMetadataCount).join(' ');
-        // Still apply cleanOcrTypo at the end
+
         return cleanOcrTypo(cleaned);
       }
     }
   }
 
-  // Strip leading pipes / bullet noise
   cleaned = cleaned.replace(/^[|\[\]!‘'~•\-\*\s]+/, '');
 
-  // Strip inline OCR column artifacts (e.g. " 24 representation", " 24 motivation")
   cleaned = cleaned.replace(/\s+\d{1,2}(?:\.\d+)?\s*\|\s*/g, ' ');
   cleaned = cleaned.replace(
     /\s+\d{1,2}(?:\.\d+)?\s+(?=[a-z]|representation|neuron|dimension|Forest|MADALINE|techniques|problem|classification|formulation|solution|gates|introduction|sample|collaborative|Bayesian|linear|SVM)/gi,
     ' '
   );
 
-  // Strip trailing table metadata columns: e.g. "| 1 | 1 | 1 |", " 1 1", " 2.4 3", " 24 1", " 1 2.4 3"
   cleaned = cleaned.replace(/\|\s*[\d\w,\s\.]*\|\s*[\d\w,\s\.]*\|\s*[\d\w,\s\.]*$/i, '');
   cleaned = cleaned.replace(/\|\s*[\d\w,\s\.]*\|\s*[\d\w,\s\.]*$/i, '');
   cleaned = cleaned.replace(/\s+\|\s*[\d\w\s\.,|]+$/i, '');
   cleaned = cleaned.replace(/\s+\d+(?:\.\d+)?\s+[\d,\s\.]+\s+[\d,\s\.]+$/i, '');
   cleaned = cleaned.replace(/\s+\d+(?:\.\d+)?\s+[\d,\s\.]+$/i, '');
 
-  // Robust match for 3+ trailing columns (e.g., Hours, CLOs, References) commonly found in DAA / engineering syllabus tables
   cleaned = cleaned.replace(/\s+\d+(?:\.\d+)?\s+[\d\w,\s\[\]\.\-]+\s+[\d\w,\s\[\]\.\-]+$/i, '');
 
   cleaned = cleaned.replace(/\s+\d{1,2}(?:\.\d+)?\s*$/i, '');
   cleaned = cleaned.replace(/[|\]\[}‘'~]+$/, '').trim();
 
-  // Clean double commas or colon glitches
   cleaned = cleaned.replace(/,\s*,/g, ',').replace(/:\s*,\s*/g, ': ').trim();
 
   return cleanOcrTypo(cleaned);
@@ -170,9 +155,6 @@ function isNewTableRowStart(line) {
   return KNOWN_TOPIC_STARTS.some((re) => re.test(l));
 }
 
-/**
- * Reconstructs wrapped multi-line table rows from a sequence of raw table lines.
- */
 export function reconstructTableLines(rawLines) {
   const reconstructed = [];
   let currentBuffer = '';
@@ -186,7 +168,6 @@ export function reconstructTableLines(rawLines) {
     const line = rawLines[i].trim();
     if (!line || isMetadataHeader(line)) continue;
 
-    // Boundary for lab section or closing summary
     if (/^(?:Total\s+contact\s+hours|Course\s+Util(?:ization|itisation)\s+Plan\s*[-–—]?\s*Lab|Learning\s+Assessment)/i.test(line)) {
       if (currentBuffer) {
         reconstructed.push(currentBuffer);
@@ -195,7 +176,6 @@ export function reconstructTableLines(rawLines) {
       break;
     }
 
-    // Unit boundary is an immediate flush
     if (/^(?:UNIT|MODULE|CHAPTER)\s+(?:[IVXLCDM]+|\d+)\b/i.test(line)) {
       if (currentBuffer) {
         reconstructed.push(currentBuffer);
@@ -205,7 +185,6 @@ export function reconstructTableLines(rawLines) {
       continue;
     }
 
-    // Check if line contains a merged OCR row
     const splitMatch = line.match(/^(issues\s+in\s+decision\s+tree\s+learning\s+[\d\.]*\s*)(Decision\s+tree\s+learning\s*\(ID3\).*)$/i);
     if (splitMatch) {
       if (currentBuffer) reconstructed.push(currentBuffer);
@@ -221,7 +200,7 @@ export function reconstructTableLines(rawLines) {
         reconstructed.push(currentBuffer);
         currentBuffer = line;
       } else {
-        // Multi-line wrap continuation! Clean trailing numbers from previous line
+
         currentBuffer = currentBuffer.replace(/\s+\d+[\s'’]*$/, '');
         currentBuffer += ' ' + line;
       }
@@ -235,9 +214,6 @@ export function reconstructTableLines(rawLines) {
   return reconstructed;
 }
 
-/**
- * Extracts theory units and topics from tabular syllabus lines while preserving unit continuity across pages.
- */
 export function extractTheoryUnitsFromTable(theoryLines) {
   const reconstructed = reconstructTableLines(theoryLines);
   const unitsMap = new Map();
@@ -250,7 +226,7 @@ export function extractTheoryUnitsFromTable(theoryLines) {
       const parsedNum = parseUnitNumber(unitMatch[1]);
       if (parsedNum !== null) {
         currentUnitNumber = parsedNum;
-        // Strip contact hours / numbers from unit name (e.g. "UNIT I 12" -> "Unit 1", "UNIT 1 Introduction 6" -> "Introduction")
+
         let rawName = unitMatch[2] ? unitMatch[2].replace(/\s+\d+(?:\.\d+)?\s*$/i, '').trim() : '';
         rawName = stripRowMetadata(rawName);
         if (/^\d+$/.test(rawName)) rawName = '';
@@ -269,7 +245,7 @@ export function extractTheoryUnitsFromTable(theoryLines) {
     }
 
     if (currentUnitNumber !== null && unitsMap.has(currentUnitNumber)) {
-      // Find semantic table schema
+
       const schema = detectTableSchema(theoryLines);
       const cleaned = stripRowMetadata(entry, schema);
       if (cleaned && cleaned.length > 3 && !/^(?:Total\s+contact|Required|Contact\s+Hours)/i.test(cleaned)) {
@@ -285,9 +261,6 @@ export function extractTheoryUnitsFromTable(theoryLines) {
   return Array.from(unitsMap.values()).sort((a, b) => a.unitNumber - b.unitNumber);
 }
 
-/**
- * Determines whether OCR lines come from a scanned table syllabus (like ml.pdf).
- */
 export function isScannedTableSyllabus(lines) {
   if (!Array.isArray(lines) || lines.length === 0) return false;
   const sample = lines.slice(0, 40).join('\n');

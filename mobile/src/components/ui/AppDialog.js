@@ -11,26 +11,24 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { 
-  TriangleAlert, 
-  Trash2, 
-  CircleCheck, 
-  Info, 
-  CircleAlert, 
+import {
+  TriangleAlert,
+  Trash2,
+  CircleCheck,
+  Info,
+  CircleAlert,
   CircleQuestionMark,
   X
 } from 'lucide-react-native';
 import { Button } from './Button';
 import { typography, radii, spacing, useAppTheme, useStyles } from '../../theme/theme';
 
-// ─── Declarative AppDialog Component ──────────────────────────────────────────
-
 export function AppDialog({
   visible = false,
   onClose,
   title,
   message,
-  type = 'default', // 'default' | 'destructive' | 'warning' | 'success' | 'info'
+  type = 'default',
   icon: CustomIcon,
   confirmText = 'OK',
   cancelText = 'Cancel',
@@ -42,7 +40,7 @@ export function AppDialog({
 }) {
   const { colors, typography, spacing, radii, isDark } = useAppTheme();
   const styles = useStyles(createStyles);
-  
+
   const animValue = useRef(new Animated.Value(0)).current;
   const [showModal, setShowModal] = useState(visible);
 
@@ -66,7 +64,6 @@ export function AppDialog({
     }
   }, [visible]);
 
-  // Handle Android hardware back button
   useEffect(() => {
     const onBackPress = () => {
       if (visible && !loading) {
@@ -103,7 +100,6 @@ export function AppDialog({
     outputRange: [16, 0],
   });
 
-  // Determine Icon and Accent
   let IconComponent = CustomIcon;
   let iconColor = colors.primary;
   let iconBgColor = `${colors.primary}18`;
@@ -185,29 +181,25 @@ export function AppDialog({
             },
           ]}
         >
-          {/* Icon Header */}
+
           {IconComponent && (
             <View style={[styles.iconContainer, { backgroundColor: iconBgColor }]}>
               <IconComponent size={28} color={iconColor} />
             </View>
           )}
 
-          {/* Title */}
           {!!title && (
             <Text style={styles.title}>{title}</Text>
           )}
 
-          {/* Message */}
           {typeof message === 'string' ? (
             <Text style={styles.message}>{message}</Text>
           ) : (
             message
           )}
 
-          {/* Optional Custom Content */}
           {children}
 
-          {/* Action Buttons */}
           <View style={[styles.actionsRow, !cancelText && styles.actionsRowSingle]}>
             {!!cancelText && (
               <Button
@@ -241,8 +233,6 @@ export function AppDialog({
     </Modal>
   );
 }
-
-// ─── Imperative Dialog Context / Hook ─────────────────────────────────────────
 
 const DialogContext = createContext(null);
 
@@ -360,7 +350,7 @@ export const DialogProvider = ({ children }) => {
 export const useAppDialog = () => {
   const context = useContext(DialogContext);
   if (!context) {
-    // Return safe fallback if not wrapped
+
     return {
       showDialog: () => Promise.resolve(true),
       hideDialog: () => {},
@@ -372,8 +362,6 @@ export const useAppDialog = () => {
   }
   return context;
 };
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const createStyles = ({ colors, typography, spacing, radii, isDark }) =>
   StyleSheet.create({

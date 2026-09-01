@@ -81,10 +81,8 @@ const TasksScreen = ({ route, navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
-  // Filter
   const [statusFilter, setStatusFilter] = useState('all');
 
-  // Modal State (Creation / Editing)
   const [modalVisible, setModalVisible] = useState(paramOpenCreate);
   const [editingTask, setEditingTask] = useState(null);
   const [title, setTitle] = useState('');
@@ -93,11 +91,10 @@ const TasksScreen = ({ route, navigation }) => {
   const [priority, setPriority] = useState('medium');
   const [dueDate, setDueDate] = useState(new Date());
 
-  // Task Reminder State
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [reminderTimeDate, setReminderTimeDate] = useState(() => {
     const d = new Date();
-    d.setHours(19, 0, 0, 0); // Default 7:00 PM
+    d.setHours(19, 0, 0, 0);
     return d;
   });
 
@@ -196,7 +193,6 @@ const TasksScreen = ({ route, navigation }) => {
 
       const dueTimeStr = `${String(dueDate.getHours()).padStart(2, '0')}:${String(dueDate.getMinutes()).padStart(2, '0')}`;
 
-      // Schedule or cancel notification if reminder settings changed
       let reminderId = editingTask?.reminderNotificationId || null;
       let pendingId = editingTask?.pendingStartNotificationId || null;
 
@@ -272,11 +268,9 @@ const TasksScreen = ({ route, navigation }) => {
     }
   };
 
-  // Lifecycle Action Handlers
   const handleStartTask = async (task) => {
     const taskId = task._id || task.id;
 
-    // Cancel pending start alert if active
     if (task.pendingStartNotificationId) {
       await cancelTaskNotification(task.pendingStartNotificationId);
     }
@@ -331,7 +325,6 @@ const TasksScreen = ({ route, navigation }) => {
   const handleEndTask = async (task) => {
     const taskId = task._id || task.id;
 
-    // Cancel all notifications for this task
     if (task.pendingStartNotificationId) {
       await cancelTaskNotification(task.pendingStartNotificationId);
     }
@@ -506,7 +499,6 @@ const TasksScreen = ({ route, navigation }) => {
               }
             />
 
-            {/* Status Filter Segmented Controls */}
             <View style={styles.segmentContainer}>
               {STATUS_FILTERS.map((f) => {
                 const isActive = statusFilter === f.value;
@@ -559,7 +551,7 @@ const TasksScreen = ({ route, navigation }) => {
               isCompleted && styles.taskCardCompleted,
             ]}>
               <View style={styles.taskMainRow}>
-                {/* Status Indicator Icon */}
+
                 <View style={styles.statusIconBox}>
                   {isPending && <Circle size={22} color={colors.mutedForeground} />}
                   {isInProgress && <Play size={22} color={colors.primary} fill={colors.primary} />}
@@ -567,7 +559,6 @@ const TasksScreen = ({ route, navigation }) => {
                   {isCompleted && <Check size={22} color={colors.accent} strokeWidth={3} />}
                 </View>
 
-                {/* Content */}
                 <View style={styles.taskContentBox}>
                   <Text
                     style={[
@@ -579,7 +570,6 @@ const TasksScreen = ({ route, navigation }) => {
                     {item.title}
                   </Text>
 
-                  {/* Dynamic Status / Timestamp Line */}
                   <View style={styles.subtextContainer}>
                     {isPending && (
                       <Text style={styles.dueDateText}>
@@ -642,7 +632,6 @@ const TasksScreen = ({ route, navigation }) => {
                   </View>
                 </View>
 
-                {/* Edit & Delete Actions */}
                 <View style={styles.taskActionColumn}>
                   <TouchableOpacity
                     style={styles.iconActionBtn}
@@ -661,7 +650,6 @@ const TasksScreen = ({ route, navigation }) => {
                 </View>
               </View>
 
-              {/* Task Lifecycle Action Control Row */}
               <View style={styles.lifecycleRow}>
                 {isPending && (
                   <TouchableOpacity
@@ -734,7 +722,6 @@ const TasksScreen = ({ route, navigation }) => {
         }}
       />
 
-      {/* Task Creation / Edit Modal */}
       <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={() => setModalVisible(false)}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

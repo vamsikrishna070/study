@@ -73,24 +73,20 @@ export const useCreateResource = () => mutation((payload) => apiClient.post('/re
 export const useUpdateResource = () => mutation(({ id, data }) => apiClient.patch(`/resources/${id}`, data));
 export const useDeleteResource = () => mutation(({ id }) => apiClient.delete(`/resources/${id}`));
 
-// Recordings
 export const getGetRecordingsQueryKey = (params = {}) => ['recordings', params];
 export const useGetRecordings = (params, options) => query(getGetRecordingsQueryKey(params), () => apiClient.get('/recordings', { params }), options);
 export const useCreateRecording = () => mutation((payload) => apiClient.post('/recordings', payload.data));
 export const useDeleteRecording = () => mutation(({ id }) => apiClient.delete(`/recordings/${id}`));
 
-// Reminders
 export const getGetRemindersQueryKey = () => ['reminders'];
 export const useGetReminders = (options) => query(getGetRemindersQueryKey(), () => apiClient.get('/reminders'), options);
 export const useCreateReminder = () => mutation((payload) => apiClient.post('/reminders', payload.data));
 export const useUpdateReminder = () => mutation(({ id, data }) => apiClient.patch(`/reminders/${id}`, data));
 export const useDeleteReminder = () => mutation(({ id }) => apiClient.delete(`/reminders/${id}`));
 
-// Search
 export const getSearchQueryKey = (q) => ['search', q];
 export const useSearch = (q, options) => query(getSearchQueryKey(q), () => apiClient.get('/search', { params: { q } }), { enabled: !!q, ...options });
 
-// Study Sessions / Study Log
 export const getGetStudySessionsQueryKey = (params = {}) => ['study-sessions', params];
 export const useGetStudySessions = (params, options) => query(getGetStudySessionsQueryKey(params), () => apiClient.get('/study-sessions', { params }), options);
 export const useDeleteStudySession = () => mutation(({ id }) => apiClient.delete(`/study-sessions/${id}`));

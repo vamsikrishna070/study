@@ -75,7 +75,6 @@ const ExamsScreen = ({ route, navigation }) => {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('upcoming');
 
-  // Modal State
   const [modalVisible, setModalVisible] = useState(paramOpenCreate);
   const [name, setName] = useState('');
   const [subjectId, setSubjectId] = useState(paramSubjectId || '');
@@ -89,7 +88,6 @@ const ExamsScreen = ({ route, navigation }) => {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Performance Modal State
   const [perfModalVisible, setPerfModalVisible] = useState(false);
   const [selectedExam, setSelectedExam] = useState(null);
   const [perfRating, setPerfRating] = useState('Good');
@@ -255,7 +253,7 @@ const ExamsScreen = ({ route, navigation }) => {
     try {
       const examId = selectedExam._id || selectedExam.id;
       const res = await updateExam(examId, data);
-      
+
       setPerfModalVisible(false);
       setSelectedExam(null);
       setPerfRating('Good');
@@ -263,7 +261,7 @@ const ExamsScreen = ({ route, navigation }) => {
       setMarksPending(true);
       setMarksObtained('');
       setMaxMarks('');
-      
+
       if (res.data) {
         setExams((prev) => prev.map((e) => ((e._id || e.id) === examId ? res.data : e)));
       } else {
@@ -330,7 +328,6 @@ const ExamsScreen = ({ route, navigation }) => {
             />
             <QueryState error={error} onRetry={loadData} label="Exams" />
 
-            {/* Category Tabs */}
             <View style={styles.tabContainer}>
               {['upcoming', 'completed'].map((tab) => {
                 const isActive = activeTab === tab;
@@ -374,8 +371,8 @@ const ExamsScreen = ({ route, navigation }) => {
         renderItem={({ item }) => {
           const examId = item._id || item.id;
           const examDate = new Date(item.date);
-          const daysLeft = item.daysLeft !== undefined 
-            ? item.daysLeft 
+          const daysLeft = item.daysLeft !== undefined
+            ? item.daysLeft
             : (isNaN(examDate.getTime()) ? 999 : Math.ceil((examDate - new Date()) / 86400000));
           const isUrgent = !item.completed && daysLeft >= 0 && daysLeft <= 7;
           const isPast = daysLeft < 0 || item.completed;
@@ -400,7 +397,6 @@ const ExamsScreen = ({ route, navigation }) => {
                   </Text>
                 </View>
 
-                {/* Countdown Badge */}
                 <View
                   style={[
                     styles.countdownBadge,
@@ -425,7 +421,6 @@ const ExamsScreen = ({ route, navigation }) => {
                 </View>
               </View>
 
-              {/* Date, Time, Venue details */}
               <View style={styles.detailsGrid}>
                 <View style={styles.detailRow}>
                   <CalendarIcon size={14} color={colors.accent} />
@@ -506,7 +501,7 @@ const ExamsScreen = ({ route, navigation }) => {
                     <Text style={styles.progressText}>Exam Completed</Text>
                   )}
                 </View>
-                
+
                 <View style={styles.cardActions}>
                   {!item.completed ? (
                     <Button
@@ -556,7 +551,6 @@ const ExamsScreen = ({ route, navigation }) => {
         }}
       />
 
-      {/* Schedule Exam Modal */}
       <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={() => setModalVisible(false)}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -679,7 +673,6 @@ const ExamsScreen = ({ route, navigation }) => {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Performance Entry Modal */}
       <Modal visible={perfModalVisible} animationType="slide" transparent onRequestClose={() => setPerfModalVisible(false)}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

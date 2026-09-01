@@ -7,7 +7,6 @@
     android:background="#121826"
     android:padding="28dp">
 
-    <!-- Card Container -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -17,7 +16,6 @@
         android:backgroundTint="#1C2436"
         android:padding="28dp">
 
-        <!-- StudyArena Header -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -28,7 +26,6 @@
             android:letterSpacing="0.05"
             android:layout_marginBottom="4dp" />
 
-        <!-- Subtitle Badge -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -39,7 +36,6 @@
             android:textStyle="bold"
             android:layout_marginBottom="32dp" />
 
-        <!-- Alarm Title -->
         <TextView
             android:id="@+id/tvAlarmTitle"
             android:layout_width="match_parent"
@@ -52,7 +48,6 @@
             android:lineSpacingExtra="4dp"
             android:layout_marginBottom="40dp" />
 
-        <!-- Dismiss Button -->
         <Button
             android:id="@+id/btnDismiss"
             android:layout_width="match_parent"
@@ -65,7 +60,6 @@
             android:letterSpacing="0.05"
             android:layout_marginBottom="12dp" />
 
-        <!-- Snooze Button -->
         <Button
             android:id="@+id/btnSnooze"
             android:layout_width="match_parent"

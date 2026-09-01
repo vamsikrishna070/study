@@ -61,7 +61,6 @@ export function CollegePicker({
   const debounceRef = useRef(null);
   const searchInputRef = useRef(null);
 
-  // Load states once when modal opens
   useEffect(() => {
     if (open && statesList.length === 0) {
       fetchCollegeStates()
@@ -84,7 +83,6 @@ export function CollegePicker({
     }
   }, []);
 
-  // Debounced fetch on search/state change
   useEffect(() => {
     if (!open) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -92,14 +90,12 @@ export function CollegePicker({
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [open, searchQuery, selectedState, doFetch]);
 
-  // Focus search input when modal opens
   useEffect(() => {
     if (open && !isManual) {
       setTimeout(() => searchInputRef.current?.focus(), 100);
     }
   }, [open, isManual]);
 
-  // Lock body scroll
   useEffect(() => {
     if (open) document.body.style.overflow = 'hidden';
     else document.body.style.overflow = '';
@@ -149,7 +145,7 @@ export function CollegePicker({
         className="relative flex h-[85vh] max-h-[620px] w-full max-w-[560px] flex-col overflow-hidden rounded-[1.75rem] border border-border bg-card shadow-2xl"
         onClick={e => e.stopPropagation()}
       >
-        {/* Header */}
+
         <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-4">
           {isManual ? (
             <button
@@ -177,7 +173,7 @@ export function CollegePicker({
         </div>
 
         {isManual ? (
-          /* ── Manual Entry ─────────────────────────────────────────── */
+
           <div className="flex-1 overflow-y-auto p-5 space-y-4">
             <p className="text-sm text-muted-foreground leading-relaxed">
               If your institution isn't listed in our curated database, you can enter its full name manually below.
@@ -215,9 +211,8 @@ export function CollegePicker({
             </button>
           </div>
         ) : (
-          /* ── Search & Filter List ─────────────────────────────────── */
           <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
-            {/* Search Bar */}
+
             <div className="shrink-0 px-5 pt-4 pb-2">
               <div className="flex items-center gap-2 rounded-xl border border-input bg-background px-3 min-h-[44px]">
                 <Search size={16} className="shrink-0 text-muted-foreground" />
@@ -237,7 +232,6 @@ export function CollegePicker({
               </div>
             </div>
 
-            {/* State Pills Bar - Horizontal scroll container */}
             <div className="shrink-0 px-5 py-2 overflow-hidden">
               <div
                 className="flex items-center gap-1.5 overflow-x-auto whitespace-nowrap pb-1 no-scrollbar"
@@ -273,7 +267,6 @@ export function CollegePicker({
               </div>
             </div>
 
-            {/* College Results - Vertical scroll container */}
             <div className="flex-1 min-h-0 overflow-y-auto px-5 pb-3 pt-1 space-y-2">
               {loading ? (
                 <div className="flex flex-col items-center justify-center py-12 gap-2">
@@ -343,7 +336,6 @@ export function CollegePicker({
               )}
             </div>
 
-            {/* Bottom: "My college isn't listed" */}
             <div className="shrink-0 border-t border-border bg-card px-5 py-3">
               <button
                 type="button"
@@ -362,7 +354,7 @@ export function CollegePicker({
 
   return (
     <>
-      {/* Trigger */}
+
       <button
         type="button"
         className={cx(

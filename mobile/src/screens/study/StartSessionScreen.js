@@ -9,16 +9,16 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
-import { 
-  Play, 
-  BookOpen, 
-  Sparkles, 
-  RotateCcw, 
-  BarChart2, 
-  Target, 
-  ListChecks, 
+import {
+  Play,
+  BookOpen,
+  Sparkles,
+  RotateCcw,
+  BarChart2,
+  Target,
+  ListChecks,
   CalendarDays,
-  PenLine 
+  PenLine
 } from 'lucide-react-native';
 import { Header } from '../../components/ui/Header';
 import { PageHeading } from '../../components/ui/PageHeading';
@@ -49,7 +49,7 @@ export default function StartSessionScreen({ navigation, route }) {
   const [syllabusTopics, setSyllabusTopics] = useState([]);
   const [selectedTopic, setSelectedTopic] = useState(initialTopic);
   const [customTopic, setCustomTopic] = useState('');
-  const [topicMode, setTopicMode] = useState('picker'); // 'picker' | 'custom'
+  const [topicMode, setTopicMode] = useState('picker');
   const [tasks, setTasks] = useState([]);
   const [selectedTaskId, setSelectedTaskId] = useState(initialTaskId);
   const [exams, setExams] = useState([]);
@@ -57,7 +57,6 @@ export default function StartSessionScreen({ navigation, route }) {
   const [goal, setGoal] = useState('');
   const [loading, setLoading] = useState(true);
 
-  // If already in an active session, redirect to FocusSession
   useEffect(() => {
     if (activeSession && activeSession.status === 'running') {
       navigation.replace('FocusSession');
@@ -92,7 +91,6 @@ export default function StartSessionScreen({ navigation, route }) {
     loadFormData();
   }, [loadFormData]);
 
-  // Load syllabus topics whenever selected subject changes
   useEffect(() => {
     if (!selectedSubjectId) {
       setSyllabusTopics([]);
@@ -196,7 +194,7 @@ export default function StartSessionScreen({ navigation, route }) {
             </View>
           ) : (
             <View style={styles.form}>
-              {/* Subject Selection */}
+
               <Field label="Subject" hint="What subject are you tackling?">
                 <SelectPicker
                   value={selectedSubjectId}
@@ -206,7 +204,6 @@ export default function StartSessionScreen({ navigation, route }) {
                 />
               </Field>
 
-              {/* Topic Selection */}
               <Field label="Topic" hint="Choose a syllabus topic or enter a custom one">
                 {syllabusTopics.length > 0 && (
                   <View style={styles.topicModeToggle}>
@@ -247,7 +244,6 @@ export default function StartSessionScreen({ navigation, route }) {
                 )}
               </Field>
 
-              {/* Goal Input */}
               <Field label="Session Goal (Optional)" hint="A clear focus outcome for this session">
                 <Input
                   value={goal}
@@ -256,7 +252,6 @@ export default function StartSessionScreen({ navigation, route }) {
                 />
               </Field>
 
-              {/* Task Link */}
               {tasks.length > 0 && (
                 <Field label="Linked Task (Optional)">
                   <SelectPicker
@@ -268,7 +263,6 @@ export default function StartSessionScreen({ navigation, route }) {
                 </Field>
               )}
 
-              {/* Exam Link */}
               {exams.length > 0 && (
                 <Field label="Linked Exam (Optional)">
                   <SelectPicker
@@ -280,7 +274,6 @@ export default function StartSessionScreen({ navigation, route }) {
                 </Field>
               )}
 
-              {/* Action Buttons */}
               <View style={styles.actionSection}>
                 <Button
                   onPress={handleStart}

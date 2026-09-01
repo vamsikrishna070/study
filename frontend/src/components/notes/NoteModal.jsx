@@ -13,14 +13,13 @@ export default function NoteModal({ initial, onClose }) {
   const subjectsQuery = useGetSubjects();
   const subjects = subjectsQuery.data || [];
   const fileInputRef = useRef(null);
-  
+
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [recordingMode, setRecordingMode] = useState(false);
   const [customSubjectError, setCustomSubjectError] = useState('');
 
-  // Determine initial subjectId vs customSubject
   const isCustomInitial = Boolean(initial?.customSubject || (initial && !initial.subjectId));
 
   const [form, setForm] = useState({
@@ -218,7 +217,6 @@ export default function NoteModal({ initial, onClose }) {
           </Field>
         </div>
 
-        {/* Custom Subject field when 'Other' is selected */}
         {isOtherSelected && (
           <Field label="Custom Subject *" hint="Enter the name of your subject or study category">
             <input

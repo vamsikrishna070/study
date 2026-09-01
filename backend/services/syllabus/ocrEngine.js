@@ -1,24 +1,17 @@
-/**
- * OCR Engine module using Tesseract.js.
- * Handles single-page and multi-page OCR execution with worker management,
- * spatial bounding boxes (words, lines, blocks), and PSM configuration.
- */
+
 
 import Tesseract from 'tesseract.js';
 
 let sharedWorker = null;
 
-/**
- * Gets or initializes a shared Tesseract.js worker
- */
 async function getWorker() {
   if (!sharedWorker) {
     try {
       sharedWorker = await Tesseract.createWorker('eng', 1, {
-        logger: () => {}, // suppress verbose progress logs
+        logger: () => {},
       });
       await sharedWorker.setParameters({
-        tessedit_pageseg_mode: '4', // PSM 4: assume single column of text of variable sizes (ideal for tables & lists)
+        tessedit_pageseg_mode: '4',
       });
     } catch (err) {
       console.error('[OCREngine] Failed to initialize Tesseract worker:', err.message);
@@ -29,28 +22,18 @@ async function getWorker() {
   return sharedWorker;
 }
 
-/**
- * Terminates the shared Tesseract worker if active
- */
 export async function terminateOcrEngine() {
   if (sharedWorker) {
     try {
       await sharedWorker.terminate();
     } catch (err) {
-      // ignore
+
     } finally {
       sharedWorker = null;
     }
   }
 }
 
-/**
- * Performs OCR on an image buffer, extracting text and spatial bounding boxes.
- * @param {Buffer | Uint8Array} imageBuffer Raster image data
- * @param {object} [options]
- * @param {string} [options.psm='4'] Page segmentation mode
- * @returns {Promise<{ text: string, confidence: number, engine: string, lines: Array<{ text: string, bbox: { x0: number, y0: number, x1: number, y1: number }, confidence: number }>, words: Array<{ text: string, bbox: { x0: number, y0: number, x1: number, y1: number }, confidence: number }> }>}
- */
 export async function performOcr(imageBuffer, options = {}) {
   if (!imageBuffer || imageBuffer.length === 0) {
     return {

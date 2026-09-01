@@ -103,7 +103,7 @@ export const DocumentPreviewCard = ({
 
   return (
     <View style={[styles.card, style]}>
-      {/* File Info Header */}
+
       <View style={styles.headerRow}>
         <View style={[styles.iconBox, { backgroundColor: `${themeAccent}18` }]}>
           <FileText size={24} color={themeAccent} />
@@ -121,7 +121,6 @@ export const DocumentPreviewCard = ({
         </View>
       </View>
 
-      {/* Extraction Status Section */}
       <View style={styles.statusSection}>
         {isExtracting ? (
           <View
@@ -174,7 +173,6 @@ export const DocumentPreviewCard = ({
         )}
       </View>
 
-      {/* Primary Action Buttons */}
       <View style={styles.actionsGrid}>
         <TouchableOpacity
           style={[styles.primaryActionBtn, { backgroundColor: themeAccent }]}
@@ -205,7 +203,6 @@ export const DocumentPreviewCard = ({
         )}
       </View>
 
-      {/* Auxiliary Actions Row (Download, Share, Replace, Remove) */}
       <View style={styles.auxRow}>
         <TouchableOpacity
           style={styles.auxBtn}

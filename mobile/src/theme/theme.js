@@ -16,10 +16,8 @@ const lightColors = {
   accent: '#df6b47', card: '#fbfaf8', cardBorder: '#e0dac8', muted: '#e7e2d8', mutedForeground: '#69758b', destructive: '#c92c2b'
 };
 
-// Export these immediately to prevent circular dependency ReferenceErrors in Hermes
-export const colors = lightColors; 
+export const colors = lightColors;
 export const theme = { ...MD3LightTheme, colors: { ...MD3LightTheme.colors, ...lightColors } };
-
 
 const darkColors = {
   background: '#121212', foreground: '#e0e0e0', primary: '#a3b8cc', primaryForeground: '#121212',
@@ -84,8 +82,7 @@ export const ThemeProvider = ({ children }) => {
   };
 
   const currentThemeData = isDark ? darkThemeObj : lightThemeObj;
-  
-  // Update global reference for Proxy access
+
   currentGlobalTheme = { ...currentThemeData, toggleTheme };
 
   return (

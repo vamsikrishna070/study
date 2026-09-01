@@ -1,8 +1,3 @@
-/**
- * Text Quality Assessment Module.
- * Evaluates extracted text per page and per document to decide whether OCR is required.
- */
-
 export const QUALITY_LEVELS = {
   GOOD: 'GOOD',
   PARTIAL: 'PARTIAL',
@@ -41,12 +36,6 @@ const SYLLABUS_KEYWORDS = [
   'plo',
 ];
 
-/**
- * Assesses the quality of raw text extracted from a single PDF page.
- * @param {string} pageText Text extracted from page
- * @param {number} [pageNumber=1] Page number (1-indexed)
- * @returns {{ quality: string, score: number, charCount: number, alphaRatio: number, keywordCount: number, needsOcr: boolean, reasons: string[] }}
- */
 export function assessPageQuality(pageText, pageNumber = 1) {
   if (!pageText || typeof pageText !== 'string') {
     return {
@@ -75,24 +64,19 @@ export function assessPageQuality(pageText, pageNumber = 1) {
     };
   }
 
-  // Count alphabetic characters
   const alphaMatches = trimmed.match(/[a-zA-Z]/g) || [];
   const alphaRatio = alphaMatches.length / charCount;
 
-  // Count recognizable words (3+ letters)
   const words = trimmed.split(/\s+/).filter((w) => w.length >= 3 && /^[a-zA-Z]+$/.test(w));
   const wordCount = words.length;
 
-  // Count replacement characters & strange symbols
   const replacementMatches = trimmed.match(/[\uFFFD\u0000-\u0008\u000E-\u001F]/g) || [];
   const garbageRatio = replacementMatches.length / charCount;
 
-  // Count syllabus domain keywords
   const lowerText = trimmed.toLowerCase();
   const matchedKeywords = SYLLABUS_KEYWORDS.filter((kw) => lowerText.includes(kw));
   const keywordCount = matchedKeywords.length;
 
-  // Detect scanned cover/metadata page (e.g. ml.pdf page 1 with only CLOs/address and missing course title)
   const isScannedCoverHeader =
     pageNumber === 1 &&
     charCount < 200 &&

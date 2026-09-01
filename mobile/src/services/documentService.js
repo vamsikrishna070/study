@@ -4,17 +4,9 @@ import * as Sharing from 'expo-sharing';
 import * as WebBrowser from 'expo-web-browser';
 import { openNativeDocument } from './AlarmModule';
 
-// ─── Directory Helpers ─────────────────────────────────────────────────────────
-
 const DOCUMENTS_CACHE_DIR_NAME = 'documents';
 const CUSTOM_SOUNDS_DIR_NAME = 'audio';
 
-/**
- * Ensures the target sub-directory exists in cache or documents path
- * @param {'cache' | 'document'} base
- * @param {string} subDir
- * @returns {Directory}
- */
 export function getOrCreateDirectory(base = 'cache', subDir = DOCUMENTS_CACHE_DIR_NAME) {
   const baseDir = base === 'document' ? Paths.document : Paths.cache;
   const dir = new Directory(baseDir, subDir);
@@ -22,18 +14,12 @@ export function getOrCreateDirectory(base = 'cache', subDir = DOCUMENTS_CACHE_DI
     try {
       dir.create({ intermediates: true });
     } catch (e) {
-      // Directory might already exist
+
     }
   }
   return dir;
 }
 
-/**
- * Sanitizes a filename to prevent path traversal and illegal characters
- * @param {string} filename
- * @param {string} fallback
- * @returns {string}
- */
 export function getSafeFilename(filename, fallback = 'document.pdf') {
   if (!filename || typeof filename !== 'string') return fallback;
   const clean = filename
@@ -44,21 +30,14 @@ export function getSafeFilename(filename, fallback = 'document.pdf') {
   return clean || fallback;
 }
 
-/**
- * Validates whether a local file exists, is non-zero, and has %PDF magic bytes
- * @param {string | File} fileOrUri
- * @returns {Promise<boolean>}
- */
 export async function validatePdfFile(fileOrUri) {
   try {
     const file = typeof fileOrUri === 'string' ? new File(fileOrUri) : fileOrUri;
     if (!file.exists || file.size === 0) return false;
 
-    // Check first bytes for %PDF- signature
     const textSample = await file.text();
     return textSample.startsWith('%PDF') || textSample.includes('%PDF-');
   } catch (e) {
-    // If text read fails on large binary, fallback to existence & size check
     try {
       const file = typeof fileOrUri === 'string' ? new File(fileOrUri) : fileOrUri;
       return file.exists && file.size > 0;
@@ -68,14 +47,6 @@ export async function validatePdfFile(fileOrUri) {
   }
 }
 
-// ─── PDF Download & Cache ─────────────────────────────────────────────────────
-
-/**
- * Generates a deterministic cache file for a remote URL
- * @param {string} remoteUrl
- * @param {string} originalName
- * @returns {File}
- */
 export function getCachedPdfFile(remoteUrl, originalName = 'document.pdf') {
   const cacheDir = getOrCreateDirectory('cache', DOCUMENTS_CACHE_DIR_NAME);
   let hash = 0;
@@ -88,13 +59,6 @@ export function getCachedPdfFile(remoteUrl, originalName = 'document.pdf') {
   return new File(cacheDir, cacheFilename);
 }
 
-/**
- * Downloads a remote PDF silently and caches it locally
- * @param {string} remoteUrl
- * @param {string} originalName
- * @param {Function} [onProgress]
- * @returns {Promise<{ uri: string, filename: string, size: number, fromCache: boolean }>}
- */
 export async function downloadPdf(remoteUrl, originalName = 'document.pdf', onProgress) {
   if (!remoteUrl || typeof remoteUrl !== 'string') {
     throw new Error('Download URL is required.');
@@ -103,7 +67,6 @@ export async function downloadPdf(remoteUrl, originalName = 'document.pdf', onPr
   const safeName = getSafeFilename(originalName, 'document.pdf');
   const targetFile = getCachedPdfFile(remoteUrl, safeName);
 
-  // Return from cache if already exists with valid non-zero size
   if (targetFile.exists && targetFile.size > 0) {
     if (typeof onProgress === 'function') onProgress(100);
     return {
@@ -139,14 +102,6 @@ export async function downloadPdf(remoteUrl, originalName = 'document.pdf', onPr
   }
 }
 
-// ─── PDF Viewing (No Share Sheet) ─────────────────────────────────────────────
-
-/**
- * Opens a local or remote PDF with native PDF viewer without triggering system share sheet
- * @param {string} urlOrUri Remote URL or local file URI
- * @param {string} originalName
- * @returns {Promise<{ success: boolean, uri: string }>}
- */
 export async function viewPdf(urlOrUri, originalName = 'document.pdf') {
   if (!urlOrUri) {
     throw new Error('Document URL is not available.');
@@ -155,14 +110,12 @@ export async function viewPdf(urlOrUri, originalName = 'document.pdf') {
   const safeName = getSafeFilename(originalName, 'document.pdf');
   let localFile;
 
-  // 1. If remote URL, silently download/retrieve from local cache first
   if (urlOrUri.startsWith('http://') || urlOrUri.startsWith('https://')) {
     try {
       const res = await downloadPdf(urlOrUri, safeName);
       localFile = new File(res.uri);
     } catch (dlErr) {
       if (__DEV__) console.warn('[DocumentService] Download error, falling back to direct URL browser:', dlErr);
-      // Fallback to in-app browser with remote HTTPS URL
       try {
         await WebBrowser.openBrowserAsync(urlOrUri, {
           presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
@@ -178,12 +131,10 @@ export async function viewPdf(urlOrUri, originalName = 'document.pdf') {
     localFile = new File(urlOrUri);
   }
 
-  // 2. Validate local file exists and is not empty
   if (!localFile || !localFile.exists || localFile.size === 0) {
     throw new Error('Could not access document file.');
   }
 
-  // 3. On Android: Launch native PDF viewer via ACTION_VIEW intent (no share sheet)
   if (Platform.OS === 'android') {
     try {
       const opened = await openNativeDocument(localFile.uri, 'application/pdf');
@@ -195,8 +146,6 @@ export async function viewPdf(urlOrUri, originalName = 'document.pdf') {
     }
   }
 
-  // 4. Safe fallback for remote URLs or devices without a standalone PDF reader app:
-  // Open the HTTPS URL in Chrome Custom Tabs / in-app browser (never pass file:// to Custom Tabs)
   if (urlOrUri.startsWith('http://') || urlOrUri.startsWith('https://')) {
     try {
       await WebBrowser.openBrowserAsync(urlOrUri, {
@@ -213,14 +162,6 @@ export async function viewPdf(urlOrUri, originalName = 'document.pdf') {
   throw new Error('No application found on device to view this document.');
 }
 
-// ─── PDF Sharing (Explicit Share Action Only) ──────────────────────────────────
-
-/**
- * Shares a PDF with external apps (WhatsApp, Drive, Email, etc.) ONLY on explicit user request
- * @param {string} urlOrUri
- * @param {string} originalName
- * @returns {Promise<void>}
- */
 export async function sharePdf(urlOrUri, originalName = 'document.pdf') {
   if (!urlOrUri) {
     throw new Error('Document URL is not available.');
@@ -246,8 +187,6 @@ export async function sharePdf(urlOrUri, originalName = 'document.pdf') {
   });
 }
 
-// ─── Custom Audio Persistent Storage & Validation ─────────────────────────────
-
 export const ALLOWED_AUDIO_EXTENSIONS = ['.mp3', '.wav', '.m4a', '.aac', '.ogg', '.flac', '.3gp', '.opus', '.oga'];
 
 export const DISALLOWED_EXTENSIONS = [
@@ -259,16 +198,6 @@ export const DISALLOWED_EXTENSIONS = [
 
 export const AUDIO_VALIDATION_ERROR_MSG = 'Please select an audio file (MP3, WAV, M4A, AAC, or OGG).';
 
-/**
- * Validates whether an asset is a valid, supported audio file.
- * Multi-level check:
- * 1. MIME type validation (rejects application/pdf, text/*, image/*, video/*, etc.)
- * 2. File extension validation (rejects .pdf, .txt, .docx, etc. and ensures allowed audio extension)
- * 3. File existence validation
- * 4. File size > 0 validation
- * @param {{ uri: string, name?: string, filename?: string, mimeType?: string, size?: number }} asset
- * @returns {Promise<{ valid: boolean, error?: string }>}
- */
 export async function validateAudioFile(asset) {
   if (!asset || !asset.uri) {
     return { valid: false, error: AUDIO_VALIDATION_ERROR_MSG };
@@ -277,7 +206,6 @@ export async function validateAudioFile(asset) {
   const rawName = (asset.name || asset.filename || '').trim();
   const mime = (asset.mimeType || '').toLowerCase().trim();
 
-  // 1. Check MIME type where available
   const rejectedMimePrefixes = [
     'application/pdf',
     'application/msword',
@@ -293,24 +221,20 @@ export async function validateAudioFile(asset) {
     return { valid: false, error: AUDIO_VALIDATION_ERROR_MSG };
   }
 
-  // Extract file extension
   const cleanName = rawName.split('?')[0].split('#')[0];
   const dotIndex = cleanName.lastIndexOf('.');
   const ext = dotIndex !== -1 ? cleanName.substring(dotIndex).toLowerCase() : '';
 
-  // 2. Check extension
   if (ext) {
     if (DISALLOWED_EXTENSIONS.includes(ext) || !ALLOWED_AUDIO_EXTENSIONS.includes(ext)) {
       return { valid: false, error: AUDIO_VALIDATION_ERROR_MSG };
     }
   } else {
-    // If no extension in filename, MIME type MUST be audio/
     if (!mime.startsWith('audio/')) {
       return { valid: false, error: AUDIO_VALIDATION_ERROR_MSG };
     }
   }
 
-  // 3. Check file exists and size > 0
   try {
     const file = new File(asset.uri);
     if (!file.exists) {
@@ -320,7 +244,6 @@ export async function validateAudioFile(asset) {
       return { valid: false, error: 'Selected audio file is empty.' };
     }
   } catch (e) {
-    // If File check fails on certain content:// URIs, fallback to asset.size
     if (asset.size !== undefined && asset.size === 0) {
       return { valid: false, error: 'Selected audio file is empty.' };
     }
@@ -329,11 +252,6 @@ export async function validateAudioFile(asset) {
   return { valid: true };
 }
 
-/**
- * Copies a selected audio file (content:// or file://) to persistent app storage (Paths.document/audio/)
- * @param {{ uri: string, name?: string, mimeType?: string, size?: number }} asset
- * @returns {Promise<{ uri: string, name: string, size: number }>}
- */
 export async function saveCustomAudio(asset) {
   const validation = await validateAudioFile(asset);
   if (!validation.valid) {
@@ -345,7 +263,6 @@ export async function saveCustomAudio(asset) {
   const isFileUri = sourceUri.startsWith('file://');
   const rawName = asset.name || 'custom_sound';
 
-  // Determine actual file extension without assuming .mp3
   let ext = '';
   if (rawName && rawName.includes('.')) {
     ext = rawName.substring(rawName.lastIndexOf('.')).toLowerCase();
@@ -362,7 +279,6 @@ export async function saveCustomAudio(asset) {
     ext = '.mp3';
   }
 
-  // Final sanity check on extension
   if (!ALLOWED_AUDIO_EXTENSIONS.includes(ext)) {
     throw new Error(AUDIO_VALIDATION_ERROR_MSG);
   }

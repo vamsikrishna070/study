@@ -16,9 +16,8 @@ const storage = new CloudinaryStorage({
     if (file.mimetype.startsWith('audio/')) folder = 'studyarena/recordings';
     if (file.mimetype.startsWith('image/')) folder = 'studyarena/images';
 
-    // Allow raw file formats (PDF, DOCX, etc.)
     const isRaw = !file.mimetype.startsWith('image/') && !file.mimetype.startsWith('video/') && !file.mimetype.startsWith('audio/');
-    
+
     return {
       folder: folder,
       resource_type: isRaw ? 'raw' : 'auto',
@@ -27,8 +26,8 @@ const storage = new CloudinaryStorage({
   },
 });
 
-export const upload = multer({ 
+export const upload = multer({
   storage: storage,
-  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+  limits: { fileSize: 10 * 1024 * 1024 }
 });
 export { cloudinary };

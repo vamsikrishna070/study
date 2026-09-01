@@ -10,15 +10,15 @@ import {
   Switch,
   ActivityIndicator,
 } from 'react-native';
-import { 
-  Sparkles, 
-  Clock, 
-  BookOpen, 
-  Smile, 
-  Meh, 
-  Frown, 
-  Save, 
-  ChevronRight 
+import {
+  Sparkles,
+  Clock,
+  BookOpen,
+  Smile,
+  Meh,
+  Frown,
+  Save,
+  ChevronRight
 } from 'lucide-react-native';
 import { Header } from '../../components/ui/Header';
 import { PageHeading } from '../../components/ui/PageHeading';
@@ -39,7 +39,7 @@ export default function EndSessionScreen({ navigation, route }) {
   const { showSuccess, showError } = useAppDialog();
 
   const summary = route.params?.sessionSummary || {};
-  const [productivity, setProductivity] = useState('productive'); // 'productive' | 'average' | 'difficult'
+  const [productivity, setProductivity] = useState('productive');
   const [reflection, setReflection] = useState('');
   const [markTaskComplete, setMarkTaskComplete] = useState(Boolean(summary.taskId));
   const [saving, setSaving] = useState(false);
@@ -78,7 +78,6 @@ export default function EndSessionScreen({ navigation, route }) {
 
       await createStudySession(payload);
 
-      // If user opted to complete the linked task
       if (markTaskComplete && summary.taskId) {
         try {
           await updateTask(summary.taskId, { completed: true });
@@ -117,7 +116,6 @@ export default function EndSessionScreen({ navigation, route }) {
             </Text>
           </View>
 
-          {/* Time & Subject Summary Card */}
           <Card style={styles.summaryCard}>
             <View style={styles.statRow}>
               <View style={styles.statIconBox}>
@@ -148,7 +146,6 @@ export default function EndSessionScreen({ navigation, route }) {
             </View>
           </Card>
 
-          {/* Productivity Rating */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>How did the session go?</Text>
             <View style={styles.productivityGrid}>
@@ -220,7 +217,6 @@ export default function EndSessionScreen({ navigation, route }) {
             </View>
           </View>
 
-          {/* Optional Reflection */}
           <Field label="What did you accomplish? (Optional)">
             <Input
               value={reflection}
@@ -233,7 +229,6 @@ export default function EndSessionScreen({ navigation, route }) {
             />
           </Field>
 
-          {/* Linked Task Completion Option */}
           {Boolean(summary.taskId) && (
             <View style={styles.taskToggleRow}>
               <View style={{ flex: 1, marginRight: spacing.md }}>
@@ -248,7 +243,6 @@ export default function EndSessionScreen({ navigation, route }) {
             </View>
           )}
 
-          {/* Save Action */}
           <View style={styles.actionWrapper}>
             <Button
               onPress={handleSave}

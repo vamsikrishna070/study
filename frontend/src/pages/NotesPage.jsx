@@ -65,7 +65,6 @@ export function NotesPage() {
         }
       />
 
-      {/* Search + Filter bar */}
       <div className="mb-6 space-y-3">
         <div className="flex gap-3">
           <div className="relative flex-1">
@@ -118,7 +117,6 @@ export function NotesPage() {
         )}
       </div>
 
-      {/* Results */}
       {query.isLoading ? (
         <LoadingBlock lines={6} />
       ) : query.error ? (

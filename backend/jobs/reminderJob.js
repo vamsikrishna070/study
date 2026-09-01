@@ -7,13 +7,13 @@ export async function processDueReminders() {
     status: 'pending',
     $or: [
       { lastFiredAt: { $exists: false } },
-      { lastFiredAt: { $lt: new Date(now.getTime() - 86400000) } } // Only fire once a day
+      { lastFiredAt: { $lt: new Date(now.getTime() - 86400000) } }
     ]
   });
 
   for (const reminder of reminders) {
     const reminderDate = new Date(reminder.date);
-    if (reminderDate.getTime() <= now.getTime() || (reminderDate.getTime() - now.getTime() <= 86400000)) { // Due or within 24h
+    if (reminderDate.getTime() <= now.getTime() || (reminderDate.getTime() - now.getTime() <= 86400000)) {
       await Notification.create({
         user: reminder.user,
         title: `Reminder: ${reminder.title}`,

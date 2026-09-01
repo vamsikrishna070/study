@@ -22,9 +22,9 @@ function TaskForm({ initial, onClose, subjects }) {
     reminderEnabled: Boolean(initial?.reminderEnabled),
     reminderTime: initial?.reminderTime || '19:00',
   });
-  
+
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-  
+
   const submit = (e) => {
     e.preventDefault();
     const data = {
@@ -39,10 +39,10 @@ function TaskForm({ initial, onClose, subjects }) {
     };
     initial ? update.mutate({ id: initial.id, data }, { onSuccess: done }) : create.mutate({ data }, { onSuccess: done });
   };
-  
+
   return (
     <form id="task-form" onSubmit={submit} className="flex h-full flex-col">
-      <Modal 
+      <Modal
         title={initial ? 'Edit Task' : 'Plan a Task'}
         eyebrow="Execution & Progress"
         onClose={onClose}
@@ -135,7 +135,7 @@ function TaskForm({ initial, onClose, subjects }) {
 
 function SortableTaskItem({ task, onEdit, onDelete, onSetStatus, isDragging }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: task.id, data: { ...task } });
-  
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -173,7 +173,7 @@ function SortableTaskItem({ task, onEdit, onDelete, onSetStatus, isDragging }) {
           </div>
           <div>
             <h3 className={cx('text-sm font-bold leading-5', isDone && 'text-muted-foreground line-through', isInProgress && 'text-primary')}>{task.title}</h3>
-            {/* Status Timestamp Subtext */}
+
             <div className="mt-1 text-xs">
               {isPending && (
                 <span className="text-muted-foreground font-mono">Complete by: {task.dueTime ? `${task.dueTime} · ` : ''}{fmtDate(task.dueDate)}</span>
@@ -206,7 +206,6 @@ function SortableTaskItem({ task, onEdit, onDelete, onSetStatus, isDragging }) {
         <span className={cx('font-mono uppercase', task.priority === 'high' ? 'text-accent font-bold' : '')}>{task.priority}</span>
       </div>
 
-      {/* Task Lifecycle Control Buttons */}
       <div className="mt-3 pl-7 flex items-center gap-2">
         {isPending && (
           <button
@@ -288,7 +287,7 @@ export function TasksPage() {
   const update = useUpdateTask();
   const del = useDeleteTask();
   const qc = useQueryClient();
-  
+
   const [editing, setEditing] = useState();
   const [open, setOpen] = useState(false);
   const [activeId, setActiveId] = useState(null);
@@ -355,7 +354,7 @@ export function TasksPage() {
         detail="Manage your study tasks with explicit lifecycle controls: Start, Stop, and End."
         action={<Button onClick={() => { setEditing(undefined); setOpen(true); }}><Plus size={16} /> Add Task</Button>}
       />
-      
+
       {query.isLoading ? <LoadingBlock lines={6} /> : query.error ? <QueryState error={query.error} onRetry={() => query.refetch()} label="Tasks" /> : (
         <DndContext collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -381,7 +380,7 @@ export function TasksPage() {
           </DragOverlay>
         </DndContext>
       )}
-      
+
       {open && <TaskForm initial={editing} subjects={subjects} onClose={() => setOpen(false)} />}
     </Shell>
   );

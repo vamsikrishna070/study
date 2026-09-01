@@ -37,7 +37,7 @@ class AlarmService : Service() {
         try {
             val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
             wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "StudyArena:AlarmWakeLock")
-            wakeLock?.acquire(10 * 60 * 1000L /*10 minutes*/)
+            wakeLock?.acquire(10 * 60 * 1000L )
         } catch (e: Exception) {
             Log.e(TAG, "Failed to acquire wake lock", e)
         }
@@ -63,7 +63,6 @@ class AlarmService : Service() {
             val soundId = intent.getStringExtra("soundId") ?: "default_alarm"
             val soundUri = intent.getStringExtra("soundUri")
 
-            // Re-schedule for 5 minutes later
             val newTime = System.currentTimeMillis() + (5 * 60 * 1000L)
             Log.d(TAG, "Snooze action received for reminder $id. Rescheduling at $newTime")
 
@@ -164,7 +163,6 @@ class AlarmService : Service() {
 
         playAlarmSound(soundId, soundUri)
 
-        // Launch activity explicitly to show full-screen alarm screen
         try {
             startActivity(fullScreenIntent)
         } catch (e: Exception) {
@@ -180,7 +178,6 @@ class AlarmService : Service() {
         try {
             var player: MediaPlayer? = null
 
-            // 1. Try custom soundUri if provided
             if (!soundUri.isNullOrBlank()) {
                 try {
                     val cleanPath = when {
@@ -228,7 +225,6 @@ class AlarmService : Service() {
                 }
             }
 
-            // 2. If no custom player, load built-in raw resources
             if (player == null) {
                 val cleanSoundId = when {
                     soundId.isBlank() || soundId == "default" || soundId == "custom" -> "default_alarm"
@@ -299,7 +295,7 @@ class AlarmService : Service() {
                 "StudyArena Alarm Notifications",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                setSound(null, null) // Audio is actively managed by MediaPlayer
+                setSound(null, null)
                 enableVibration(true)
                 vibrationPattern = longArrayOf(0, 500, 500, 500)
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC

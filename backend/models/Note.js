@@ -15,7 +15,7 @@ const noteSchema = new mongoose.Schema({
   tags: [{ type: String, trim: true }],
   priority: { type: String, enum: ['low', 'medium', 'high', 'exam'], default: 'medium' },
   attachments: [{
-    type: { type: String, default: 'file' }, // 'file', 'recording', 'link', 'youtube', 'image', 'document', 'audio', 'video'
+    type: { type: String, default: 'file' },
     url: String,
     publicId: String,
     originalName: String,

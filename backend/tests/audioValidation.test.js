@@ -17,7 +17,6 @@ function validateAudioFileLocal(asset) {
   const rawName = (asset.name || asset.filename || '').trim();
   const mime = (asset.mimeType || '').toLowerCase().trim();
 
-  // 1. Check MIME type where available
   const rejectedMimePrefixes = [
     'application/pdf',
     'application/msword',
@@ -33,24 +32,21 @@ function validateAudioFileLocal(asset) {
     return { valid: false, error: AUDIO_VALIDATION_ERROR_MSG };
   }
 
-  // Extract file extension
   const cleanName = rawName.split('?')[0].split('#')[0];
   const dotIndex = cleanName.lastIndexOf('.');
   const ext = dotIndex !== -1 ? cleanName.substring(dotIndex).toLowerCase() : '';
 
-  // 2. Check extension
   if (ext) {
     if (DISALLOWED_EXTENSIONS.includes(ext) || !ALLOWED_AUDIO_EXTENSIONS.includes(ext)) {
       return { valid: false, error: AUDIO_VALIDATION_ERROR_MSG };
     }
   } else {
-    // If no extension in filename, MIME type MUST be audio/
+
     if (!mime.startsWith('audio/')) {
       return { valid: false, error: AUDIO_VALIDATION_ERROR_MSG };
     }
   }
 
-  // 3. Check size > 0
   if (asset.size !== undefined && asset.size <= 0) {
     return { valid: false, error: 'Selected audio file is empty.' };
   }
@@ -73,7 +69,6 @@ function runAudioValidationTests() {
     }
   }
 
-  // Test Cases: Disallowed Files
   const pdfAsset = { uri: 'file:///path/to/studyarena.pdf', name: 'studyarena.pdf', mimeType: 'application/pdf', size: 1024 };
   const pdfRes = validateAudioFileLocal(pdfAsset);
   assert(!pdfRes.valid && pdfRes.error === AUDIO_VALIDATION_ERROR_MSG, 'PDF (application/pdf, studyarena.pdf) -> REJECT');
@@ -98,22 +93,18 @@ function runAudioValidationTests() {
   const zipRes = validateAudioFileLocal(zipAsset);
   assert(!zipRes.valid && zipRes.error === AUDIO_VALIDATION_ERROR_MSG, 'ZIP (application/zip, archive.zip) -> REJECT');
 
-  // Test Disguised MIME (e.g. PDF named with generic octet-stream)
   const disguisedPdf = { uri: 'content://provider/doc.pdf', name: 'assignment.pdf', mimeType: 'application/octet-stream', size: 4000 };
   const disguisedPdfRes = validateAudioFileLocal(disguisedPdf);
   assert(!disguisedPdfRes.valid, 'Disguised PDF with octet-stream MIME -> REJECT');
 
-  // Test Disguised Extension (e.g. PDF named .mp3 but returned with application/pdf MIME)
   const disguisedMime = { uri: 'content://provider/fake.mp3', name: 'fake.mp3', mimeType: 'application/pdf', size: 4000 };
   const disguisedMimeRes = validateAudioFileLocal(disguisedMime);
   assert(!disguisedMimeRes.valid, 'Fake MP3 extension with application/pdf MIME -> REJECT');
 
-  // Test Empty Audio File
   const emptyMp3 = { uri: 'file:///path/to/empty.mp3', name: 'empty.mp3', mimeType: 'audio/mpeg', size: 0 };
   const emptyMp3Res = validateAudioFileLocal(emptyMp3);
   assert(!emptyMp3Res.valid && emptyMp3Res.error.includes('empty'), 'Empty MP3 file (size: 0) -> REJECT');
 
-  // Test Allowed Audio Files
   const mp3Asset = { uri: 'file:///path/to/bell.mp3', name: 'bell.mp3', mimeType: 'audio/mpeg', size: 15000 };
   assert(validateAudioFileLocal(mp3Asset).valid, 'MP3 (audio/mpeg, bell.mp3) -> ACCEPT');
 

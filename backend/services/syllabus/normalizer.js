@@ -1,7 +1,4 @@
-/**
- * Text normalization and cleanup utilities for the syllabus extractor.
- * Handles Unicode ligatures, broken line hyphens, zero-width chars, and contextual OCR corrections.
- */
+
 
 const LIGATURE_MAP = {
   '\uFB00': 'ff',
@@ -52,9 +49,6 @@ const WORD_NUMBER_MAP = {
   ten: 10,
 };
 
-/**
- * Converts Roman numerals (I, II, III, IV, V, VI, etc.) to Arabic integers
- */
 export function romanToArabic(roman) {
   if (!roman || typeof roman !== 'string') return null;
   const str = roman.trim().toUpperCase();
@@ -76,9 +70,6 @@ export function romanToArabic(roman) {
   return total > 0 ? total : null;
 }
 
-/**
- * Parses unit number from string, supporting Roman numerals, digits, and spelled-out words
- */
 export function parseUnitNumber(str, defaultNum = 1) {
   if (!str) return defaultNum;
   const clean = String(str)
@@ -86,38 +77,29 @@ export function parseUnitNumber(str, defaultNum = 1) {
     .replace(/[:.\-–—]/g, '')
     .trim();
 
-  // 1. Check direct integer
   const num = parseInt(clean, 10);
   if (!isNaN(num) && num > 0) return num;
 
-  // 2. Check Roman numeral
   const roman = romanToArabic(clean);
   if (roman !== null) return roman;
 
-  // 3. Check spelled-out word (e.g. "FIRST", "FIFTH")
   const wordKey = clean.toLowerCase();
   if (WORD_NUMBER_MAP[wordKey]) return WORD_NUMBER_MAP[wordKey];
 
   return defaultNum;
 }
 
-/**
- * Normalizes Unicode characters, ligatures, and zero-width artifacts
- */
 export function normalizeUnicode(text) {
   if (!text || typeof text !== 'string') return '';
 
   let res = text;
 
-  // Replace ligatures
   for (const [ligature, replacement] of Object.entries(LIGATURE_MAP)) {
     res = res.replaceAll(ligature, replacement);
   }
 
-  // Remove soft hyphens and zero-width characters
   res = res.replace(/[\u00AD\u200B\u200C\u200D\uFEFF]/g, '');
 
-  // Normalize non-breaking spaces and special quotes/dashes
   res = res
     .replace(/[\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]/g, ' ')
     .replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212]/g, '-')
@@ -127,23 +109,16 @@ export function normalizeUnicode(text) {
   return res;
 }
 
-/**
- * Stitches broken line hyphenation (e.g. "algo-\nrithm" -> "algorithm")
- */
 export function stitchBrokenHyphens(text) {
   if (!text || typeof text !== 'string') return '';
   return text.replace(/([a-zA-Z]{2,})-\s*\n\s*([a-zA-Z]{2,})/g, '$1$2');
 }
 
-/**
- * Contextual OCR corrections for common technical terms and OCR artifacts
- */
 export function cleanOcrTypo(text) {
   if (!text || typeof text !== 'string') return '';
 
   let cleaned = normalizeUnicode(text);
 
-  // Common OCR technical term fixes
   cleaned = cleaned
     .replace(/\bntroduction\b/g, 'Introduction')
     .replace(/\bnstance based\b/g, 'Instance based')
@@ -178,9 +153,6 @@ export function cleanOcrTypo(text) {
   return cleaned;
 }
 
-/**
- * Full document text normalizer.
- */
 export function normalizeDocumentText(text) {
   if (!text || typeof text !== 'string') return '';
   const stitched = stitchBrokenHyphens(normalizeUnicode(text));

@@ -54,7 +54,7 @@ export function Modal({ title, eyebrow, onClose, children, footer, onSubmit }) {
       if (e.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', handleKeyDown);
-    // Prevent body scrolling
+
     document.body.style.overflow = 'hidden';
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
@@ -66,9 +66,9 @@ export function Modal({ title, eyebrow, onClose, children, footer, onSubmit }) {
 
   const modalContent = (
     <div className="modal-backdrop fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/45 p-4 backdrop-blur-sm sm:p-6" role="dialog" aria-modal="true" data-testid="dialog-form" onClick={onClose}>
-      <Wrapper 
-        onSubmit={onSubmit} 
-        className="flex max-h-[calc(100dvh-32px)] w-full max-w-[700px] flex-col overflow-hidden rounded-[2rem] border border-border bg-card shadow-2xl" 
+      <Wrapper
+        onSubmit={onSubmit}
+        className="flex max-h-[calc(100dvh-32px)] w-full max-w-[700px] flex-col overflow-hidden rounded-[2rem] border border-border bg-card shadow-2xl"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex shrink-0 items-start justify-between border-b border-border px-6 py-5 sm:px-8">
@@ -80,11 +80,11 @@ export function Modal({ title, eyebrow, onClose, children, footer, onSubmit }) {
             <X size={19} />
           </button>
         </div>
-        
+
         <div className="flex-1 overflow-y-auto p-6 sm:p-8">
           {children}
         </div>
-        
+
         {footer && (
           <div className="shrink-0 border-t border-border bg-muted/20 px-6 py-5 sm:px-8">
             {footer}
@@ -103,8 +103,8 @@ export function Field({ label, children, hint }) {
 
 export const inputClass = 'focus-ring w-full min-h-[44px] rounded-xl border border-input bg-background px-3.5 py-2.5 text-sm outline-none transition-colors focus:border-accent';
 
-export function PageHeading({eyebrow,title,detail,action}) { 
-  return <div className="mb-8 flex flex-col justify-between gap-5 sm:flex-row sm:items-end"><div><p className="font-mono text-[10px] uppercase tracking-[.22em] text-accent">{eyebrow}</p><h1 className="mt-2 font-display text-5xl tracking-tight">{title}</h1><p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">{detail}</p></div>{action}</div>; 
+export function PageHeading({eyebrow,title,detail,action}) {
+  return <div className="mb-8 flex flex-col justify-between gap-5 sm:flex-row sm:items-end"><div><p className="font-mono text-[10px] uppercase tracking-[.22em] text-accent">{eyebrow}</p><h1 className="mt-2 font-display text-5xl tracking-tight">{title}</h1><p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">{detail}</p></div>{action}</div>;
 }
 
 export function ChartCard({title,eyebrow,children}){

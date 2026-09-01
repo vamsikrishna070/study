@@ -1,7 +1,7 @@
 import client from './client';
 
 export const extractSyllabus = async (subjectId, fileUri, fileType, fileName) => {
-  // If a local file URI is provided (file:// or content://), upload and patch first
+
   if (fileUri && (fileUri.startsWith('file://') || fileUri.startsWith('content://'))) {
     const formData = new FormData();
     formData.append('file', {
@@ -29,7 +29,6 @@ export const extractSyllabus = async (subjectId, fileUri, fileType, fileName) =>
     });
   }
 
-  // Call the extract endpoint (backend reads the subject's saved syllabusFile from database)
   const extractResponse = await client.post(`/subjects/${subjectId}/syllabus/extract`);
   return extractResponse.data;
 };

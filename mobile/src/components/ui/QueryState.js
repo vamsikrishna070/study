@@ -25,10 +25,10 @@ export function QueryState({ error, onRetry, label = 'This section' }) {
 
 const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.create({
   container: {
-    backgroundColor: `${colors.destructive}0D`, // 5% opacity
+    backgroundColor: `${colors.destructive}0D`,
     borderRadius: radii.xxl,
     borderWidth: 1,
-    borderColor: `${colors.destructive}40`, // 25% opacity
+    borderColor: `${colors.destructive}40`,
     padding: spacing.xl,
     alignItems: 'center',
     justifyContent: 'center',
@@ -37,7 +37,7 @@ const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.crea
     width: 40,
     height: 40,
     borderRadius: radii.round,
-    backgroundColor: `${colors.destructive}1A`, // 10% opacity
+    backgroundColor: `${colors.destructive}1A`,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.sm,

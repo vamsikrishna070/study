@@ -4,23 +4,33 @@ import { fileURLToPath } from 'node:url';
 import * as cheerio from 'cheerio';
 import { DateTime } from 'luxon';
 import { createWorker } from 'tesseract.js';
+import mongoose from 'mongoose';
 import SrmPortalAccount from '../../models/SrmPortalAccount.js';
 import User from '../../models/User.js';
 import Subject from '../../models/Subject.js';
 import { encryptPortalSecret, decryptPortalSecret } from '../../utils/portalCrypto.js';
 import { getActiveSession } from './srmAttendanceService.js';
+import {
+  safeString,
+  safeNumber,
+  safeInt,
+  safeHour,
+  safeStatus,
+  buildSubjectStats,
+  computeOverall,
+  buildTodayClassesFromCache,
+} from '../../utils/srmPortalHelpers.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const staticDir = path.join(__dirname, '../../static');
 
-// Load faculty cabins
 let facultyCabinMap = new Map();
 try {
   const facultyPath = path.join(staticDir, 'faculty.json');
   if (fs.existsSync(facultyPath)) {
     const facultyData = JSON.parse(fs.readFileSync(facultyPath, 'utf8'));
-    const normalizeName = (name) => (name || '')
+    const normalizeName = (name) => safeString(name)
       .toLowerCase()
       .replace(/\(.*?\)/g, "")
       .replace(/\b(dr|mr|mrs|ms|prof)\b/g, "")
@@ -41,7 +51,7 @@ try {
 }
 
 const getFacultyCabin = (name) => {
-  const norm = (name || '')
+  const norm = safeString(name)
     .toLowerCase()
     .replace(/\(.*?\)/g, "")
     .replace(/\b(dr|mr|mrs|ms|prof)\b/g, "")
@@ -63,14 +73,93 @@ const DEFAULT_HEADERS = {
 
 function splitPair(raw) {
   if (!raw) return { left: null, right: null };
-  const parts = raw.split('/');
+  const str = safeString(raw);
+  const parts = str.split('/');
   if (parts.length === 1) {
     return { left: parts[0].trim() || null, right: null };
   }
   return { left: parts[0].trim() || null, right: parts[1].trim() || null };
 }
 
-// 1. Internal: Fetch a fresh SRM session (JSESSIONID) and download the CAPTCHA image bytes
+function parseAttendanceRow(tdList, $) {
+  if (!tdList || tdList.length < 6) return null;
+  const col0 = safeString($(tdList[0]).text());
+  const col1 = safeString($(tdList[1]).text());
+  const col2 = safeString($(tdList[2]).text());
+
+  let code = '', name = '', condIdx = 2;
+  if (/^\d+$/.test(col0) && col1 && col2) {
+    code = col1;
+    name = col2;
+    condIdx = 3;
+  } else {
+    code = col0;
+    name = col1;
+    condIdx = 2;
+  }
+
+  if (!code || !name || /code|subject|conducted|s\.?no/i.test(code)) return null;
+
+  const cond = safeInt($(tdList[condIdx]).text(), 0);
+  const pres = safeInt($(tdList[condIdx + 1]).text(), 0);
+  const abs = safeInt($(tdList[condIdx + 2]).text(), 0);
+  const od = safeInt($(tdList[condIdx + 3]).text(), 0);
+
+  let presPct = 0;
+  if (tdList.length > condIdx + 4) presPct = safeNumber($(tdList[condIdx + 4]).text(), 0);
+
+  let attPct = presPct;
+  if (tdList.length > condIdx + 6) attPct = safeNumber($(tdList[condIdx + 6]).text(), presPct);
+
+  return { code, name, cond, pres, abs, od, attPct, presPct };
+}
+
+export async function findPortalAccountForUser(userOrId) {
+  if (!userOrId) return null;
+  let userObj = null;
+  let userId = null;
+
+  if (typeof userOrId === 'object' && userOrId._id) {
+    userObj = userOrId;
+    userId = userOrId._id;
+  } else if (mongoose.Types.ObjectId.isValid(userOrId)) {
+    userId = userOrId;
+    userObj = await User.findById(userId);
+  }
+
+  if (!userId) return null;
+
+  let account = await SrmPortalAccount.findOne({ userId }).select('+encryptedPassword +encryptedSessionId');
+
+  if (!account && userObj && userObj.registrationNumber) {
+    const cleanReg = safeString(userObj.registrationNumber).toUpperCase();
+    if (cleanReg) {
+      const orphanAccount = await SrmPortalAccount.findOne({ srmUsername: cleanReg }).select('+encryptedPassword +encryptedSessionId');
+      if (orphanAccount) {
+        orphanAccount.userId = userId;
+        await orphanAccount.save();
+        account = orphanAccount;
+      }
+    }
+  }
+
+  if (account) {
+    try {
+      const duplicates = await SrmPortalAccount.find({
+        _id: { $ne: account._id },
+        userId: account.userId
+      });
+      if (duplicates.length > 0) {
+        await SrmPortalAccount.deleteMany({ _id: { $in: duplicates.map(d => d._id) } });
+      }
+    } catch (dupErr) {
+      console.warn('[PORTAL LOOKUP] Duplicate cleanup warning:', dupErr.message);
+    }
+  }
+
+  return account;
+}
+
 async function fetchSrmSession() {
   const loginPageRes = await fetch(`${BASE_URL}/StudentLoginPage`, {
     method: 'GET',
@@ -106,27 +195,25 @@ async function fetchSrmSession() {
   return { jsessionId, captchaBuffer };
 }
 
-// 2. Internal: Use Tesseract.js to OCR the CAPTCHA image and return the text
 async function solveCaptchaOcr(imageBuffer) {
   const worker = await createWorker('eng', 1, {
-    // Suppress verbose Tesseract logs
     logger: () => {},
     errorHandler: () => {},
   });
   try {
     await worker.setParameters({
       tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
-      tessedit_pageseg_mode: '8', // Treat as single word
+      tessedit_pageseg_mode: '8',
     });
     const { data } = await worker.recognize(imageBuffer);
-    return (data.text || '').replace(/\s+/g, '').trim();
+    return safeString(data.text).replace(/\s+/g, '');
   } finally {
     await worker.terminate();
   }
 }
 
-// 3. Internal: Attempt SRM login with a solved CAPTCHA — returns jsessionId on success
 export async function attemptSrmLogin(username, password) {
+  console.log(`[SRM LOGIN] Login attempt started for SRM username: ${username}`);
   const MAX_RETRIES = 3;
   let lastErrorReason = null;
 
@@ -156,7 +243,9 @@ export async function attemptSrmLogin(username, password) {
     }
 
     const payload = new URLSearchParams({
+      UserName: username,
       txtUserName: username,
+      AuthKey: password,
       txtAuthKey: password,
       ccode: captchaText,
     });
@@ -182,16 +271,18 @@ export async function attemptSrmLogin(username, password) {
     }
 
     const html = await loginRes.text();
+    const setCookieHeader = loginRes.headers.get('set-cookie') || '';
+    const newJsessionIdMatch = setCookieHeader.match(/JSESSIONID=([^;]+)/);
+    const finalSessionId = newJsessionIdMatch ? newJsessionIdMatch[1] : jsessionId;
 
-    // 1. Success check: student greeting or portal elements or h2
     const nameMatch = html.match(/<h2>(.*?)<\/h2>/i);
-    const isSuccess = Boolean(nameMatch) || /Student Corner|HRDSystem|tblSubjectWiseAttendance|Welcome/i.test(html);
+    const isLoginPage = html.includes('txtUserName') || html.includes('txtAuthKey');
+    const isSuccess = !isLoginPage && (Boolean(nameMatch) || /HRDSystem|tblSubjectWiseAttendance|Welcome|Logout|profile_pic/i.test(html));
     if (isSuccess) {
-      console.log(`[PortalService] SRM Portal login succeeded on attempt ${attempt}!`);
-      return jsessionId;
+      console.log(`[SRM LOGIN] SRM Portal login succeeded for username: ${username} on attempt ${attempt}`);
+      return finalSessionId;
     }
 
-    // 2. Failure check: distinguish Explicit Credential Error vs CAPTCHA error
     const lowerHtml = html.toLowerCase();
     const isExplicitCredentialError =
       lowerHtml.includes('invalid user name') ||
@@ -220,7 +311,6 @@ export async function attemptSrmLogin(username, password) {
       continue;
     }
 
-    // Default retry for unrecognized response
     console.warn(`[PortalService] Attempt ${attempt}: Login response unrecognized. Retrying...`);
     lastErrorReason = 'UNRECOGNIZED_RESPONSE';
   }
@@ -234,25 +324,31 @@ export async function attemptSrmLogin(username, password) {
   throw err;
 }
 
-// 4. Connect user's SRM portal account — fully automatic, no CAPTCHA exposed to student
 export async function connectPortalAccount(userId, srmUsername, srmPassword) {
+  console.log(`[PORTAL CONNECT] Starting portal connection for User ID: ${userId}, SRM Username: ${safeString(srmUsername).toUpperCase()}`);
   if (!srmUsername || !srmPassword) {
     const err = new Error('Registration Number and Password are required.');
     err.code = 'INVALID_CREDENTIALS';
     throw err;
   }
 
-  const cleanUsername = srmUsername.trim().toUpperCase();
-
-  // Auto-authenticate: fetch session, solve CAPTCHA, login
+  const cleanUsername = safeString(srmUsername).toUpperCase();
   const jsessionId = await attemptSrmLogin(cleanUsername, srmPassword);
 
   const encryptedPassword = encryptPortalSecret(srmPassword);
   const encryptedSessionId = encryptPortalSecret(jsessionId);
   const sessionTime = DateTime.now().setZone('Asia/Kolkata').toFormat('yyyy-MM-dd, HH:mm:ss');
 
-  let account = await SrmPortalAccount.findOne({ userId });
+  let account = await SrmPortalAccount.findOne({ srmUsername: cleanUsername }).select('+encryptedPassword +encryptedSessionId');
+
   if (!account) {
+    const oldUserAccount = await SrmPortalAccount.findOne({ userId, srmUsername: { $ne: cleanUsername } });
+    if (oldUserAccount) {
+      console.log(`[PORTAL CONNECT] Unlinking old SRM account ${oldUserAccount.srmUsername} for User ID: ${userId}`);
+      await SrmPortalAccount.deleteOne({ _id: oldUserAccount._id });
+      await Subject.deleteMany({ user: userId, isSrmManaged: true });
+    }
+
     account = new SrmPortalAccount({
       userId,
       srmUsername: cleanUsername,
@@ -262,7 +358,10 @@ export async function connectPortalAccount(userId, srmUsername, srmPassword) {
       connectionStatus: 'connected',
     });
   } else {
-    account.srmUsername = cleanUsername;
+    if (String(account.userId) !== String(userId)) {
+      console.log(`[PORTAL CONNECT] Re-assigning SRM account ${cleanUsername} from User ${account.userId} to User ${userId}`);
+      account.userId = userId;
+    }
     account.encryptedPassword = encryptedPassword;
     account.encryptedSessionId = encryptedSessionId;
     account.sessionTime = sessionTime;
@@ -271,22 +370,48 @@ export async function connectPortalAccount(userId, srmUsername, srmPassword) {
 
   await account.save();
 
-  // Scrape and cache initial data
+  try {
+    await SrmPortalAccount.deleteMany({
+      _id: { $ne: account._id },
+      userId: account.userId
+    });
+  } catch (dupErr) {
+    console.warn('[PORTAL CONNECT] Duplicate cleanup warning:', dupErr.message);
+  }
+
+  const user = await User.findById(userId);
+  if (user) {
+    let userUpdated = false;
+    if (user.registrationNumber !== cleanUsername) {
+      user.registrationNumber = cleanUsername;
+      userUpdated = true;
+    }
+    if (user.university !== 'SRM University-AP') {
+      user.university = 'SRM University-AP';
+      userUpdated = true;
+    }
+    if (userUpdated) {
+      await user.save();
+    }
+  }
+
   try {
     await scrapeAndStoreData(account, jsessionId);
   } catch (scrapeErr) {
     console.warn('[PortalService] Initial data scrape partial failure:', scrapeErr.message);
   }
 
+  console.log(`[PORTAL CONNECT] Account connected and saved for User ID: ${userId}, SRM Username: ${cleanUsername}`);
+
   return {
     success: true,
     srmUsername: cleanUsername,
+    registrationNumber: cleanUsername,
     connectionStatus: 'connected',
     lastSuccessfulSync: account.lastSuccessfulSync,
   };
 }
 
-// 3. Helper to scrape SRM portal pages using session ID
 async function scrapeAndStoreData(account, sessionId) {
   const postReport = (id, extraParams = {}) => {
     const params = new URLSearchParams({ ids: String(id), ...extraParams });
@@ -294,8 +419,25 @@ async function scrapeAndStoreData(account, sessionId) {
       method: 'POST',
       headers: {
         ...DEFAULT_HEADERS,
-        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'X-Requested-With': 'XMLHttpRequest',
         'Cookie': `JSESSIONID=${sessionId}`,
+        'Referer': `${BASE_URL}/HRDSystem`,
+      },
+      body: params.toString(),
+    }).then((res) => res.text());
+  };
+
+  const postTransaction = (id, extraParams = {}) => {
+    const params = new URLSearchParams({ ids: String(id), ...extraParams });
+    return fetch(`${BASE_URL}/students/transaction/studentattendance.jsp`, {
+      method: 'POST',
+      headers: {
+        ...DEFAULT_HEADERS,
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'X-Requested-With': 'XMLHttpRequest',
+        'Cookie': `JSESSIONID=${sessionId}`,
+        'Referer': `${BASE_URL}/students/transaction/studentattendance.jsp`,
       },
       body: params.toString(),
     }).then((res) => res.text());
@@ -311,7 +453,7 @@ async function scrapeAndStoreData(account, sessionId) {
     }).then((res) => res.text());
 
   try {
-    const [htmlOriginal, htmlAttendance, htmlTimetable, htmlSubjects, htmlProfile, htmlCgpa, htmlInternals, htmlLedger] =
+    const [htmlOriginal, htmlAttendance, htmlTimetable, htmlSubjects, htmlProfile, htmlCgpa, htmlInternals, htmlLedger, htmlTodayConduct] =
       await Promise.all([
         postHrd().catch(() => ''),
         postReport(3).catch(() => ''),
@@ -321,128 +463,190 @@ async function scrapeAndStoreData(account, sessionId) {
         postReport(6).catch(() => ''),
         postReport(5).catch(() => ''),
         postReport(6).catch(() => ''),
+        postTransaction(33).catch(() => ''),
       ]);
 
-    const $original = cheerio.load(htmlOriginal);
-    const $attendance = cheerio.load(htmlAttendance);
-    const $timetable = cheerio.load(htmlTimetable);
-    const $subjects = cheerio.load(htmlSubjects);
-    const $profile = cheerio.load(htmlProfile);
-    const $cgpa = cheerio.load(htmlCgpa);
-    const $internals = cheerio.load(htmlInternals);
-    const $ledger = cheerio.load(htmlLedger);
+    const $original = cheerio.load(htmlOriginal || '');
+    const $attendance = cheerio.load(htmlAttendance || '');
+    const $timetable = cheerio.load(htmlTimetable || '');
+    const $subjects = cheerio.load(htmlSubjects || '');
+    const $profile = cheerio.load(htmlProfile || '');
+    const $cgpa = cheerio.load(htmlCgpa || '');
+    const $internals = cheerio.load(htmlInternals || '');
+    const $ledger = cheerio.load(htmlLedger || '');
+    const $todayConduct = cheerio.load(htmlTodayConduct || '');
 
-    // Profile
     const profile = {};
     $profile("table.table-striped tr").each((_, row) => {
       const td = $profile(row).find("td");
       if (td.length === 3) {
-        const key = td.eq(0).text().trim();
-        const val = td.eq(2).text().trim();
+        const key = safeString(td.eq(0).text());
+        const val = safeString(td.eq(2).text());
         if (/Student Name/i.test(key)) profile.studentName = val;
         else if (/Register No/i.test(key)) profile.registerNo = val;
         else if (/Institution/i.test(key)) profile.institution = val;
         else if (/Semester/i.test(key)) profile.semester = val;
         else if (/Program \/ Section/i.test(key)) {
-          const [program, section] = val.split("/").map((v) => v.trim());
-          profile.program = program;
-          profile.section = section?.replace(/['"]+/g, "");
+          const parts = val.split("/").map((v) => safeString(v));
+          profile.program = parts[0] || '';
+          profile.section = (parts[1] || '').replace(/['"]+/g, "");
         } else if (/Specialization/i.test(key)) profile.specialization = val;
         else if (/D\.O\.B\. \/ Gender/i.test(key)) {
-          const [dob, gender] = val.split("/").map((v) => v.trim());
-          profile.dob = dob;
-          profile.gender = gender;
+          const parts = val.split("/").map((v) => safeString(v));
+          profile.dob = parts[0] || '';
+          profile.gender = parts[1] || '';
         }
       }
     });
     const pic = $original("div.profile_pic img").attr("src");
     if (pic) profile.picture = `https://student.srmap.edu.in${pic}`;
-    // CGPA
+
     const cgpaDiv = $cgpa("div[style*='float: right'][style*='font-size']");
-    const cgpa = {
-      cgpa: cgpaDiv.length ? cgpaDiv.text().split(":")[1]?.trim() || "0" : "0",
-    };
+    const rawCgpaText = cgpaDiv.length ? safeString(cgpaDiv.text()) : '';
+    const cgpaVal = rawCgpaText.includes(':') ? safeString(rawCgpaText.split(':')[1]) : '0';
+    const cgpa = { cgpa: cgpaVal || '0' };
 
-    // Helper to normalize subject codes (strips extra spaces, upper case)
-    const normalizeCode = (c) => (c || '').replace(/\s+/g, ' ').trim().toUpperCase();
+    const normalizeCode = (c) => safeString(typeof c === 'string' ? c : (c?.subjectCode || c?.code || '')).replace(/\s+/g, ' ').toUpperCase();
 
-    // 1. Subject Map from Report Page 2 ($subjects)
     const subjectMap = {};
     $subjects("table tr").each((_, row) => {
       const td = $subjects(row).find("td");
       if (td.length >= 4) {
-        const sem = td.eq(0).text().trim();
-        const code = td.eq(1).text().trim();
-        const name = td.eq(2).text().trim();
-        const credit = td.eq(3).text().trim();
+        const sem = safeString(td.eq(0).text());
+        const code = safeString(td.eq(1).text());
+        const name = safeString(td.eq(2).text());
+        const credit = safeString(td.eq(3).text());
         if (code && sem && !/code|semester/i.test(code)) {
           subjectMap[normalizeCode(code)] = { code, name, semester: sem, credit };
         }
       }
     });
 
-    // 2. Attendance List & Authoritative Active Subjects Set from Report Page 3 ($attendance)
     const attendance = [];
     const attendanceSubjectsMap = new Map();
     const activeCodesSet = new Set();
+    let totalConducted = 0;
+    let totalPresent = 0;
+    let totalAbsent = 0;
+    let totalOdMl = 0;
 
-    $attendance("table tr").each((_, row) => {
-      const td = $attendance(row).find("td");
-      if (td.length >= 7) {
-        const code = td.eq(0).text().trim();
-        const name = td.eq(1).text().trim();
-        if (code && name && !/code|subject|conducted/i.test(code)) {
-          const normCode = normalizeCode(code);
-          activeCodesSet.add(normCode);
-          attendanceSubjectsMap.set(normCode, { code, name });
+    $attendance("table#tblSubjectWiseAttendance tr").each((_, row) => {
+      const tdList = $attendance(row).find("td").toArray();
+      const parsed = parseAttendanceRow(tdList, $attendance);
+      if (parsed) {
+        const { code, name, cond, pres, abs, od, attPct, presPct } = parsed;
+        const normCode = normalizeCode(code);
+        activeCodesSet.add(normCode);
+        attendanceSubjectsMap.set(normCode, { code, name });
 
-          if (td.length >= 9) {
-            attendance.push({
-              subject_code: code,
-              subject_name: name,
-              classes_conducted: td.eq(2).text().trim(),
-              present: td.eq(3).text().trim(),
-              absent: td.eq(4).text().trim(),
-              od_ml_taken: td.eq(5).text().trim(),
-              present_percentage: td.eq(6).text().trim(),
-              od_ml_percentage: td.eq(7).text().trim(),
-              attendance_percentage: td.eq(8).text().trim(),
-            });
-          }
-        }
+        totalConducted += cond;
+        totalPresent += pres;
+        totalAbsent += abs;
+        totalOdMl += od;
+
+        attendance.push({
+          subjectCode: code,
+          subjectName: name,
+          conducted: cond,
+          present: pres,
+          absent: abs,
+          odMl: od,
+          percentage: attPct,
+          subject_code: code,
+          subject_name: name,
+          classes_conducted: String(cond),
+          od_ml_taken: String(od),
+          present_percentage: String(presPct),
+          od_ml_percentage: "0.00",
+          attendance_percentage: String(attPct),
+        });
       }
     });
 
-    // 3. Timetable & Subjects Legend from Report Page 10 ($timetable)
+    const overallPercentage = totalConducted > 0
+      ? parseFloat((((totalPresent + totalOdMl) / totalConducted) * 100).toFixed(2))
+      : 0;
+
+    const overallAttendance = {
+      conducted: totalConducted,
+      present: totalPresent,
+      absent: totalAbsent,
+      odMl: totalOdMl,
+      percentage: overallPercentage,
+      status: overallPercentage >= 75 ? 'ELIGIBLE (≥75%)' : 'ATTENDANCE ALERT',
+    };
+    profile.overallAttendance = overallAttendance;
+
+    const todayConductClasses = [];
+    $todayConduct("div.container-fluid").each((_, container) => {
+      const title = safeString($todayConduct(container).find("div.row div").first().text());
+      if (!title.includes("Today Attendance")) return;
+
+      $todayConduct(container)
+        .find("div.row")
+        .slice(2)
+        .each((_, row) => {
+          const cols = $todayConduct(row)
+            .find("div")
+            .map((_, col) => safeString($todayConduct(col).text()))
+            .get();
+
+          if (cols.length >= 4) {
+            let date = '', day = '', hourRaw = '', subjectRaw = '', statusRaw = '';
+            if (cols.length >= 5) {
+              [date, day, hourRaw, subjectRaw, statusRaw] = cols;
+            } else {
+              [day, hourRaw, subjectRaw, statusRaw] = cols;
+            }
+
+            const parsedHour = safeHour(hourRaw);
+            if (!parsedHour) return;
+
+            const normStatus = safeStatus(statusRaw);
+
+            todayConductClasses.push({
+              date: safeString(date),
+              day: safeString(day),
+              hour: parsedHour,
+              subjectCode: safeString(subjectRaw),
+              subjectName: safeString(subjectRaw),
+              status: normStatus,
+            });
+          }
+        });
+    });
+
+    if (todayConductClasses.length > 0) {
+      account.todayAttendanceCache = todayConductClasses;
+    }
+
     const rawTimetable = [];
     $timetable("tr").each((_, row) => {
       const td = $timetable(row).find("td");
       if (td.length > 1) {
         rawTimetable.push({
-          day: td.eq(0).text().trim(),
-          subjects: td.slice(1).map((_, el) => $timetable(el).text().trim()).get(),
+          day: safeString(td.eq(0).text()),
+          subjects: td.slice(1).map((_, el) => safeString($timetable(el).text())).get(),
         });
       }
     });
 
     const timetable = rawTimetable.filter((item) => /monday|tuesday|wednesday|thursday|friday|saturday|day/i.test(item.day)).slice(0, 6);
 
-    // Extract subjects legend from $timetable by scanning all rows
     const legendSubjectsMap = new Map();
     $timetable("tr").each((_, row) => {
       const td = $timetable(row).find("td");
       if (td.length >= 3) {
-        const firstCol = td.eq(0).text().trim();
-        const secondCol = td.eq(1).text().trim();
+        const firstCol = safeString(td.eq(0).text());
+        const secondCol = safeString(td.eq(1).text());
 
-        // If first column looks like a course code (e.g. CSE302, 21CSC302J, MAT101, etc.)
         if (/^[A-Z0-9\s]{3,15}$/i.test(firstCol) && !/day|s\.?no|code|hour|monday|tuesday|wednesday|thursday|friday|saturday/i.test(firstCol)) {
           const code = firstCol;
           const normCode = normalizeCode(code);
           const name = secondCol || attendanceSubjectsMap.get(normCode)?.name || subjectMap[normCode]?.name || code;
-          const ltp = td.length >= 3 ? td.eq(2).text().trim() : '';
-          const rawFaculty = td.length >= 4 ? td.eq(3).text().trim() : '';
-          const classrooms = td.length >= 5 ? td.eq(4).text().trim() : '';
+          const ltp = td.length >= 3 ? safeString(td.eq(2).text()) : '';
+          const rawFaculty = td.length >= 4 ? safeString(td.eq(3).text()) : '';
+          const classrooms = td.length >= 5 ? safeString(td.eq(4).text()) : '';
 
           const idMatch = rawFaculty.match(/\((?:id:?\s*)?(\d+)\)/i) || rawFaculty.match(/(\d{4,6})/);
           const facultyId = idMatch ? idMatch[1] : '';
@@ -467,7 +671,6 @@ async function scrapeAndStoreData(account, sessionId) {
       }
     });
 
-    // 4. Multi-Source Merger: Reconcile Legend + Attendance + SubjectMap
     const mergedSubjectsMap = new Map();
 
     legendSubjectsMap.forEach((sub, normCode) => {
@@ -492,39 +695,18 @@ async function scrapeAndStoreData(account, sessionId) {
       }
     });
 
-    Object.entries(subjectMap).forEach(([normCode, info]) => {
-      if (!mergedSubjectsMap.has(normCode)) {
-        mergedSubjectsMap.set(normCode, {
-          code: info.code,
-          name: info.name || info.code,
-          subjectCode: info.code,
-          subjectName: info.name || info.code,
-          ltp: '',
-          credit: info.credit || '',
-          semester: info.semester || profile.semester || '',
-          faculty: '',
-          facultyId: '',
-          classrooms: '',
-          facultyCabin: null,
-        });
-      }
-    });
-
-    // 5. Authoritative Active Subject Filtering
     const blacklistKeywords = ['internship', 'photography', 'co-curricular', 'extra-curricular', 'community service', 'audit course'];
     const allScrapedSubjects = Array.from(mergedSubjectsMap.values());
     const activeSubjectDetails = [];
 
     allScrapedSubjects.forEach((sub) => {
       const normCode = normalizeCode(sub.code);
-      const nameLower = (sub.name || '').toLowerCase();
-      const codeLower = (sub.code || '').toLowerCase();
+      const nameLower = safeString(sub.name).toLowerCase();
+      const codeLower = safeString(sub.code).toLowerCase();
 
-      // Check if it matches any blacklist keywords
       const isBlacklisted = blacklistKeywords.some(kw => nameLower.includes(kw) || codeLower.includes(kw));
-      // If it is blacklisted AND not present in the weekly timetable legend, filter it out
+
       if (isBlacklisted && !legendSubjectsMap.has(normCode)) {
-        console.log(`[SRM SYNC] Filtering out non-academic/unrelated subject: ${sub.code} - ${sub.name}`);
         return;
       }
 
@@ -536,19 +718,14 @@ async function scrapeAndStoreData(account, sessionId) {
       }
     });
 
-    console.log(`[SRM SYNC] Total Scraped: ${allScrapedSubjects.length}, Authoritative Active (Attendance-bearing): ${activeSubjectDetails.length}`);
-    console.log(`[SRM SYNC] Active Subject Codes: [${activeSubjectDetails.map((s) => s.code).join(', ')}]`);
-
-    // Internal Marks (Exams)
-    // PRESERVE NULL FOR UNPUBLISHED MARKS. NEVER DEFAULT UNPUBLISHED MARKS TO 0.
     const exams = [];
     $internals("table.table.table-striped.table-bordered > tbody > tr").each((i, row) => {
       const td = $internals(row).find("td");
       if (td.length === 4) {
-        const subject_code = td.eq(0).text().trim();
-        const subject_name = td.eq(1).text().trim();
-        const raw_obtained = td.eq(2).text().trim();
-        const raw_max = td.eq(3).text().trim();
+        const subject_code = safeString(td.eq(0).text());
+        const subject_name = safeString(td.eq(1).text());
+        const raw_obtained = safeString(td.eq(2).text());
+        const raw_max = safeString(td.eq(3).text());
 
         const isPublished = raw_obtained !== '' && raw_obtained !== '-' && raw_obtained !== 'N/A' && !/not published/i.test(raw_obtained);
         const marks_obtained = isPublished ? raw_obtained : null;
@@ -560,9 +737,9 @@ async function scrapeAndStoreData(account, sessionId) {
         detailRow.find("table tr").each((j, drow) => {
           const dtd = $internals(drow).find("td");
           if (dtd.length === 3 && !dtd.eq(0).hasClass("ui-state-active")) {
-            const compName = dtd.eq(0).text().trim();
-            const rawConducted = dtd.eq(1).text().trim();
-            const rawConverted = dtd.eq(2).text().trim();
+            const compName = safeString(dtd.eq(0).text());
+            const rawConducted = safeString(dtd.eq(1).text());
+            const rawConverted = safeString(dtd.eq(2).text());
 
             const conducted = splitPair(rawConducted);
             const converted = splitPair(rawConverted);
@@ -591,93 +768,93 @@ async function scrapeAndStoreData(account, sessionId) {
       }
     });
 
-    // Semester Results Ledger
     const results = [];
     $ledger("div.subTable table tr").each((_, row) => {
       const td = $ledger(row).find("td");
       if (td.length >= 9) {
         results.push({
-          semester: td.eq(0).text().trim(),
-          month_year: td.eq(1).text().trim(),
-          subject_code: td.eq(2).text().trim(),
-          subject_description: td.eq(3).text().trim(),
-          credit: td.eq(4).text().trim(),
-          grade: td.eq(5).text().trim(),
-          grade_points: td.eq(6).text().trim(),
-          result: td.eq(7).text().trim(),
-          attempt: td.eq(8).text().trim(),
+          semester: safeString(td.eq(0).text()),
+          month_year: safeString(td.eq(1).text()),
+          subject_code: safeString(td.eq(2).text()),
+          subject_description: safeString(td.eq(3).text()),
+          credit: safeString(td.eq(4).text()),
+          grade: safeString(td.eq(5).text()),
+          grade_points: safeString(td.eq(6).text()),
+          result: safeString(td.eq(7).text()),
+          attempt: safeString(td.eq(8).text()),
           source: 'srm_portal',
         });
       }
     });
 
-    account.profileCache = profile;
-    account.cgpaCache = cgpa;
-    account.attendanceCache = attendance;
-    account.timetableCache = timetable;
-    account.subjectsCache = activeSubjectDetails;
-    account.examsCache = exams;
-    account.resultsCache = results;
+    if (Object.keys(profile).length > 0) account.profileCache = profile;
+    if (cgpa.cgpa) account.cgpaCache = cgpa;
+    if (attendance.length > 0) account.attendanceCache = attendance;
+    if (timetable.length > 0) account.timetableCache = timetable;
+    if (activeSubjectDetails.length > 0) account.subjectsCache = activeSubjectDetails;
+    if (exams.length > 0) account.examsCache = exams;
+    if (results.length > 0) account.resultsCache = results;
     account.lastSuccessfulSync = new Date();
     account.connectionStatus = 'connected';
 
     await account.save();
 
-    // Synchronize to StudyArena User profile
-    const user = await User.findById(account.userId);
-    if (user && profile) {
-      let updated = false;
-      if (profile.studentName) {
-        if (user.officialName !== profile.studentName) {
-          user.officialName = profile.studentName;
-          updated = true;
-        }
-        if (!user.name || user.name === 'Student') {
-          user.name = profile.studentName;
-          updated = true;
-        }
-      }
-      
-      const regNoToSave = profile.registerNo || account.srmUsername;
-      if (regNoToSave && user.registrationNumber !== regNoToSave) { user.registrationNumber = regNoToSave; updated = true; }
-      
-      if (profile.institution && user.university !== profile.institution) { user.university = profile.institution; updated = true; }
-      if (profile.program && user.degree !== profile.program) { user.degree = profile.program; updated = true; }
-      if (profile.specialization && user.branch !== profile.specialization) { user.branch = profile.specialization; updated = true; }
-      if (profile.section && user.section !== profile.section) { user.section = profile.section; updated = true; }
-      
-      if (profile.semester) {
-        const romanMap = { i: 1, ii: 2, iii: 3, iv: 4, v: 5, vi: 6, vii: 7, viii: 8, ix: 9, x: 10, xi: 11, xii: 12 };
-        let semStr = profile.semester.toLowerCase().replace(/semester|sem/gi, '').trim();
-        let semNum = parseInt(semStr, 10);
-        if (isNaN(semNum) && romanMap[semStr]) semNum = romanMap[semStr];
-        if (isNaN(semNum)) {
-          const digitMatch = profile.semester.match(/\b([1-9]|1[0-2])\b/);
-          if (digitMatch) semNum = parseInt(digitMatch[1], 10);
-        }
-        if (!isNaN(semNum) && semNum >= 1 && semNum <= 12) {
-          if (user.semester !== semNum) {
-            user.semester = semNum;
+    if (account.userId) {
+      const user = await User.findById(account.userId);
+      if (user && profile && Object.keys(profile).length > 0) {
+        let updated = false;
+        if (profile.studentName) {
+          if (user.officialName !== profile.studentName) {
+            user.officialName = profile.studentName;
             updated = true;
           }
-          // Normalize profileCache.semester to clean format "Semester N"
-          profile.semester = `Semester ${semNum}`;
+          if (!user.name || user.name === 'Student') {
+            user.name = profile.studentName;
+            updated = true;
+          }
         }
-      }
-      
-      if (updated) {
-        await user.save();
+
+        const regNoToSave = profile.registerNo || account.srmUsername;
+        if (regNoToSave && user.registrationNumber !== regNoToSave) { user.registrationNumber = regNoToSave; updated = true; }
+
+        if (profile.institution && user.university !== profile.institution) { user.university = profile.institution; updated = true; }
+        if (profile.program && user.degree !== profile.program) { user.degree = profile.program; updated = true; }
+        if (profile.specialization && user.branch !== profile.specialization) { user.branch = profile.specialization; updated = true; }
+        if (profile.section && user.section !== profile.section) { user.section = profile.section; updated = true; }
+
+        if (profile.semester) {
+          const romanMap = { i: 1, ii: 2, iii: 3, iv: 4, v: 5, vi: 6, vii: 7, viii: 8, ix: 9, x: 10, xi: 11, xii: 12 };
+          let semStr = safeString(profile.semester).toLowerCase().replace(/semester|sem/gi, '').trim();
+          let semNum = parseInt(semStr, 10);
+          if (isNaN(semNum) && romanMap[semStr]) semNum = romanMap[semStr];
+          if (isNaN(semNum)) {
+            const digitMatch = safeString(profile.semester).match(/\b([1-9]|1[0-2])\b/);
+            if (digitMatch) semNum = parseInt(digitMatch[1], 10);
+          }
+          if (!isNaN(semNum) && semNum >= 1 && semNum <= 12) {
+            if (user.semester !== semNum) {
+              user.semester = semNum;
+              updated = true;
+            }
+            profile.semester = `Semester ${semNum}`;
+          }
+        }
+
+        if (updated) {
+          await user.save();
+        }
       }
     }
 
-    // Automatically Upsert & Reconcile Subjects in MongoDB
     try {
-      if (allScrapedSubjects.length > 0) {
+      if (allScrapedSubjects.length > 0 && account.userId) {
         for (const sub of allScrapedSubjects) {
           if (!sub.code || !sub.name) continue;
 
-          const cleanCode = sub.code.trim().toUpperCase();
-          const cleanName = sub.name.trim();
+          const cleanCode = safeString(sub.code).toUpperCase();
+          const cleanName = safeString(sub.name);
+          const creditsNum = Math.min(Math.max(safeInt(sub.credit, 3), 1), 10);
+          const semNum = Math.min(Math.max(safeInt(sub.semester, 1), 1), 12);
 
           let existingSubject = await Subject.findOne({ user: account.userId, code: cleanCode });
           if (!existingSubject) {
@@ -691,20 +868,16 @@ async function scrapeAndStoreData(account, sessionId) {
               existingSubject.name = cleanName;
               subjectUpdated = true;
             }
-            if (sub.credit) {
-              const numCredit = Number(sub.credit);
-              if (!isNaN(numCredit) && numCredit > 0 && existingSubject.credits !== numCredit) {
-                existingSubject.credits = numCredit;
-                subjectUpdated = true;
-              }
+            if (existingSubject.credits !== creditsNum) {
+              existingSubject.credits = creditsNum;
+              subjectUpdated = true;
             }
-            if (sub.faculty && existingSubject.faculty !== sub.faculty) {
-              existingSubject.faculty = sub.faculty;
+            if (sub.faculty && existingSubject.faculty !== safeString(sub.faculty)) {
+              existingSubject.faculty = safeString(sub.faculty);
               subjectUpdated = true;
             }
             existingSubject.isSrmManaged = true;
 
-            // Only update active state if Attendance Details was successfully retrieved
             if (activeCodesSet.size > 0 && existingSubject.isSrmActive !== sub.isSrmActive) {
               existingSubject.isSrmActive = sub.isSrmActive;
               subjectUpdated = true;
@@ -714,21 +887,19 @@ async function scrapeAndStoreData(account, sessionId) {
               await existingSubject.save();
             }
           } else if (sub.isSrmActive !== false) {
-            // Create new active subject
             await Subject.create({
               user: account.userId,
               code: cleanCode,
               name: cleanName,
-              credits: Number(sub.credit) || 3,
-              faculty: sub.faculty || '',
-              semester: Number(sub.semester) || 1,
+              credits: creditsNum,
+              faculty: safeString(sub.faculty),
+              semester: semNum,
               isSrmManaged: true,
               isSrmActive: true,
             });
           }
         }
 
-        // Reconcile obsolete SRM subjects not present in current Attendance Details
         if (activeCodesSet.size > 0) {
           const userSrmSubjects = await Subject.find({ user: account.userId, isSrmManaged: true });
           for (const s of userSrmSubjects) {
@@ -736,14 +907,12 @@ async function scrapeAndStoreData(account, sessionId) {
             if (!activeCodesSet.has(norm) && s.isSrmActive !== false) {
               s.isSrmActive = false;
               await s.save();
-              console.log(`[SRM RECONCILE] Marked non-attendance subject as inactive: ${s.code} - ${s.name}`);
             }
           }
         }
       }
     } catch (subjectErr) {
       console.error('[SRM SYNC] Failed to reconcile subjects:', subjectErr.message);
-      // We log but do NOT fail the portal sync so other features still work.
     }
 
     return true;
@@ -753,16 +922,65 @@ async function scrapeAndStoreData(account, sessionId) {
   }
 }
 
-// 4. Get portal data for user
+const activeSyncPromises = new Map();
+
+export async function isAccountSyncing(userId) {
+  const account = await SrmPortalAccount.findOne({ userId }).select('_id srmUsername');
+  if (!account) return false;
+  const accountKey = String(account._id);
+  const usernameKey = account.srmUsername;
+  return activeSyncPromises.has(accountKey) || (usernameKey && activeSyncPromises.has(usernameKey));
+}
+
+export async function triggerBackgroundSync(userId) {
+  if (!userId) return null;
+  const user = await User.findById(userId);
+  const account = await findPortalAccountForUser(user || userId);
+  if (!account || account.connectionStatus !== 'connected') return null;
+
+  const accountKey = String(account._id);
+  const usernameKey = account.srmUsername;
+
+  if (activeSyncPromises.has(accountKey)) {
+    console.log(`[PORTAL] Background sync already active for account ${accountKey}. Sharing task.`);
+    return activeSyncPromises.get(accountKey);
+  }
+  if (usernameKey && activeSyncPromises.has(usernameKey)) {
+    console.log(`[PORTAL] Background sync already active for username ${usernameKey}. Sharing task.`);
+    return activeSyncPromises.get(usernameKey);
+  }
+
+  const syncTask = (async () => {
+    try {
+      console.log(`[PORTAL] Starting background auto-sync for account ${accountKey} (${usernameKey})...`);
+      await reSyncPortalData(userId);
+      console.log(`[PORTAL] Background auto-sync completed for account ${accountKey}.`);
+    } catch (err) {
+      console.warn(`[PORTAL] Background auto-sync error for account ${accountKey}:`, err.message);
+    } finally {
+      activeSyncPromises.delete(accountKey);
+      if (usernameKey) activeSyncPromises.delete(usernameKey);
+    }
+  })();
+
+  activeSyncPromises.set(accountKey, syncTask);
+  if (usernameKey) activeSyncPromises.set(usernameKey, syncTask);
+  return syncTask;
+}
+
 export async function getPortalAccountData(userId) {
-  const account = await SrmPortalAccount.findOne({ userId });
+  const user = typeof userId === 'object' && userId._id ? userId : await User.findById(userId);
+  const targetUserId = user?._id || userId;
+
+  const account = await findPortalAccountForUser(user || targetUserId);
+
   if (!account) {
     return { isConnected: false, hasStoredPortalData: false };
   }
 
   let userSubjectsCount = 0;
   try {
-    userSubjectsCount = await Subject.countDocuments({ user: userId, isSrmActive: { $ne: false } });
+    userSubjectsCount = await Subject.countDocuments({ user: targetUserId, isSrmActive: { $ne: false } });
   } catch (cntErr) {
     console.warn('[PortalService] Unable to count user subjects:', cntErr.message);
   }
@@ -777,14 +995,18 @@ export async function getPortalAccountData(userId) {
     totalEnrolledCount > 0
   );
 
-    const isStaleOrEmpty =
-    !account.lastSuccessfulSync ||
-    (Date.now() - new Date(account.lastSuccessfulSync).getTime() > 10 * 60 * 1000) ||
-    cachedSubjectsCount === 0 ||
-    attendanceCount === 0;
+  const subjectStats = buildSubjectStats(account.attendanceCache || []);
+  const todayClasses = buildTodayClassesFromCache(account);
+  const overallAttendance = computeOverall(subjectStats);
 
-  if (isStaleOrEmpty && account.connectionStatus === 'connected') {
-    triggerBackgroundSync(userId);
+  const accountKey = String(account._id);
+  const isSyncing = activeSyncPromises.has(accountKey) || (account.srmUsername && activeSyncPromises.has(account.srmUsername));
+
+  const lastSyncTime = account.lastSuccessfulSync ? new Date(account.lastSuccessfulSync).getTime() : 0;
+  const isStale = (Date.now() - lastSyncTime > 15 * 60 * 1000) || cachedSubjectsCount === 0 || attendanceCount === 0;
+
+  if (isStale && account.connectionStatus === 'connected' && !isSyncing) {
+    triggerBackgroundSync(targetUserId);
   }
 
   return {
@@ -792,12 +1014,16 @@ export async function getPortalAccountData(userId) {
     hasStoredPortalData: hasStoredData,
     connectionStatus: account.connectionStatus || 'connected',
     isSessionExpired: account.connectionStatus === 'expired',
+    isSyncing: Boolean(isSyncing),
     srmUsername: account.srmUsername,
+    registrationNumber: account.srmUsername,
     lastSuccessfulSync: account.lastSuccessfulSync,
     source: 'srm_portal',
     profile: account.profileCache || {},
     cgpa: account.cgpaCache || { cgpa: '0' },
-    attendance: account.attendanceCache || [],
+    attendance: todayClasses,
+    subjectStats: subjectStats,
+    overallAttendance: overallAttendance,
     timetable: account.timetableCache || [],
     subjects: account.subjectsCache || [],
     enrolledSubjectsCount: totalEnrolledCount,
@@ -806,67 +1032,63 @@ export async function getPortalAccountData(userId) {
   };
 }
 
-const activeSyncPromises = new Map();
-
-export async function triggerBackgroundSync(userId) {
-  if (!userId) return null;
-  const userKey = String(userId);
-
-  if (activeSyncPromises.has(userKey)) {
-    console.log(`[PORTAL] Background sync already active for user ${userKey}. Sharing task.`);
-    return activeSyncPromises.get(userKey);
-  }
-
-  const syncTask = (async () => {
-    try {
-      console.log(`[PORTAL] Starting background auto-sync for user ${userKey}...`);
-      await reSyncPortalData(userId);
-      console.log(`[PORTAL] Background auto-sync completed for user ${userKey}.`);
-    } catch (err) {
-      console.warn(`[PORTAL] Background auto-sync error for user ${userKey}:`, err.message);
-    } finally {
-      activeSyncPromises.delete(userKey);
-    }
-  })();
-
-  activeSyncPromises.set(userKey, syncTask);
-  return syncTask;
-}
-
-// 5. Re-sync portal data (called on user request)
 export async function reSyncPortalData(userId) {
-  const account = await SrmPortalAccount.findOne({ userId }).select('+encryptedPassword +encryptedSessionId');
+  console.log(`[PORTAL SYNC] Sync start for User ID: ${userId}`);
+  const user = await User.findById(userId);
+  const account = await findPortalAccountForUser(user || userId);
+
   if (!account) {
-    throw new Error('SRM Portal account is not connected.');
+    console.warn(`[PORTAL SYNC] Sync failed: SrmPortalAccount NOT_CONNECTED for User ID: ${userId}`);
+    const err = new Error('SRM Portal account is not connected.');
+    err.code = 'NOT_CONNECTED';
+    throw err;
   }
 
   try {
+    console.log(`[PORTAL SYNC] Session check start for User ID: ${userId}...`);
     const sessionId = await getActiveSession(account);
+    console.log(`[PORTAL SYNC] Session existence: ${Boolean(sessionId)} for User ID: ${userId}`);
+
     await scrapeAndStoreData(account, sessionId);
     account.connectionStatus = 'connected';
     account.lastSuccessfulSync = new Date();
     await account.save();
+
+    console.log(`[PORTAL SYNC] Sync completed successfully for User ID: ${userId}`);
     return await getPortalAccountData(userId);
   } catch (err) {
-    console.warn('[PortalService] Re-sync session refresh failed:', err.message);
+    console.warn(`[PORTAL SYNC] Re-sync session refresh/scrape failed for User ID: ${userId}:`, err.message);
+    if (err.message === 'PORTAL_SESSION_EXPIRED' || err.code === 'INVALID_CREDENTIALS') {
+      account.connectionStatus = 'expired';
+      await account.save().catch(() => {});
+      throw err;
+    }
     account.connectionStatus = 'expired';
-    await account.save();
+    await account.save().catch(() => {});
     const data = await getPortalAccountData(userId);
     data.syncWarning = 'Live SRM session could not be refreshed. Showing your last synced data.';
     return data;
   }
 }
 
-// 6. Disconnect SRM Portal account
 export async function disconnectPortalAccount(userId) {
-  await SrmPortalAccount.deleteOne({ userId });
+  console.log(`[PORTAL DISCONNECT] Unlinking SRM portal and clearing caches for user ${userId}...`);
+  await SrmPortalAccount.deleteMany({ userId });
+  await Subject.deleteMany({ user: userId, isSrmManaged: true });
+
+  const user = await User.findById(userId);
+  if (user) {
+    user.registrationNumber = '';
+    user.officialName = '';
+    await user.save();
+  }
+
   return {
     success: true,
     message: 'SRM Portal disconnected successfully.',
   };
 }
 
-// 7. Static JSON APIs: Calendar & Resources
 export function getAcademicCalendarData() {
   const calendarPath = path.join(staticDir, 'academic_calendar.json');
   if (fs.existsSync(calendarPath)) {
@@ -878,7 +1100,6 @@ export function getAcademicCalendarData() {
 export function getLearningResourcesData(type, course, year, subjectId) {
   const resDir = path.join(staticDir, 'resources');
 
-  // Map "year1" → "1", "year2" → "2", etc. Also accept bare "1","2".
   const normalizeYear = (y) => {
     if (!y) return null;
     const m = String(y).match(/(\d+)/);
@@ -886,13 +1107,11 @@ export function getLearningResourcesData(type, course, year, subjectId) {
   };
 
   if (type === 'courses') {
-    // Return a flat sorted list of departments available in the given year.
-    // courses.json shape: { "1": { "CSE": { name, code }, "ECE": {...} }, "2": {...} }
     const p = path.join(resDir, 'courses.json');
     if (!fs.existsSync(p)) return [];
     const raw = JSON.parse(fs.readFileSync(p, 'utf8'));
     const yr = normalizeYear(year);
-    // If a year is provided, return only departments for that year; otherwise all unique depts.
+
     const depts = new Map();
     for (const [y, deptMap] of Object.entries(raw)) {
       if (yr && y !== yr) continue;
@@ -904,17 +1123,12 @@ export function getLearningResourcesData(type, course, year, subjectId) {
   }
 
   if (type === 'subjects') {
-    // Return a flat array of subjects for the given department and year.
-    // subjects.json shape: { "CSE": { "1": [{id, code, name},...], "2":[...] }, "ECE": {...} }
-    // "course" param is the department code (e.g. "CSE", "ECE").
-    // "year"   param is "year1", "year2", "1", "2", etc.
     const p = path.join(resDir, 'subjects.json');
     if (!fs.existsSync(p)) return [];
     const raw = JSON.parse(fs.readFileSync(p, 'utf8'));
     const yr = normalizeYear(year);
     const dept = (course || '').toUpperCase();
 
-    // Collect subjects: if dept is specified, look only in that dept; else all depts.
     const results = [];
     for (const [deptKey, yearMap] of Object.entries(raw)) {
       if (dept && deptKey !== dept) continue;
@@ -929,9 +1143,6 @@ export function getLearningResourcesData(type, course, year, subjectId) {
   }
 
   if (type === 'resource') {
-    // Return resources for a specific subject.
-    // resource.json shape: { "CSE": { "1": { "1": { previousYearPapers, slidesAndNotes } } } }
-    // Params: course=dept, year=year1, subjectId=numeric id
     const p = path.join(resDir, 'resource.json');
     if (!fs.existsSync(p)) return { previousYearPapers: { mid: [], sem: [] }, slidesAndNotes: [] };
     const raw = JSON.parse(fs.readFileSync(p, 'utf8'));

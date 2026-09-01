@@ -23,7 +23,6 @@ const WEEKDAYS = [
   { id: 6, label: 'Sat' },
 ];
 
-// Simple formatter for dates
 const fmtDateStr = (dateString) => {
   if (!dateString) return '';
   const d = new Date(dateString);
@@ -40,12 +39,10 @@ function ReminderForm({ initial, onClose }) {
   const syllabi = syllabiQuery.data || [];
   const audioInputRef = useRef(null);
 
-  // Audio preview state
   const [previewAudio, setPreviewAudio] = useState(null);
   const [isPlayingPreview, setIsPlayingPreview] = useState(false);
   const [uploadingAudio, setUploadingAudio] = useState(false);
 
-  // Initial date & time decomposition
   const initDate = initial?.remindAt ? new Date(initial.remindAt) : new Date(Date.now() + 60 * 60 * 1000);
   const pad = (n) => String(n).padStart(2, '0');
   const initDateStr = `${initDate.getFullYear()}-${pad(initDate.getMonth() + 1)}-${pad(initDate.getDate())}`;
@@ -54,7 +51,7 @@ function ReminderForm({ initial, onClose }) {
   const [form, setForm] = useState({
     title: initial?.title || '',
     description: initial?.description || '',
-    scheduleType: initial?.scheduleType || 'one-time', // one-time | daily | weekly | monthly | yearly
+    scheduleType: initial?.scheduleType || 'one-time',
     category: initial?.category || 'general',
     priority: initial?.priority || 'medium',
     date: initDateStr,
@@ -73,7 +70,6 @@ function ReminderForm({ initial, onClose }) {
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  // Cleanup audio preview
   useEffect(() => {
     return () => {
       if (previewAudio) {
@@ -118,7 +114,6 @@ function ReminderForm({ initial, onClose }) {
     }
   };
 
-  // Syllabus linking
   const selectedSyllabus = form.subject ? syllabi.find(s => s.subject?._id === form.subject || s.subject === form.subject) : null;
   const availableUnits = selectedSyllabus?.units || [];
   const selectedUnitData = form.unit ? availableUnits.find(u => u._id === form.unit) : null;
@@ -131,7 +126,6 @@ function ReminderForm({ initial, onClose }) {
       return;
     }
 
-    // Build the trigger timestamp
     const [hours, minutes] = form.time.split(':').map(Number);
     let targetDate;
     if (form.scheduleType === 'one-time') {
@@ -208,7 +202,6 @@ function ReminderForm({ initial, onClose }) {
           />
         </Field>
 
-        {/* Schedule Type / Repeat Selector */}
         <div className="grid gap-5 sm:grid-cols-2">
           <Field label="Repeat">
             <select
@@ -224,7 +217,6 @@ function ReminderForm({ initial, onClose }) {
             </select>
           </Field>
 
-          {/* When Controls: dynamically adapts */}
           {isOneTime ? (
             <Field label="Date *">
               <input
@@ -272,7 +264,6 @@ function ReminderForm({ initial, onClose }) {
           )}
         </div>
 
-        {/* Time input when Repeat is not daily/yearly or when one-time */}
         {isOneTime && (
           <Field label="Time *">
             <input
@@ -316,7 +307,6 @@ function ReminderForm({ initial, onClose }) {
           </Field>
         </div>
 
-        {/* Sound / Audio Picker */}
         <div className="rounded-2xl border border-border bg-muted/20 p-4 space-y-3">
           <div className="flex items-center justify-between">
             <label className="text-xs font-bold uppercase tracking-[.12em] text-muted-foreground">
@@ -384,7 +374,6 @@ function ReminderForm({ initial, onClose }) {
           )}
         </div>
 
-        {/* Link to Subject */}
         <Field label="Link to Subject (optional)">
           <select
             className={inputClass}
@@ -450,7 +439,7 @@ export default function Reminders() {
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [filter, setFilter] = useState('upcoming'); // upcoming | recurring | completed
+  const [filter, setFilter] = useState('upcoming');
 
   const remove = (rem) => {
     if (confirm(`Delete "${rem.title}"?`)) {
@@ -495,7 +484,6 @@ export default function Reminders() {
         }
       />
 
-      {/* FILTER TABS */}
       <div className="mb-6 flex space-x-1 rounded-xl bg-muted/50 p-1 w-fit">
         <button
           onClick={() => setFilter('upcoming')}

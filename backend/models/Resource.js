@@ -5,7 +5,7 @@ const resourceSchema = new mongoose.Schema({
   subject: { type: mongoose.Schema.Types.ObjectId, ref: 'Subject', default: null },
   topic: { type: String, default: '' },
   title: { type: String, required: true, trim: true },
-  resourceType: { type: String, default: 'file' }, // 'file', 'recording', 'link', 'youtube', 'image', 'document', 'audio', 'video'
+  resourceType: { type: String, default: 'file' },
   url: { type: String, trim: true },
   fileData: {
     publicId: String,

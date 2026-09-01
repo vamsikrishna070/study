@@ -95,7 +95,7 @@ export function SyllabusReviewModal({
       >
         <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
         <View style={styles.sheetContainer}>
-          {/* Header */}
+
           <View style={styles.header}>
             <View style={{ flex: 1, paddingRight: 8 }}>
               <Text style={styles.title}>Review Extracted Syllabus</Text>
@@ -120,7 +120,6 @@ export function SyllabusReviewModal({
             </TouchableOpacity>
           </View>
 
-          {/* Body */}
           <ScrollView style={styles.body} keyboardShouldPersistTaps="handled">
             {safeUnits.length === 0 ? (
               <View style={styles.emptyBox}>
@@ -136,7 +135,7 @@ export function SyllabusReviewModal({
                   const badgeText = isLab ? 'LAB' : `U${theoryCounter}`;
                   return (
                     <View key={uIdx} style={[styles.unitCard, isLab && { borderColor: colors.primary, borderWidth: 1.5 }]}>
-                      {/* Unit Name Row */}
+
                       <View style={styles.unitHeaderRow}>
                         <Text style={[styles.unitIndexBadge, isLab && { backgroundColor: colors.primary, color: colors.primaryForeground, paddingHorizontal: 6 }]}>
                           {badgeText}
@@ -156,7 +155,6 @@ export function SyllabusReviewModal({
                       </TouchableOpacity>
                     </View>
 
-                    {/* Topics List */}
                     <View style={styles.topicsBox}>
                       {(unit.topics || []).map((topic, tIdx) => (
                         <View key={tIdx} style={styles.topicRow}>
@@ -188,7 +186,6 @@ export function SyllabusReviewModal({
           )}
           </ScrollView>
 
-          {/* Footer */}
           <View style={styles.footer}>
             <Button variant="quiet" onPress={onClose} disabled={saving}>
               Cancel

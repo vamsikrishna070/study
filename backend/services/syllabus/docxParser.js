@@ -1,16 +1,8 @@
-/**
- * DOCX parsing module using mammoth.
- * Extracts plain text, tables (HTML), and hierarchical headings from Word (.docx) documents.
- */
+
 
 import mammoth from 'mammoth';
 import { normalizeDocumentText } from './normalizer.js';
 
-/**
- * Converts mammoth HTML table and paragraph nodes into structured plain lines.
- * @param {string} html
- * @returns {string}
- */
 function convertMammothHtmlToText(html) {
   if (!html || typeof html !== 'string') return '';
 
@@ -29,11 +21,6 @@ function convertMammothHtmlToText(html) {
     .replace(/&gt;/g, '>');
 }
 
-/**
- * Parses a DOCX buffer to normalized text preserving tables and headings.
- * @param {Buffer} buffer
- * @returns {Promise<{ combinedText: string, totalPages: number, pages: Array<{ pageNumber: number, text: string, extractionMethod: string, ocrUsed: boolean }> }>}
- */
 export async function parseDocxDocument(buffer) {
   try {
     let text = '';
@@ -43,7 +30,7 @@ export async function parseDocxDocument(buffer) {
         text = convertMammothHtmlToText(htmlResult.value);
       }
     } catch (htmlErr) {
-      // Fallback to raw text if HTML conversion fails
+
     }
 
     if (!text || text.trim().length < 20) {

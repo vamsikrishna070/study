@@ -12,7 +12,7 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function calculatePasswordStrength(password) {
   if (!password) return { score: 0, label: '', color: '' };
-  
+
   let score = 0;
   if (password.length >= 8) score += 1;
   if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score += 1;
@@ -42,7 +42,7 @@ const RegisterScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  
+
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -82,7 +82,7 @@ const RegisterScreen = ({ navigation }) => {
     try {
       const trimmedName = name.trim();
       const trimmedEmail = email.trim().toLowerCase();
-      
+
       await register(trimmedName, trimmedEmail, password);
       navigation.navigate('VerifyOtp', { email: trimmedEmail, mode: 'email-verification' });
     } catch (error) {
@@ -97,7 +97,7 @@ const RegisterScreen = ({ navigation }) => {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -159,7 +159,6 @@ const RegisterScreen = ({ navigation }) => {
               />
             </Field>
 
-            {/* Password Strength Indicator */}
             {password.length > 0 && (
               <View style={styles.strengthContainer}>
                 <View style={styles.strengthBarRow}>
@@ -200,7 +199,6 @@ const RegisterScreen = ({ navigation }) => {
               />
             </Field>
 
-            {/* Password Match Indicator */}
             {confirmPassword.length > 0 && (
               <View style={styles.matchIndicatorRow}>
                 {password === confirmPassword ? (

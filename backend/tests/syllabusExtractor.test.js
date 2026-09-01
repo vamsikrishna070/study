@@ -38,7 +38,6 @@ async function runTests() {
     }
   }
 
-  // 1. Number and Roman Numeral Parsing Tests
   console.log('\n[1. Unit Number & Roman Numeral Parsing]');
   assert(romanToArabic('I') === 1, 'Roman I -> 1');
   assert(romanToArabic('II') === 2, 'Roman II -> 2');
@@ -52,7 +51,6 @@ async function runTests() {
   assert(parseUnitNumber('FIRST UNIT') === 1, 'Spelled-out "FIRST UNIT" -> 1');
   assert(parseUnitNumber('FIFTH MODULE') === 5, 'Spelled-out "FIFTH MODULE" -> 5');
 
-  // 2. OCR and Typo Correction Tests
   console.log('\n[2. OCR and Typo Corrections]');
   assert(
     cleanOcrTypo('Multithreading and Even Handling') === 'Multithreading and Event Handling',
@@ -71,7 +69,6 @@ async function runTests() {
     'Typo "Principal Comporent Amys" corrected'
   );
 
-  // 3. Delimiter & Bracket Protection Tests
   console.log('\n[3. Delimiter & Parentheses Preservation]');
   const parts = splitOutsideBrackets('Guided media (Twisted pair, Coaxial cable, Fiber optics), Wireless transmission', ',');
   assert(parts.length === 2, 'Split by comma outside parentheses produces exactly 2 topics');
@@ -83,7 +80,6 @@ async function runTests() {
   const compositeParts = splitCompositeTopic('Process Management: Process Concepts, CPU Scheduling, Operations on Processes');
   assert(compositeParts.length === 3, 'Colon-led category split into 3 atomic topics');
 
-  // 4. File Validation & Magic Signature Tests
   console.log('\n[4. File Validation & Magic Signatures]');
   const validPdfBuf = Buffer.from('%PDF-1.4 Mock valid PDF content for testing');
   const validDocxBuf = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00, 0x00]);
@@ -96,7 +92,6 @@ async function runTests() {
   assert(!validateDocumentBuffer(htmlBuf).valid, 'HTML error page safely rejected');
   assert(!validateDocumentBuffer(Buffer.alloc(0)).valid, 'Empty buffer safely rejected');
 
-  // 5. Structural Text Extraction (Operating Systems)
   console.log('\n[5. Structural Text Extraction: Operating Systems]');
   const sampleOsText = `
 SRM University AP, Andhra Pradesh
@@ -174,7 +169,6 @@ Text Books
   assert(osResult.units.length === 6, 'Unified units array contains 6 units (5 theory + 1 lab)');
   assert(osResult.metadata.confidence >= 0.9, `Confidence score is >= 0.90 (Got: ${osResult.metadata.confidence})`);
 
-  // 6. Structural Text Extraction: JNTU Standard Paragraph Format
   console.log('\n[6. Structural Text Extraction: JNTU Standard Syllabus]');
   const jntuText = `
 JAWAHARLAL NEHRU TECHNOLOGICAL UNIVERSITY HYDERABAD
@@ -206,7 +200,6 @@ TEXT BOOKS:
     'Textbooks filtered out from JNTU topics'
   );
 
-  // 7. Structural Text Extraction: Bulleted/Numbered Modules
   console.log('\n[7. Structural Text Extraction: Bulleted Module Syllabus]');
   const bulletedText = `
 Computer Networks (CS-301)
@@ -245,7 +238,6 @@ Transport and Application Layer
     `Multi-line Module 1 Name captured: "${bulletResult.theoryUnits[0].unitName}"`
   );
 
-  // 8. Universal Roman Numeral Section Syllabus
   console.log('\n[8. Universal Roman Numeral Heading Syllabus]');
   const romanText = `
 Web Technologies (IT-304)
@@ -266,7 +258,6 @@ MongoDB Schema Design, Mongoose ODM, CRUD Operations, Indexing and Performance.
   assert(romanResult.theoryUnits[0].unitNumber === 1, 'Unit I -> unitNumber 1');
   assert(romanResult.theoryUnits[4].unitNumber === 5, 'Unit V -> unitNumber 5');
 
-  // 9. Real University Syllabus Binary PDF Tests
   console.log('\n[9. Real University Syllabus Binary PDF Tests]');
   const fixturesDir = path.join(__dirname, 'fixtures', 'syllabi');
   const files = ['ml.pdf', 'os.pdf', 'coa.pdf', 'cse309_obe.pdf', 'genai.pdf', 'cse209.pdf'];
@@ -328,7 +319,6 @@ MongoDB Schema Design, Mongoose ODM, CRUD Operations, Indexing and Performance.
       assert(result.theoryUnits[3].topics.length === 11, `ml.pdf: Unit 4 has 11 topics (Got: ${result.theoryUnits[3].topics.length})`);
       assert(result.theoryUnits[4].topics.length === 5, `ml.pdf: Unit 5 has 5 topics (Got: ${result.theoryUnits[4].topics.length})`);
 
-      // Verify topic distribution
       assert(result.theoryUnits[0].topics.some((t) => t.title.toLowerCase().includes('introduction to machine learning')), 'ml.pdf: Unit 1 contains Introduction to ML');
       assert(result.theoryUnits[0].topics.some((t) => t.title.toLowerCase().includes('linear regression')), 'ml.pdf: Unit 1 contains Linear Regression');
       assert(result.theoryUnits[1].topics.some((t) => t.title.toLowerCase().includes('decision tree')), 'ml.pdf: Unit 2 contains Decision Tree');
@@ -337,12 +327,10 @@ MongoDB Schema Design, Mongoose ODM, CRUD Operations, Indexing and Performance.
       assert(result.theoryUnits[3].topics.some((t) => t.title.toLowerCase().includes('neural network') || t.title.toLowerCase().includes('perceptron') || t.title.toLowerCase().includes('adaline')), 'ml.pdf: Unit 4 contains ANN / Perceptron / ADALINE');
       assert(result.theoryUnits[4].topics.some((t) => t.title.toLowerCase().includes('ensembles') || t.title.toLowerCase().includes('clustering')), 'ml.pdf: Unit 5 contains Ensembles / Clustering');
 
-      // Verify Lab
       assert(result.labExperiments.length === 15, `ml.pdf: Extracted 15 Lab Experiments (Got: ${result.labExperiments.length})`);
       assert(result.labExperiments[0].title.toLowerCase().includes('python basics'), 'ml.pdf: Lab Exp 1 is Introduction to Python basics');
       assert(result.labExperiments[14].title.toLowerCase().includes('hierarchical clustering'), 'ml.pdf: Lab Exp 15 is Implementation of hierarchical clustering');
 
-      // Verify no contamination
       assert(!result.theoryUnits.some((u) => u.topics.some((t) => t.title.toLowerCase().includes('python basics'))), 'ml.pdf: Zero lab experiments inside theory units');
       assert(!result.theoryUnits[0].topics.some((t) => t.title.toLowerCase().includes('decision tree')), 'ml.pdf: Unit 1 has no Unit 2 topics');
       assert(!result.theoryUnits[1].topics.some((t) => t.title.toLowerCase().includes('support vector')), 'ml.pdf: Unit 2 has no Unit 3 topics');
@@ -367,7 +355,6 @@ MongoDB Schema Design, Mongoose ODM, CRUD Operations, Indexing and Performance.
     }
   }
 
-  // 10. Multi-Encoding TXT & DOCX Tests
   console.log('\n[10. Multi-Encoding TXT & DOCX Multi-Format Tests]');
   const txtContent = `
 Course Title: Artificial Intelligence
@@ -389,17 +376,14 @@ Course Unitization Plan (Lab)
   assert(txtResult.labExperiments.length === 2, `TXT: 2 Lab Experiments extracted (Got: ${txtResult.labExperiments.length})`);
   assert(txtResult.metadata.sourceType === 'txt', 'TXT: Source type identified as txt');
 
-  // Test UTF-8 with BOM
   const bomTxtBuf = Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(txtContent, 'utf8')]);
   const bomTxtResult = await extractSyllabusFromBuffer(bomTxtBuf, { originalFileName: 'bom_syllabus.txt' });
   assert(bomTxtResult.theoryUnits.length === 3, 'TXT UTF-8 with BOM correctly decoded');
 
-  // Test UTF-16 LE
   const utf16Buf = Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(txtContent, 'utf16le')]);
   const utf16Result = await extractSyllabusFromBuffer(utf16Buf, { originalFileName: 'utf16_syllabus.txt' });
   assert(utf16Result.theoryUnits.length === 3, 'TXT UTF-16 LE correctly decoded');
 
-  // 11. Table Metadata Semantic Stripping Tests
   console.log('\n[11. Table Metadata Semantic Stripping]');
   const mockTableLines = [
     'Unit No Unit Name Hours CLO References',
@@ -407,7 +391,7 @@ Course Unitization Plan (Lab)
     'Introduction to Neural Networks 3 1 2 3'
   ];
   const schema3 = detectTableSchema(mockTableLines);
-  
+
   assert(
     stripRowMetadata('Linear Regression 2 1,3 1', schema3) === 'Linear Regression',
     'Metadata Contamination Test: Stripped "2 1,3 1" from "Linear Regression 2 1,3 1"'
@@ -430,14 +414,13 @@ Course Unitization Plan (Lab)
     'IPv6',
     'C++17'
   ];
-  
+
   let legitPassed = true;
   for (const num of legitimateNumbers) {
     if (stripRowMetadata(`${num} 2 1,3 1`, schema3) !== num) legitPassed = false;
   }
   assert(legitPassed, 'Legitimate Numbers Test: 0/1 Knapsack, 8-Queen, IPv4, C++17 remain perfectly intact when metadata is stripped');
 
-  // Terminate any shared OCR workers
   await terminateOcrEngine();
 
   console.log(`\n===============================================================`);

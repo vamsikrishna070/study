@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
-import { BookOpen, AlertTriangle, ArrowLeft } from 'lucide-react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import { BookOpen, AlertTriangle } from 'lucide-react-native';
 import { useAppTheme, useStyles } from '../../theme/theme';
 import { getPortalStatus } from '../../api/portal';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ScreenHeader } from '../../components/ui/ScreenHeader';
 
 const PortalAttendanceScreen = ({ navigation }) => {
   const { colors, typography, spacing, radii } = useAppTheme();
@@ -46,26 +47,18 @@ const PortalAttendanceScreen = ({ navigation }) => {
   const lowAttendance = attendanceList.filter((i) => parseFloat(i.attendance_percentage || '0') < 75);
 
   return (
-    <ScrollView 
-      style={styles.container} 
-      contentContainerStyle={[
-        styles.scrollContent, 
-        { 
-          paddingTop: Math.max(insets.top, 16) + spacing.md,
-          paddingBottom: Math.max(insets.bottom, 20) + 80,
-        }
-      ]}
-    >
-      {/* Header */}
-      <View style={styles.headerContainer}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <ArrowLeft size={16} color={colors.accent} />
-          <Text style={styles.backBtnText}>Back to Dashboard</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>Subject Attendance</Text>
-      </View>
+    <View style={styles.container}>
+      <ScreenHeader title="Subject Attendance" showBack={true} />
+      <ScrollView
+        style={styles.scrollContainer}
+        contentContainerStyle={[
+          styles.scrollContent,
+          {
+            paddingBottom: Math.max(insets.bottom, 20) + 80,
+          }
+        ]}
+      >
 
-      {/* Warning */}
       {lowAttendance.length > 0 && (
         <View style={styles.warningBox}>
           <AlertTriangle size={16} color="#f59e0b" />
@@ -75,7 +68,6 @@ const PortalAttendanceScreen = ({ navigation }) => {
         </View>
       )}
 
-      {/* Metric summary */}
       <View style={styles.metricCard}>
         <Text style={styles.metricLabel}>ENROLLED SUBJECTS</Text>
         <Text style={styles.metricValue}>
@@ -105,7 +97,6 @@ const PortalAttendanceScreen = ({ navigation }) => {
                 </View>
               </View>
 
-              {/* Progress */}
               <View style={styles.progressBarBg}>
                 <View
                   style={[
@@ -136,8 +127,8 @@ const PortalAttendanceScreen = ({ navigation }) => {
             </View>
           );
         })}
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 };
 

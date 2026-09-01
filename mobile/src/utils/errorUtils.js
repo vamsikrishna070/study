@@ -1,13 +1,6 @@
-/**
- * Centralized User-Friendly Error Normalizer for StudyArena Mobile (React Native).
- * Maps raw technical errors (Axios, status codes, network errors, timeouts)
- * into short, professional, human-readable user messages.
- * 
- * NEVER displays raw technical stack traces or backend internals in Alerts / UI.
- * ALWAYS logs technical details to console.error() for developer debugging.
- */
+
 export function getUserFriendlyError(error, context = '') {
-  // Always log full technical error for developers in dev console
+
   if (error) {
     console.error(`[StudyArena Mobile Error] Context: "${context || 'general'}"`, error);
   }
@@ -16,7 +9,6 @@ export function getUserFriendlyError(error, context = '') {
     return 'Something went wrong. Please try again.';
   }
 
-  // Handle string errors safely
   if (typeof error === 'string') {
     const isTechnical = /Axios|Mongo|TypeError|ReferenceError|SyntaxError|HTTP|500|Brevo|Cheerio|ECONN/i.test(error);
     if (!isTechnical && error.length < 120) {
@@ -25,7 +17,6 @@ export function getUserFriendlyError(error, context = '') {
     return 'Something went wrong. Please try again.';
   }
 
-  // Network / Offline errors
   if (
     error.code === 'ERR_NETWORK' ||
     error.message?.includes('Network Error') ||
@@ -34,16 +25,13 @@ export function getUserFriendlyError(error, context = '') {
     return 'We couldn\'t connect to StudyArena. Please check your internet connection and try again.';
   }
 
-  // Timeout errors
   if (error.code === 'ECONNABORTED' || error.message?.toLowerCase().includes('timeout')) {
     return 'The request took too long. Please try again.';
   }
 
-  // Handle HTTP status codes from Axios / Fetch
   const status = error.response?.status;
   const backendMsg = error.response?.data?.message;
 
-  // Filter out any raw technical messages coming from backend
   const isSafeMessage =
     backendMsg &&
     typeof backendMsg === 'string' &&
@@ -56,7 +44,6 @@ export function getUserFriendlyError(error, context = '') {
     return backendMsg;
   }
 
-  // Status Code Mapping
   switch (status) {
     case 400:
       if (context === 'auth_register') return 'Please check the information you entered and try again.';
@@ -100,7 +87,6 @@ export function getUserFriendlyError(error, context = '') {
       break;
   }
 
-  // Context-specific safe defaults
   switch (context) {
     case 'auth_register':
       return 'We couldn\'t create your account. Please try again.';

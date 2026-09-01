@@ -9,16 +9,16 @@ import {
   Platform,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { 
-  Calendar as CalendarIcon, 
-  Clock, 
-  BookOpen, 
-  PenLine 
+import {
+  Calendar as CalendarIcon,
+  Clock,
+  BookOpen,
+  PenLine
 } from 'lucide-react-native';
-import { 
-  Smile, 
-  Meh, 
-  Frown 
+import {
+  Smile,
+  Meh,
+  Frown
 } from 'lucide-react-native';
 import { Header } from '../../components/ui/Header';
 import { PageHeading } from '../../components/ui/PageHeading';
@@ -186,7 +186,6 @@ export default function LogSessionScreen({ navigation }) {
               />
             )}
 
-            {/* Productivity Rating */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Productivity Rating</Text>
               <View style={styles.productivityGrid}>

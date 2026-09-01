@@ -52,7 +52,7 @@ export function AuthProvider({ children }) {
       if (data.success) {
         setUser(data.data);
         setIsAuthenticated(true);
-        // Automatically record daily activity/streak after authentication
+
         recordDailyActivity();
       }
     } catch (error) {
@@ -174,10 +174,10 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ 
-      user, isAuthenticated, isLoading, 
-      login, register, verifyEmail, resendOtp, forgotPassword, resetPassword, 
-      logout, updateProfile, refreshUser: checkAuth 
+    <AuthContext.Provider value={{
+      user, isAuthenticated, isLoading,
+      login, register, verifyEmail, resendOtp, forgotPassword, resetPassword,
+      logout, updateProfile, refreshUser: checkAuth
     }}>
       {children}
     </AuthContext.Provider>

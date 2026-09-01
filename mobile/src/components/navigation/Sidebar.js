@@ -1,12 +1,12 @@
 import React, { useContext } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text, Image } from 'react-native';
-import { 
-  Target, 
-  ChevronRight, 
-  LayoutDashboard, 
-  BookOpen, 
-  ListChecks, 
-  CalendarDays, 
+import {
+  Target,
+  ChevronRight,
+  LayoutDashboard,
+  BookOpen,
+  ListChecks,
+  CalendarDays,
   LogOut,
   FileStack,
   FileText,
@@ -23,13 +23,12 @@ import { DrawerContentScrollView } from '@react-navigation/drawer';
 import { DrawerActions } from '@react-navigation/native';
 import { AuthContext } from '../../context/AuthContext';
 import { typography, spacing, radii, useAppTheme, useStyles } from '../../theme/theme';
-import { isSrmApStudent } from '../../utils/srmAp';
 
 const navItems = [
   { href: 'OverviewTab', label: 'Overview', icon: LayoutDashboard },
+  { href: 'ScheduleTab', label: 'Schedule', icon: CalendarDays },
   { href: 'PortalDashboard', label: 'SRM Portal', icon: GraduationCap },
   { href: 'PortalAttendance', label: 'Attendance', icon: Clock },
-  { href: 'PortalTimetable', label: 'Timetable', icon: CalendarDays },
   { href: 'StudySessions', label: 'Study Sessions', icon: Timer },
   { href: 'SubjectsTab', label: 'Subjects', icon: BookOpen },
   { href: 'Syllabus', label: 'Syllabus', icon: FileStack },
@@ -48,12 +47,7 @@ const Sidebar = (props) => {
   const { state, navigation } = props;
   const { user, logout } = useContext(AuthContext);
 
-  // Only show SRM Portal to SRM AP students
-  const visibleNavItems = navItems.filter(
-    (item) => item.href !== 'PortalDashboard' || isSrmApStudent(user)
-  );
-
-  const tabScreens = ['OverviewTab', 'SubjectsTab', 'TasksTab', 'ExamsTab'];
+  const tabScreens = ['OverviewTab', 'ScheduleTab', 'SubjectsTab', 'TasksTab', 'ExamsTab'];
 
   const handleNavigation = (routeName) => {
     if (typeof navigation.closeDrawer === 'function') {
@@ -65,6 +59,14 @@ const Sidebar = (props) => {
     if (tabScreens.includes(routeName)) {
       navigation.navigate('HomeDrawer', {
         screen: routeName,
+      });
+    } else if (routeName === 'PortalAttendance') {
+      navigation.navigate('PortalDashboard', {
+        screen: 'PortalAttendance',
+      });
+    } else if (routeName === 'PortalDashboard') {
+      navigation.navigate('PortalDashboard', {
+        screen: 'PortalDashboardMain',
       });
     } else {
       navigation.navigate(routeName);
@@ -81,10 +83,9 @@ const Sidebar = (props) => {
   return (
     <View style={styles.container}>
       <DrawerContentScrollView {...props} contentContainerStyle={styles.scrollContent}>
-        
-        {/* Brand Header */}
-        <TouchableOpacity 
-          style={styles.brandContainer} 
+
+        <TouchableOpacity
+          style={styles.brandContainer}
           onPress={() => handleNavigation('OverviewTab')}
           accessibilityLabel="StudyArena Home"
         >
@@ -100,7 +101,7 @@ const Sidebar = (props) => {
         <Text style={styles.sectionHeader}>WORKSPACE</Text>
 
         <View style={styles.navSection}>
-          {visibleNavItems.map((item) => {
+          {navItems.map((item) => {
             const isActive = false;
 
             return (
@@ -120,9 +121,8 @@ const Sidebar = (props) => {
 
       </DrawerContentScrollView>
 
-      {/* Footer / Profile */}
       <View style={styles.footer}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.profileBtn}
           onPress={() => handleNavigation('Settings')}
           accessibilityLabel="Settings"
@@ -146,8 +146,8 @@ const Sidebar = (props) => {
           </View>
           <Settings size={15} color={colors.mutedForeground} style={{ opacity: 0.6 }} />
         </TouchableOpacity>
-        
-        <TouchableOpacity 
+
+        <TouchableOpacity
           style={styles.logoutBtn}
           onPress={handleLogout}
           accessibilityLabel="Log out"
@@ -260,7 +260,7 @@ const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.crea
     height: '100%',
   },
   avatarPlaceholder: {
-    backgroundColor: colors.primary + '33', 
+    backgroundColor: colors.primary + '33',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 0,

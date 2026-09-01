@@ -10,7 +10,6 @@ export const isExpoGo = () => {
   }
 };
 
-// Configure how notifications appear when the app is in the foreground
 try {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
@@ -38,35 +37,30 @@ export const setupNotifications = async () => {
         },
       };
 
-      // System Default channel
       await Notifications.setNotificationChannelAsync('study-alarm-default', {
         ...baseConfig,
         name: 'Reminders (Default Sound)',
-        sound: true, // system default
+        sound: true,
       });
 
-      // Default Custom Alarm channel
       await Notifications.setNotificationChannelAsync('study-alarm-default-custom', {
         ...baseConfig,
         name: 'Reminders (Default Alarm)',
         sound: 'default_alarm.wav',
       });
 
-      // Gentle Alarm channel
       await Notifications.setNotificationChannelAsync('study-alarm-gentle', {
         ...baseConfig,
         name: 'Reminders (Gentle)',
         sound: 'gentle_alarm.wav',
       });
 
-      // Study Bell channel
       await Notifications.setNotificationChannelAsync('study-alarm-bell', {
         ...baseConfig,
         name: 'Reminders (Study Bell)',
         sound: 'study_bell.wav',
       });
 
-      // Task Alerts channel
       await Notifications.setNotificationChannelAsync('study-task-alerts', {
         name: 'Task Alerts & Pending Notifications',
         importance: Notifications.AndroidImportance.HIGH,
@@ -95,76 +89,184 @@ export const setupNotifications = async () => {
 };
 
 export const scheduleReminderNotification = async (reminder) => {
+  console.log('[Reminder] Creating reminder');
+  console.log('[Reminder] Recurrence:', reminder.scheduleType || 'one-time');
+
   try {
     const triggerDate = new Date(reminder.remindAt);
     const type = reminder.scheduleType || 'one-time';
 
-    if (type === 'one-time' && triggerDate <= new Date()) {
-      console.warn("Cannot schedule one-time notification in the past.");
-      return null;
-    }
-
-    const soundChoice = reminder.soundChoice || 'default';
+    const soundChoice = reminder.soundChoice || reminder.soundId || 'default';
     let channelId = 'study-alarm-default';
-
     if (soundChoice === 'default_alarm') {
       channelId = 'study-alarm-default-custom';
-    } else if (soundChoice === 'gentle') {
+    } else if (soundChoice === 'gentle' || soundChoice === 'gentle_alarm') {
       channelId = 'study-alarm-gentle';
-    } else if (soundChoice === 'bell') {
+    } else if (soundChoice === 'bell' || soundChoice === 'study_bell') {
       channelId = 'study-alarm-bell';
-    }
-
-    let trigger;
-    if (type === 'daily') {
-      trigger = {
-        type: Notifications.SchedulableTriggerInputTypes.DAILY,
-        channelId,
-        hour: triggerDate.getHours(),
-        minute: triggerDate.getMinutes(),
-      };
-    } else if (type === 'weekly') {
-      trigger = {
-        type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
-        channelId,
-        weekday: triggerDate.getDay() + 1,
-        hour: triggerDate.getHours(),
-        minute: triggerDate.getMinutes(),
-      };
-    } else {
-      trigger = {
-        type: Notifications.SchedulableTriggerInputTypes.DATE,
-        channelId,
-        date: triggerDate,
-      };
     }
 
     const title = reminder.title || 'Reminder';
     const body = reminder.description || 'Time for your scheduled study session.';
 
-    const id = await Notifications.scheduleNotificationAsync({
-      content: {
-        title,
-        body,
-        sound: true,
-        priority: Notifications.AndroidNotificationPriority.HIGH,
-      },
-      trigger,
-    });
-    return id;
+    const scheduledIds = [];
+
+    if (type === 'daily') {
+      const trigger = {
+        type: Notifications.SchedulableTriggerInputTypes.DAILY,
+        hour: triggerDate.getHours(),
+        minute: triggerDate.getMinutes(),
+        channelId,
+      };
+      console.log('[Reminder] Trigger:', JSON.stringify(trigger));
+      const id = await Notifications.scheduleNotificationAsync({
+        content: {
+          title,
+          body,
+          sound: true,
+          priority: Notifications.AndroidNotificationPriority.HIGH,
+          channelId,
+          data: { reminderId: reminder._id || reminder.id, scheduleType: type },
+        },
+        trigger,
+      });
+      scheduledIds.push(id);
+    } else if (type === 'weekly') {
+      const selectedDays = (Array.isArray(reminder.weekdays) && reminder.weekdays.length > 0)
+        ? reminder.weekdays
+        : [triggerDate.getDay()];
+
+      for (const day of selectedDays) {
+        const expoWeekday = (day % 7) + 1;
+        const trigger = {
+          type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+          weekday: expoWeekday,
+          hour: triggerDate.getHours(),
+          minute: triggerDate.getMinutes(),
+          channelId,
+        };
+        console.log('[Reminder] Trigger:', JSON.stringify(trigger));
+        const id = await Notifications.scheduleNotificationAsync({
+          content: {
+            title,
+            body,
+            sound: true,
+            priority: Notifications.AndroidNotificationPriority.HIGH,
+            channelId,
+            data: { reminderId: reminder._id || reminder.id, scheduleType: type, weekday: day },
+          },
+          trigger,
+        });
+        scheduledIds.push(id);
+      }
+    } else if (type === 'monthly') {
+      const dayOfMonth = reminder.repeatDayOfMonth || triggerDate.getDate();
+      const trigger = {
+        type: Notifications.SchedulableTriggerInputTypes.MONTHLY,
+        day: dayOfMonth,
+        hour: triggerDate.getHours(),
+        minute: triggerDate.getMinutes(),
+        channelId,
+      };
+      console.log('[Reminder] Trigger:', JSON.stringify(trigger));
+      const id = await Notifications.scheduleNotificationAsync({
+        content: {
+          title,
+          body,
+          sound: true,
+          priority: Notifications.AndroidNotificationPriority.HIGH,
+          channelId,
+          data: { reminderId: reminder._id || reminder.id, scheduleType: type },
+        },
+        trigger,
+      });
+      scheduledIds.push(id);
+    } else if (type === 'yearly') {
+      const dayOfMonth = reminder.repeatDayOfMonth || triggerDate.getDate();
+      const trigger = {
+        type: Notifications.SchedulableTriggerInputTypes.YEARLY,
+        month: triggerDate.getMonth(),
+        day: dayOfMonth,
+        hour: triggerDate.getHours(),
+        minute: triggerDate.getMinutes(),
+        channelId,
+      };
+      console.log('[Reminder] Trigger:', JSON.stringify(trigger));
+      const id = await Notifications.scheduleNotificationAsync({
+        content: {
+          title,
+          body,
+          sound: true,
+          priority: Notifications.AndroidNotificationPriority.HIGH,
+          channelId,
+          data: { reminderId: reminder._id || reminder.id, scheduleType: type },
+        },
+        trigger,
+      });
+      scheduledIds.push(id);
+    } else {
+      if (triggerDate <= new Date()) {
+        console.warn("[Reminder] Cannot schedule one-time notification in the past.");
+        return null;
+      }
+      const trigger = {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: triggerDate,
+        channelId,
+      };
+      console.log('[Reminder] Trigger:', JSON.stringify(trigger));
+      const id = await Notifications.scheduleNotificationAsync({
+        content: {
+          title,
+          body,
+          sound: true,
+          priority: Notifications.AndroidNotificationPriority.HIGH,
+          channelId,
+          data: { reminderId: reminder._id || reminder.id, scheduleType: 'one-time' },
+        },
+        trigger,
+      });
+      scheduledIds.push(id);
+    }
+
+    const finalId = scheduledIds.length === 1 ? scheduledIds[0] : JSON.stringify(scheduledIds);
+    console.log('[Reminder] Notification ID:', finalId);
+    console.log('[Reminder] Scheduling result: SUCCESS');
+
+    const allScheduled = await Notifications.getAllScheduledNotificationsAsync();
+    console.log('[Reminder] Scheduled notifications count:', allScheduled.length);
+    console.log('[Reminder] Scheduled notifications:', JSON.stringify(allScheduled, null, 2));
+
+    return finalId;
   } catch (err) {
-    console.warn("[NotificationService] Failed to schedule notification:", err.message);
+    console.error("[Reminder] Scheduling result: ERROR -", err);
     return null;
   }
 };
 
 export const cancelReminderNotification = async (notificationId) => {
-  if (notificationId) {
-    try {
-      await Notifications.cancelScheduledNotificationAsync(notificationId);
-    } catch (err) {
-      console.warn('[NotificationService] Failed to cancel notification:', err.message);
+  if (!notificationId) return;
+  try {
+    let ids = [];
+    if (typeof notificationId === 'string' && notificationId.startsWith('[')) {
+      try {
+        ids = JSON.parse(notificationId);
+      } catch (_) {
+        ids = [notificationId];
+      }
+    } else if (Array.isArray(notificationId)) {
+      ids = notificationId;
+    } else {
+      ids = [notificationId];
     }
+
+    for (const id of ids) {
+      if (id) {
+        await Notifications.cancelScheduledNotificationAsync(id);
+      }
+    }
+  } catch (err) {
+    console.warn('[NotificationService] Failed to cancel notification:', err.message);
   }
 };
 
@@ -190,18 +292,7 @@ export const scheduleTaskPendingAlert = async (task) => {
 
     const notificationTime = new Date(triggerTime.getTime() - 60 * 60 * 1000);
 
-    if (__DEV__) {
-      console.log('\n--- TASK NOTIFICATION DEBUG ---');
-      console.log(`Task: ${task.title}`);
-      console.log(`Current: ${new Date().toLocaleString()}`);
-      console.log(`Due: ${triggerTime.toLocaleString()}`);
-      console.log(`One-hour warning: ${notificationTime.toLocaleString()}`);
-      console.log(`Reminder enabled: ${task.reminderEnabled ? 'yes' : 'no'}`);
-      if (task.reminderEnabled) console.log(`Reminder time: ${task.reminderTime}`);
-    }
-
     if (notificationTime <= new Date()) {
-      if (__DEV__) console.log(`[NotificationService] Warning time is in the past. Skipping 1-hour warning.`);
       return null;
     }
 
@@ -215,9 +306,14 @@ export const scheduleTaskPendingAlert = async (task) => {
         body,
         sound: true,
         priority: Notifications.AndroidNotificationPriority.HIGH,
+        channelId: 'study-task-alerts',
         data: { taskId: task._id || task.id, type: 'task_pending' },
       },
-      trigger: notificationTime,
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: notificationTime,
+        channelId: 'study-task-alerts',
+      },
     });
     return id;
   } catch (err) {
@@ -238,9 +334,9 @@ export const scheduleTaskDailyReminder = async (task) => {
 
     const trigger = {
       type: Notifications.SchedulableTriggerInputTypes.DAILY,
-      channelId: 'study-alarm-default',
       hour: hours,
       minute: minutes,
+      channelId: 'study-alarm-default',
     };
 
     const id = await Notifications.scheduleNotificationAsync({
@@ -249,6 +345,7 @@ export const scheduleTaskDailyReminder = async (task) => {
         body,
         sound: true,
         priority: Notifications.AndroidNotificationPriority.DEFAULT,
+        channelId: 'study-alarm-default',
         data: { taskId: task._id || task.id, type: 'task_daily' },
       },
       trigger,

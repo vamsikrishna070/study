@@ -7,9 +7,9 @@ import {
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as DocumentPicker from 'expo-document-picker';
 import { saveCustomAudio, validateAudioFile } from '../../services/documentService';
-import { 
-  Bell, Plus, CalendarDays, Clock, Trash2, BellOff, ChevronRight, X, 
-  Repeat, Music, Volume2, VolumeX, FileMusic, Check, CircleAlert 
+import {
+  Bell, Plus, CalendarDays, Clock, Trash2, BellOff, ChevronRight, X,
+  Repeat, Music, Volume2, VolumeX, FileMusic, Check, CircleAlert
 } from 'lucide-react-native';
 import { getReminders, createReminder, updateReminder, deleteReminder } from '../../api/reminders';
 import { getSubjects } from '../../api/subjects';
@@ -20,7 +20,7 @@ import {
   playAudioPreview,
   stopAudioPreview,
 } from '../../services/AlarmModule';
-import { setupNotifications } from '../../services/NotificationService';
+import { setupNotifications, scheduleReminderNotification, cancelReminderNotification } from '../../services/NotificationService';
 import { getNextTriggerTimestamp, validateReminderDateTime } from '../../utils/reminderHelper';
 import {
   getNotifId,
@@ -50,8 +50,6 @@ const PRIORITY_OPTIONS = [
   { label: 'High', value: 'high' },
 ];
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
 const formatDate = (date) => {
   if (!date) return 'No date set';
   const d = new Date(date);
@@ -75,14 +73,11 @@ const isToday = (remindAt) => {
   return d.getDate() === n.getDate() && d.getMonth() === n.getMonth() && d.getFullYear() === n.getFullYear();
 };
 
-// ─── Component ────────────────────────────────────────────────────────────────
-
 const RemindersScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const { colors, typography, spacing, radii, isDark } = useAppTheme();
   const { showDialog, showError, showDeleteConfirm } = useAppDialog();
 
-  // List state
   const [reminders, setReminders] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -90,11 +85,9 @@ const RemindersScreen = ({ navigation }) => {
   const [error, setError] = useState(null);
   const [notificationPermission, setNotificationPermission] = useState(null);
 
-  // Bottom sheet state
   const [sheetVisible, setSheetVisible] = useState(false);
   const sheetAnim = useRef(new Animated.Value(0)).current;
 
-  // Form state
   const [editingId, setEditingId] = useState(null);
   const [editingNotifId, setEditingNotifId] = useState(null);
   const [title, setTitle] = useState('');
@@ -108,7 +101,6 @@ const RemindersScreen = ({ navigation }) => {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState(null);
 
-  // Recurrence & Audio State
   const [scheduleType, setScheduleType] = useState('one-time');
   const [weekdays, setWeekdays] = useState([]);
   const [soundId, setSoundId] = useState('default');
@@ -116,11 +108,8 @@ const RemindersScreen = ({ navigation }) => {
   const [soundName, setSoundName] = useState('');
   const [previewingSound, setPreviewingSound] = useState(null);
 
-  // Date/time picker visibility (Android shows inline picker on press)
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
-
-  // ─── Data Loading ────────────────────────────────────────────────────────────
 
   const loadReminders = useCallback(async (isRefresh = false) => {
     try {
@@ -128,10 +117,21 @@ const RemindersScreen = ({ navigation }) => {
       const [remRes, subsRes] = await Promise.all([getReminders(), getSubjects()]);
       const data = (remRes.data || remRes || []);
       const subsData = (subsRes.data || subsRes || []);
-      // Sort by remindAt ascending
       const sorted = [...data].sort((a, b) => new Date(a.remindAt) - new Date(b.remindAt));
       setReminders(sorted);
       setSubjects(subsData);
+
+      for (const rem of sorted) {
+        if (rem.notificationEnabled !== false) {
+          const existingNotifId = await getNotifId(rem._id);
+          if (!existingNotifId) {
+            const notifId = await scheduleReminderNotification(rem);
+            if (notifId) {
+              await setNotifId(rem._id, notifId);
+            }
+          }
+        }
+      }
     } catch (e) {
       const msg = e?.response?.status === 401
         ? 'Session expired. Please log in again.'
@@ -158,8 +158,6 @@ const RemindersScreen = ({ navigation }) => {
     loadReminders(true);
   }, [loadReminders]);
 
-  // ─── Bottom Sheet ─────────────────────────────────────────────────────
-
   const openSheet = async (reminder = null) => {
     try {
       if (typeof navigation.closeDrawer === 'function') {
@@ -171,7 +169,7 @@ const RemindersScreen = ({ navigation }) => {
         }
       }
     } catch (e) {
-      // Ignore if not rendered inside a drawer
+
     }
     await stopAudioPreview();
     setPreviewingSound(null);
@@ -196,7 +194,6 @@ const RemindersScreen = ({ navigation }) => {
       setSoundUri(reminder.soundUri || null);
       setSoundName(reminder.soundName || '');
     } else {
-      // Default new reminder time: 15 minutes in the future
       const futureDefault = new Date(now.getTime() + 15 * 60 * 1000);
       setEditingId(null);
       setEditingNotifId(null);
@@ -231,8 +228,6 @@ const RemindersScreen = ({ navigation }) => {
     });
   };
 
-  // ─── Custom Audio Pick & Preview ──────────────────────────────────────────────
-
   const handlePickCustomAudio = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
@@ -255,7 +250,6 @@ const RemindersScreen = ({ navigation }) => {
       if (result.canceled || !result.assets || result.assets.length === 0) return;
       const asset = result.assets[0];
 
-      // Multi-level validation before attempting to copy or save
       const validation = await validateAudioFile(asset);
       if (!validation.valid) {
         showError('Invalid Audio File', validation.error || 'Please select an audio file (MP3, WAV, M4A, AAC, or OGG).');
@@ -292,8 +286,6 @@ const RemindersScreen = ({ navigation }) => {
     }
   };
 
-  // ─── Validation ───────────────────────────────────────────────────────────────
-
   const handleScheduleTypeChange = (type) => {
     setScheduleType(type);
     if (type === 'one-time') {
@@ -324,7 +316,6 @@ const RemindersScreen = ({ navigation }) => {
       setFormError('Please enter a reminder title.');
       return false;
     }
-    // Perform robust live date/time validation using real-time moment
     const valResult = validateReminderDateTime(selectedDate, selectedTime, scheduleType, weekdays);
     if (!valResult.isValid) {
       setFormError(valResult.error);
@@ -333,8 +324,6 @@ const RemindersScreen = ({ navigation }) => {
     setFormError(null);
     return true;
   };
-
-  // ─── Create / Edit ────────────────────────────────────────────────────────────
 
   const handleSubmit = async () => {
     if (!validate()) return;
@@ -375,18 +364,25 @@ const RemindersScreen = ({ navigation }) => {
 
     try {
       if (editingId) {
-        // ── EDIT ─────────────────────────────────────────────────────────────
         const res = await updateReminder(editingId, payload);
         const updated = res.data || res;
 
-        // Cancel old native alarm
+        const oldNotifId = await getNotifId(editingId);
+        if (oldNotifId) {
+          await cancelReminderNotification(oldNotifId);
+          await removeNotifId(editingId);
+        }
         await cancelAlarm(editingId);
 
-        // Schedule new native alarm only if enabled and next trigger is strictly in future
         if (notificationEnabled) {
+          const newNotifId = await scheduleReminderNotification(updated);
+          if (newNotifId) {
+            await setNotifId(editingId, newNotifId);
+          }
+
           const nextTimestamp = getNextTriggerTimestamp(updated);
           if (nextTimestamp && nextTimestamp > Date.now()) {
-            console.log(`[REMINDER] Scheduling edited reminder: "${updated.title}" at ${new Date(nextTimestamp).toISOString()}`);
+            console.log(`[REMINDER] Scheduling edited native alarm: "${updated.title}" at ${new Date(nextTimestamp).toISOString()}`);
             await scheduleAlarm(
               editingId,
               nextTimestamp,
@@ -405,15 +401,18 @@ const RemindersScreen = ({ navigation }) => {
         });
 
       } else {
-        // ── CREATE ────────────────────────────────────────────────────────────
         const res = await createReminder(payload);
         const created = res.data || res;
 
-        // Schedule notification only after successful backend creation and strictly in future
         if (notificationEnabled) {
+          const notifId = await scheduleReminderNotification(created);
+          if (notifId) {
+            await setNotifId(created._id, notifId);
+          }
+
           const nextTimestamp = getNextTriggerTimestamp(created);
           if (nextTimestamp && nextTimestamp > Date.now()) {
-            console.log(`[REMINDER] Scheduling new reminder: "${created.title}" at ${new Date(nextTimestamp).toISOString()}`);
+            console.log(`[REMINDER] Scheduling new native alarm: "${created.title}" at ${new Date(nextTimestamp).toISOString()}`);
             await scheduleAlarm(
               created._id,
               nextTimestamp,
@@ -445,18 +444,20 @@ const RemindersScreen = ({ navigation }) => {
     }
   };
 
-  // ─── Delete ───────────────────────────────────────────────────────────────────
-
   const handleDelete = (reminder) => {
     showDeleteConfirm({
       title: 'Delete Reminder',
       message: `Are you sure you want to delete "${reminder.title}"?\n\nThis action cannot be undone.`,
       onConfirm: async () => {
         try {
-          await deleteReminder(reminder._id);
-          // Cancel scheduled native alarm
+
+          const notifId = await getNotifId(reminder._id);
+          if (notifId) {
+            await cancelReminderNotification(notifId);
+            await removeNotifId(reminder._id);
+          }
           await cancelAlarm(reminder._id);
-          await removeNotifId(reminder._id);
+          await deleteReminder(reminder._id);
           setReminders(prev => prev.filter(r => r._id !== reminder._id));
         } catch (e) {
           showError('Delete Failed', 'Failed to delete the reminder. Please try again.');
@@ -464,8 +465,6 @@ const RemindersScreen = ({ navigation }) => {
       },
     });
   };
-
-  // ─── Date/Time Handlers ───────────────────────────────────────────────────────
 
   const onDateChange = (event, date) => {
     setShowDatePicker(false);
@@ -493,8 +492,6 @@ const RemindersScreen = ({ navigation }) => {
     setSoundId(id);
   };
 
-  // ─── Render Helpers ───────────────────────────────────────────────────────────
-
   const getReminderStatus = (reminder) => {
     const isRecurring = reminder.scheduleType && reminder.scheduleType !== 'one-time';
     if (isRecurring) return { label: 'Recurring', color: colors.primary };
@@ -507,8 +504,6 @@ const RemindersScreen = ({ navigation }) => {
     () => makeStyles(colors, typography, spacing, radii, insets, isDark),
     [colors, typography, spacing, radii, insets, isDark]
   );
-
-  // ─── Render: Reminder Card ────────────────────────────────────────────────────
 
   const renderItem = ({ item }) => {
     const status = getReminderStatus(item);
@@ -577,8 +572,8 @@ const RemindersScreen = ({ navigation }) => {
               <Music size={12} color={colors.mutedForeground} />
               <Text style={styles.metaText} numberOfLines={1}>
                 {item.soundId === 'custom' ? (item.soundName || 'Custom Audio') :
-                 item.soundId === 'default_alarm' ? 'Default Alarm' : 
-                 item.soundId === 'gentle_alarm' ? 'Gentle Alarm' : 
+                 item.soundId === 'default_alarm' ? 'Default Alarm' :
+                 item.soundId === 'gentle_alarm' ? 'Gentle Alarm' :
                  item.soundId === 'study_bell' ? 'Study Bell' : 'Alarm'}
               </Text>
             </View>
@@ -591,8 +586,6 @@ const RemindersScreen = ({ navigation }) => {
     );
   };
 
-  // ─── Render: Sheet Overlay ────────────────────────────────────────────────────
-
   const sheetTranslateY = sheetAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [600, 0],
@@ -602,8 +595,6 @@ const RemindersScreen = ({ navigation }) => {
     inputRange: [0, 0.5, 1],
     outputRange: [0, 0.4, 1],
   });
-
-  // ─── Render ───────────────────────────────────────────────────────────────────
 
   if (loading) {
     return (
@@ -671,7 +662,6 @@ const RemindersScreen = ({ navigation }) => {
         }
       />
 
-      {/* ─── Bottom Sheet Modal ─────────────────────────────────────────────────── */}
       <Modal
         visible={sheetVisible}
         animationType="none"
@@ -683,12 +673,11 @@ const RemindersScreen = ({ navigation }) => {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.sheetWrapper}
         >
-          {/* Backdrop */}
+
           <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet}>
             <Animated.View style={[StyleSheet.absoluteFill, styles.sheetBackdrop, { opacity: sheetOpacity }]} />
           </Pressable>
 
-          {/* Sheet */}
           <Animated.View
             style={[
               styles.sheet,
@@ -696,10 +685,9 @@ const RemindersScreen = ({ navigation }) => {
               { transform: [{ translateY: sheetTranslateY }] },
             ]}
           >
-            {/* Drag handle */}
+
             <View style={styles.sheetHandle} />
 
-            {/* Sheet Header */}
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>{editingId ? 'Edit Reminder' : 'Schedule Reminder'}</Text>
               <TouchableOpacity onPress={closeSheet} style={styles.closeBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -712,7 +700,7 @@ const RemindersScreen = ({ navigation }) => {
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.sheetScroll}
             >
-              {/* Title */}
+
               <Text style={styles.fieldLabel}>Reminder title</Text>
               <TextInput
                 style={[styles.input, formError && !title.trim() && styles.inputError]}
@@ -724,7 +712,6 @@ const RemindersScreen = ({ navigation }) => {
                 autoFocus
               />
 
-              {/* Description */}
               <Text style={styles.fieldLabel}>Description (optional)</Text>
               <TextInput
                 style={[styles.input, styles.inputMultiline]}
@@ -737,7 +724,6 @@ const RemindersScreen = ({ navigation }) => {
                 textAlignVertical="top"
               />
 
-              {/* Subject (Optional) */}
               <Text style={[styles.fieldLabel, { marginTop: 8 }]}>Link to Subject (optional)</Text>
               <SelectPicker
                 value={subjectId}
@@ -752,7 +738,6 @@ const RemindersScreen = ({ navigation }) => {
                 placeholder="None"
               />
 
-              {/* Category & Priority Row */}
               <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.fieldLabel}>Category</Text>
@@ -772,10 +757,8 @@ const RemindersScreen = ({ navigation }) => {
                 </View>
               </View>
 
-              {/* When Section */}
               <Text style={[styles.fieldLabel, { marginTop: 8 }]}>When</Text>
 
-              {/* Date Picker Trigger (Only shown for one-time reminders) */}
               {scheduleType === 'one-time' && (
                 <TouchableOpacity
                   style={styles.pickerRow}
@@ -798,7 +781,6 @@ const RemindersScreen = ({ navigation }) => {
                 />
               )}
 
-              {/* Time Picker Trigger */}
               <TouchableOpacity
                 style={[styles.pickerRow, !!formError && styles.inputError]}
                 onPress={() => setShowTimePicker(true)}
@@ -818,7 +800,6 @@ const RemindersScreen = ({ navigation }) => {
                 />
               )}
 
-              {/* Inline Date/Time Error Box */}
               {!!formError && (
                 <View style={styles.inlineErrorBox}>
                   <CircleAlert size={14} color={colors.destructive} style={{ marginRight: 6 }} />
@@ -826,7 +807,6 @@ const RemindersScreen = ({ navigation }) => {
                 </View>
               )}
 
-              {/* ── Repeat / Recurrence ──────────────────────────────────────── */}
               <Text style={[styles.fieldLabel, { marginTop: 4 }]}>Repeat</Text>
               <View style={styles.recurrenceRow}>
                 {[
@@ -857,7 +837,6 @@ const RemindersScreen = ({ navigation }) => {
                 ))}
               </View>
 
-              {/* Weekday selector for weekly */}
               {scheduleType === 'weekly' && (
                 <View style={styles.weekdayRow}>
                   {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((label, idx) => (
@@ -889,7 +868,6 @@ const RemindersScreen = ({ navigation }) => {
                 </View>
               )}
 
-              {/* ── Notification Sound ───────────────────────────────────────── */}
               <Text style={[styles.fieldLabel, { marginTop: 4 }]}>Notification Sound</Text>
               <View style={styles.recurrenceRow}>
                 {[
@@ -926,7 +904,6 @@ const RemindersScreen = ({ navigation }) => {
                 ))}
               </View>
 
-              {/* Custom Audio Pick & Preview Area */}
               {soundId === 'custom' && (
                 <View style={styles.customAudioCard}>
                   <View style={styles.customAudioHeader}>
@@ -948,7 +925,6 @@ const RemindersScreen = ({ navigation }) => {
                 </View>
               )}
 
-              {/* Audio Preview Bar */}
               <View style={styles.previewContainer}>
                 <TouchableOpacity
                   style={[
@@ -978,7 +954,6 @@ const RemindersScreen = ({ navigation }) => {
                 When triggered, your device will ring at high priority with full alarm controls.
               </Text>
 
-              {/* Notification Toggle */}
               <View style={styles.switchRow}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.switchLabel}>Notification</Text>
@@ -992,7 +967,6 @@ const RemindersScreen = ({ navigation }) => {
                 />
               </View>
 
-              {/* Form error */}
               {!!formError && (
                 <View style={styles.formErrorBox}>
                   <Text style={styles.formErrorText}>{formError}</Text>
@@ -1000,7 +974,6 @@ const RemindersScreen = ({ navigation }) => {
               )}
             </ScrollView>
 
-            {/* Submit */}
             <View style={styles.sheetFooter}>
               <Button
                 onPress={handleSubmit}
@@ -1020,8 +993,6 @@ const RemindersScreen = ({ navigation }) => {
     </View>
   );
 };
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const makeStyles = (colors, typography, spacing, radii, insets, isDark) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
@@ -1064,7 +1035,6 @@ const makeStyles = (colors, typography, spacing, radii, insets, isDark) => Style
     marginTop: 4,
     elevation: 3,
   },
-  // Permission banner
   permBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1079,7 +1049,6 @@ const makeStyles = (colors, typography, spacing, radii, insets, isDark) => Style
     color: colors.destructive,
     flex: 1,
   },
-  // Card
   card: {
     backgroundColor: colors.card,
     borderRadius: radii.xl,
@@ -1144,7 +1113,6 @@ const makeStyles = (colors, typography, spacing, radii, insets, isDark) => Style
     fontFamily: typography.sans.bold,
     fontSize: 11,
   },
-  // Error state
   errorState: { alignItems: 'center', paddingVertical: spacing.xl, gap: spacing.md },
   errorText: {
     fontFamily: typography.sans.regular,
@@ -1152,7 +1120,6 @@ const makeStyles = (colors, typography, spacing, radii, insets, isDark) => Style
     color: colors.mutedForeground,
     textAlign: 'center',
   },
-  // Bottom sheet
   sheetWrapper: { flex: 1, justifyContent: 'flex-end' },
   sheetBackdrop: { backgroundColor: '#000' },
   sheet: {
@@ -1299,7 +1266,6 @@ const makeStyles = (colors, typography, spacing, radii, insets, isDark) => Style
     fontSize: 15,
     color: colors.mutedForeground,
   },
-  // Recurrence
   recurrenceRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1326,7 +1292,6 @@ const makeStyles = (colors, typography, spacing, radii, insets, isDark) => Style
   recurrenceChipTextActive: {
     color: colors.primaryForeground,
   },
-  // Weekday selector
   weekdayRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1352,7 +1317,6 @@ const makeStyles = (colors, typography, spacing, radii, insets, isDark) => Style
   weekdayTextActive: {
     color: colors.primaryForeground,
   },
-  // Custom audio card & preview
   customAudioCard: {
     backgroundColor: colors.background,
     borderRadius: radii.lg,
@@ -1412,7 +1376,6 @@ const makeStyles = (colors, typography, spacing, radii, insets, isDark) => Style
   previewBtnTextActive: {
     color: colors.primaryForeground,
   },
-  // Audio disclaimer
   audioDisclaimer: {
     fontFamily: typography.sans.regular,
     fontSize: 11,

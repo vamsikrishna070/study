@@ -12,10 +12,9 @@ class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            
-            // Check exact alarm permission on Android 12+
+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
-                return // Can't schedule
+                return
             }
 
             val prefs = context.getSharedPreferences("StudyArenaAlarms", Context.MODE_PRIVATE)
@@ -30,8 +29,6 @@ class BootReceiver : BroadcastReceiver() {
                         val soundId = data.optString("soundId", "default_alarm")
                         val soundUri = data.optString("soundUri", null)
 
-                        // If alarm is in the past, don't schedule one-time alarms
-                        // Since JS handles recurrence calculations, if it's past, we wait for JS sync on app open.
                         if (timestamp > System.currentTimeMillis()) {
                             val alarmIntent = Intent(context, AlarmReceiver::class.java).apply {
                                 putExtra("id", id)
@@ -41,7 +38,7 @@ class BootReceiver : BroadcastReceiver() {
                                     putExtra("soundUri", soundUri)
                                 }
                             }
-                            
+
                             val pendingIntent = PendingIntent.getBroadcast(
                                 context,
                                 id.hashCode(),
@@ -51,7 +48,7 @@ class BootReceiver : BroadcastReceiver() {
 
                             alarmManager.setAlarmClock(AlarmManager.AlarmClockInfo(timestamp, pendingIntent), pendingIntent)
                         } else {
-                            // Clean up expired alarm entry
+
                             prefs.edit().remove(id).apply()
                         }
                     } catch (e: Exception) {

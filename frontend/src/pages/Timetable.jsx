@@ -62,7 +62,7 @@ export default function Timetable() {
   return (
     <Shell>
       <div className="space-y-6">
-        {/* Header */}
+
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <Link to="/" className="inline-flex items-center gap-1.5 text-xs font-semibold text-accent hover:underline mb-2">
@@ -86,7 +86,6 @@ export default function Timetable() {
           </button>
         </div>
 
-        {/* Day Tabs */}
         <div className="flex border-b border-border/60 overflow-x-auto no-scrollbar">
           {DAYS.map((day) => {
             const isActive = activeDay === day.key;
@@ -113,7 +112,6 @@ export default function Timetable() {
           })}
         </div>
 
-        {/* Slots List */}
         {activeDaySlots.length === 0 ? (
           <div className="rounded-2xl border border-card-border bg-card p-12 text-center text-sm text-muted-foreground space-y-2">
             <CalendarDays size={32} className="mx-auto text-muted-foreground/60" />

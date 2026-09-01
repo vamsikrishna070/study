@@ -29,7 +29,6 @@ import { useToast } from '../../components/ui/use-toast.js';
 import { formatSemester } from '../../utils/semester.js';
 import { getUserFriendlyError } from '../../utils/errorUtils.js';
 
-// Portal features (Course Resources removed per requirements)
 const PORTAL_FEATURES = [
   {
     title: 'Attendance Details',
@@ -65,7 +64,7 @@ const PORTAL_FEATURES = [
 
 export default function PortalDashboard() {
   const { toast } = useToast();
-  const { refreshUser } = useAuth();
+  const { user, refreshUser } = useAuth();
   const statusQuery = useGetPortalStatus();
   const connectMutation = useConnectPortal();
   const syncMutation = useSyncPortal();
@@ -96,7 +95,7 @@ export default function PortalDashboard() {
         srmPassword,
       });
 
-      await refreshUser(); // refresh global auth state to populate Settings profile fields
+      await refreshUser();
 
       toast({ title: 'Portal Connected!', description: 'SRM Portal linked and data synchronized successfully.' });
       setShowConnectModal(false);
@@ -169,7 +168,7 @@ export default function PortalDashboard() {
   return (
     <Shell>
       <div className="space-y-8">
-        {/* Header */}
+
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="inline-flex items-center gap-2 font-mono text-xs font-bold uppercase tracking-wider text-accent">
@@ -216,7 +215,7 @@ export default function PortalDashboard() {
 
         {hasStoredPortalData ? (
           <>
-            {/* Non-blocking session expired banner */}
+
             {isSessionExpired && (
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-500 font-semibold shadow-sm">
                 <div className="flex items-center gap-2">
@@ -234,7 +233,6 @@ export default function PortalDashboard() {
               </div>
             )}
 
-            {/* Student Information */}
             <div className="rounded-2xl border border-card-border bg-card p-6 shadow-sm space-y-3">
               <div className="flex items-center gap-2 font-mono text-xs font-bold uppercase tracking-wider text-accent">
                 <UserCheck size={16} /> STUDENT INFORMATION
@@ -242,7 +240,7 @@ export default function PortalDashboard() {
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5 pt-2">
                 <div>
                   <span className="text-[11px] font-semibold text-muted-foreground uppercase">Student Name</span>
-                  <div className="font-bold text-base">{user?.displayName || profile.studentName || user?.name || '—'}</div>
+                  <div className="font-bold text-base">{user?.displayName || profile.studentName || user?.officialName || user?.name || 'Student'}</div>
                   {user?.displayName && profile.studentName && (
                     <div className="text-[10px] text-muted-foreground">Official SRM: {profile.studentName}</div>
                   )}
@@ -266,7 +264,6 @@ export default function PortalDashboard() {
               </div>
             </div>
 
-            {/* Metrics */}
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-2xl border border-card-border bg-card p-5 shadow-sm space-y-1">
                 <span className="font-mono text-xs font-bold uppercase text-muted-foreground">Cumulative GPA</span>
@@ -283,7 +280,6 @@ export default function PortalDashboard() {
               </div>
             </div>
 
-            {/* Portal Features Grid */}
             <div className="space-y-4">
               <h2 className="font-display text-xl font-bold">Portal Features</h2>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -332,7 +328,6 @@ export default function PortalDashboard() {
           </div>
         )}
 
-        {/* Connect Modal — Registration Number + Password only, no CAPTCHA */}
         {showConnectModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
             <div className="w-full max-w-md rounded-2xl border border-card-border bg-card p-6 shadow-2xl space-y-4">

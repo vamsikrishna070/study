@@ -1,30 +1,13 @@
-/**
- * Universal Spatial Layout and Table Parser.
- * Uses 2D spatial coordinates (X, Y, W, H) from PDF and OCR bounding boxes to:
- * 1. Cluster words into logical lines and rows
- * 2. Detect multi-column vs tabular reading layouts
- * 3. Classify table columns (Unit/Module vs Content vs Metadata)
- * 4. Reconstruct multi-line wrapped cells
- * 5. Strip metadata columns (Contact Hours, CLOs, COs, References, Marks)
- */
+
 
 import { cleanOcrTypo } from './normalizer.js';
 
-/**
- * Clusters spatial text items into horizontal visual lines using Y-coordinate proximity.
- * @param {Array<{ str: string, x: number, y: number, width: number, height: number }>} items
- * @param {number} [yTolerance=4]
- * @returns {Array<{ y: number, height: number, items: Array<{ str: string, x: number, width: number }> }>}
- */
 export function clusterItemsIntoLines(items, yTolerance = 4) {
   if (!Array.isArray(items) || items.length === 0) return [];
 
-  // Filter out empty items
   const validItems = items.filter((it) => it && typeof it.str === 'string' && it.str.trim().length > 0);
   if (validItems.length === 0) return [];
 
-  // Sort descending by Y (standard PDF coordinate system where (0,0) is bottom-left)
-  // or ascending if top-left OCR system
   const isTopDown = validItems.some((it) => it.y === 0) || validItems[0].y < validItems[validItems.length - 1].y;
 
   const sorted = [...validItems].sort((a, b) => (isTopDown ? a.y - b.y : b.y - a.y));
@@ -41,7 +24,7 @@ export function clusterItemsIntoLines(items, yTolerance = 4) {
         currentLine.items.push(item);
         currentLine.height = Math.max(currentLine.height, item.height || 10);
       } else {
-        // Sort line items left-to-right (X ascending)
+
         currentLine.items.sort((a, b) => a.x - b.x);
         lines.push(currentLine);
         currentLine = { y: item.y, height: item.height || 10, items: [item] };
@@ -57,12 +40,6 @@ export function clusterItemsIntoLines(items, yTolerance = 4) {
   return lines;
 }
 
-/**
- * Detects whether a set of spatial lines represents a multi-column page layout (e.g. 2 columns).
- * @param {Array<{ items: Array<{ x: number, str: string }> }>} lines
- * @param {number} [pageWidth=600]
- * @returns {{ isMultiColumn: boolean, columnCount: number, columnBounds: Array<{ minX: number, maxX: number }> }}
- */
 export function detectMultiColumnLayout(lines, pageWidth = 600) {
   if (!Array.isArray(lines) || lines.length < 10) {
     return { isMultiColumn: false, columnCount: 1, columnBounds: [{ minX: 0, maxX: pageWidth }] };
@@ -86,53 +63,35 @@ export function detectMultiColumnLayout(lines, pageWidth = 600) {
   return { isMultiColumn: false, columnCount: 1, columnBounds: [{ minX: 0, maxX: pageWidth }] };
 }
 
-/**
- * Strips metadata columns (Hours, CLOs, COs, References, Marks, Page numbers) from a line or row.
- * @param {string} text
- * @returns {string}
- */
 export function stripMetadataColumns(text) {
   if (!text || typeof text !== 'string') return '';
   let cleaned = text.trim();
 
-  // Strip leading/trailing table noise and pipes
   cleaned = cleaned.replace(/^[|\[\]I!‘'~•\-\*\s]+/, '').replace(/[|\]\[}‘'~]+$/, '');
 
-  // Strip trailing table metadata columns:
-  // e.g. "| 1 | 1 | 1 |", " 1 1", " 2.4 3", " 24 1", " 1 2.4 3", " 1 1 1,2", " 3 3 1,2"
   cleaned = cleaned.replace(/\|\s*[\d\w,\s\.]*\|\s*[\d\w,\s\.]*\|\s*[\d\w,\s\.]*$/i, '');
   cleaned = cleaned.replace(/\|\s*[\d\w,\s\.]*\|\s*[\d\w,\s\.]*$/i, '');
   cleaned = cleaned.replace(/\s+\|\s*[\d\w\s\.,|]+$/i, '');
   cleaned = cleaned.replace(/\s+\d+(?:\.\d+)?\s+[\d,\s\.]+\s+[\d,\s\.]+$/i, '');
   cleaned = cleaned.replace(/\s+\d+(?:\.\d+)?\s+[\d,\s\.]+$/i, '');
-  
-  // Robust match for 3+ trailing columns (e.g., Hours, CLOs, References) commonly found in DAA / engineering syllabus tables
-  // Matches any sequence of space followed by numbers/commas/letters at the end of the line
+
   cleaned = cleaned.replace(/\s+\d+(?:\.\d+)?\s+[\d\w,\s\[\]\.\-]+\s+[\d\w,\s\[\]\.\-]+$/i, '');
 
   cleaned = cleaned.replace(/\s+\d{1,2}(?:\.\d+)?\s*$/i, '');
 
-  // Strip inline OCR column artifacts (e.g. " 24 representation", " 24 motivation")
   cleaned = cleaned.replace(/\s+\d{1,2}(?:\.\d+)?\s*\|\s*/g, ' ');
   cleaned = cleaned.replace(
     /\s+\d{1,2}(?:\.\d+)?\s+(?=[a-z]|representation|neuron|dimension|Forest|MADALINE|techniques|problem|classification|formulation|solution|gates|introduction|sample|collaborative|Bayesian|linear|SVM)/gi,
     ' '
   );
 
-  // Strip trailing section headers (e.g. "Course Unitization Plan - Lab")
   cleaned = cleaned.replace(/\.?\s*(?:Course\s+Unit(?:ization|isation)\s+Plan|Course\s+Utilization\s+Plan).*$/i, '').trim();
 
-  // Clean double commas or colon glitches
   cleaned = cleaned.replace(/,\s*,/g, ',').replace(/:\s*,\s*/g, ': ').trim();
 
   return cleanOcrTypo(cleaned);
 }
 
-/**
- * Checks whether a line represents a table column header (Unit No, Unit Name, Contact Hours, etc.).
- * @param {string} line
- * @returns {boolean}
- */
 export function isTableHeader(line) {
   if (!line || typeof line !== 'string') return false;
   const l = line.trim();
@@ -143,12 +102,6 @@ export function isTableHeader(line) {
   );
 }
 
-/**
- * Reconstructs wrapped multi-line table rows from a list of raw table lines.
- * Merges cell continuations intelligently based on grammar, punctuation, and layout.
- * @param {string[]} lines
- * @returns {string[]}
- */
 export function reconstructWrappedTableRows(lines) {
   if (!Array.isArray(lines) || lines.length === 0) return [];
 
@@ -175,7 +128,6 @@ export function reconstructWrappedTableRows(lines) {
 
     if (isUnitBoundary(c)) return false;
 
-    // Direct wrapped fragment checks
     if (
       /^(?:Underfitting|representation|decision\s+tree\s+algorithm|problem|inductive\s+bias|Collaborative\s+filtering|classification|Bayesian\s+Learning|formulation|function|solution\s+to|python\s+exercise|SVM|motivation|ANN\s+representation|neuron|gates\s+using|using\s+ADALINE|ADALINE:|Polynomial\s+discriminant|MADALINE|Introduction\b|dimension|Forest|techniques)\b/i.test(
         c
@@ -184,7 +136,6 @@ export function reconstructWrappedTableRows(lines) {
       return true;
     }
 
-    // Previous line ends with dangling preposition / connector / hyphen / comma
     const pClean = p.replace(/\s+[\d,\s\.'’|~}]+$/, '').trim();
     if (/[,:–—\-(]$/.test(pClean)) return true;
     if (
@@ -204,7 +155,6 @@ export function reconstructWrappedTableRows(lines) {
     const line = lines[i].trim();
     if (!line || isTableHeader(line)) continue;
 
-    // Check for section closure
     if (/^(?:Total\s+contact\s+hours|Course\s+Util(?:ization|itisation)\s+Plan\s*[-–—]?\s*Lab|Learning\s+Assessment)/i.test(line)) {
       if (currentBuffer) {
         reconstructed.push(currentBuffer);
@@ -213,7 +163,6 @@ export function reconstructWrappedTableRows(lines) {
       break;
     }
 
-    // Unit boundary is a standalone delimiter
     if (isUnitBoundary(line)) {
       if (currentBuffer) {
         reconstructed.push(currentBuffer);
@@ -223,7 +172,6 @@ export function reconstructWrappedTableRows(lines) {
       continue;
     }
 
-    // Split merged OCR lines if 2 topic starts were concatenated
     const mergedMatch = line.match(/^(issues\s+in\s+decision\s+tree\s+learning\s+[\d\.]*\s*)(Decision\s+tree\s+learning\s*\(ID3\).*)$/i);
     if (mergedMatch) {
       if (currentBuffer) reconstructed.push(currentBuffer);
@@ -242,7 +190,7 @@ export function reconstructWrappedTableRows(lines) {
         reconstructed.push(currentBuffer);
         currentBuffer = line;
       } else {
-        // Default fallback: if current line starts lowercase or previous ends incomplete
+
         currentBuffer = currentBuffer.replace(/\s+\d+[\s'’]*$/, '');
         currentBuffer += ' ' + line;
       }

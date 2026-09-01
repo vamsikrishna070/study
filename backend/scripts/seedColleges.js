@@ -51,13 +51,8 @@ const ALL_8_UTS = [
   'Puducherry'
 ];
 
-/**
- * Curated, authoritative dataset of prominent higher education institutions
- * covering all 28 Indian States & 8 Union Territories.
- * Sources: Ministry of Education (MoE), NIRF, AISHE, UGC, AICTE.
- */
 const INSTITUTIONS = [
-  // ── ANDHRA PRADESH ──────────────────────────────────────────────────────────
+
   { name: 'SRM University-AP', shortName: 'SRM-AP', type: 'University', state: 'Andhra Pradesh', city: 'Amaravati', district: 'Guntur', website: 'https://srmap.edu.in' },
   { name: 'K L University (Koneru Lakshmaiah Education Foundation)', shortName: 'KLU', type: 'Deemed University', state: 'Andhra Pradesh', city: 'Vaddeswaram', district: 'Guntur', website: 'https://kluniversity.in' },
   { name: 'Andhra University', shortName: 'AU', type: 'University', state: 'Andhra Pradesh', city: 'Visakhapatnam', district: 'Visakhapatnam', website: 'https://andhrauniversity.edu.in' },
@@ -74,7 +69,6 @@ const INSTITUTIONS = [
   { name: 'Velagapudi Ramakrishna Siddhartha Engineering College', shortName: 'VRSEC', type: 'Autonomous College', state: 'Andhra Pradesh', city: 'Vijayawada', district: 'NTR', website: 'https://vrsiddhartha.ac.in' },
   { name: 'Acharya Nagarjuna University', shortName: 'ANU', type: 'University', state: 'Andhra Pradesh', city: 'Nagarjuna Nagar', district: 'Guntur', website: 'https://nagarjunauniversity.ac.in' },
 
-  // ── TELANGANA ───────────────────────────────────────────────────────────────
   { name: 'Indian Institute of Technology Hyderabad', shortName: 'IITH', type: 'Institute of National Importance', state: 'Telangana', city: 'Kandi', district: 'Sangareddy', website: 'https://iith.ac.in' },
   { name: 'International Institute of Information Technology Hyderabad', shortName: 'IIIT Hyderabad', type: 'Deemed University', state: 'Telangana', city: 'Hyderabad', district: 'Hyderabad', website: 'https://iiit.ac.in' },
   { name: 'University of Hyderabad', shortName: 'UoH', type: 'University', state: 'Telangana', city: 'Hyderabad', district: 'Rangareddy', website: 'https://uohyd.ac.in' },
@@ -89,7 +83,6 @@ const INSTITUTIONS = [
   { name: 'Mahindra University', shortName: 'MU', type: 'University', state: 'Telangana', city: 'Hyderabad', district: 'Medchal', website: 'https://mahindrauniversity.edu.in' },
   { name: 'Gokaraju Rangaraju Institute of Engineering and Technology', shortName: 'GRIET', type: 'Autonomous College', state: 'Telangana', city: 'Hyderabad', district: 'Medchal', website: 'https://griet.ac.in' },
 
-  // ── KARNATAKA ───────────────────────────────────────────────────────────────
   { name: 'Indian Institute of Science Bangalore', shortName: 'IISc', type: 'Institute of National Importance', state: 'Karnataka', city: 'Bengaluru', district: 'Bengaluru Urban', website: 'https://iisc.ac.in' },
   { name: 'National Institute of Technology Karnataka Surathkal', shortName: 'NITK', type: 'Institute of National Importance', state: 'Karnataka', city: 'Surathkal', district: 'Dakshina Kannada', website: 'https://nitk.ac.in' },
   { name: 'Indian Institute of Information Technology Bangalore', shortName: 'IIIT Bangalore', type: 'Deemed University', state: 'Karnataka', city: 'Bengaluru', district: 'Bengaluru Urban', website: 'https://iiitb.ac.in' },
@@ -103,7 +96,6 @@ const INSTITUTIONS = [
   { name: 'University of Mysore', shortName: 'UoM', type: 'University', state: 'Karnataka', city: 'Mysuru', district: 'Mysuru', website: 'https://uni-mysore.ac.in' },
   { name: 'National Institute of Mental Health and Neurosciences', shortName: 'NIMHANS', type: 'Institute of National Importance', state: 'Karnataka', city: 'Bengaluru', district: 'Bengaluru Urban', website: 'https://nimhans.ac.in' },
 
-  // ── TAMIL NADU ──────────────────────────────────────────────────────────────
   { name: 'Indian Institute of Technology Madras', shortName: 'IIT Madras', type: 'Institute of National Importance', state: 'Tamil Nadu', city: 'Chennai', district: 'Chennai', website: 'https://iitm.ac.in' },
   { name: 'National Institute of Technology Tiruchirappalli', shortName: 'NIT Trichy', type: 'Institute of National Importance', state: 'Tamil Nadu', city: 'Tiruchirappalli', district: 'Tiruchirappalli', website: 'https://nitt.edu' },
   { name: 'Anna University', shortName: 'Anna University', type: 'University', state: 'Tamil Nadu', city: 'Chennai', district: 'Chennai', website: 'https://annauniv.edu' },
@@ -117,7 +109,6 @@ const INSTITUTIONS = [
   { name: 'Loyola College', shortName: 'Loyola', type: 'Autonomous College', state: 'Tamil Nadu', city: 'Chennai', district: 'Chennai', website: 'https://loyolacollege.edu' },
   { name: 'Coimbatore Institute of Technology', shortName: 'CIT', type: 'Autonomous College', state: 'Tamil Nadu', city: 'Coimbatore', district: 'Coimbatore', website: 'https://cit.edu.in' },
 
-  // ── MAHARASHTRA ─────────────────────────────────────────────────────────────
   { name: 'Indian Institute of Technology Bombay', shortName: 'IIT Bombay', type: 'Institute of National Importance', state: 'Maharashtra', city: 'Mumbai', district: 'Mumbai Suburban', website: 'https://iitb.ac.in' },
   { name: 'Visvesvaraya National Institute of Technology Nagpur', shortName: 'VNIT Nagpur', type: 'Institute of National Importance', state: 'Maharashtra', city: 'Nagpur', district: 'Nagpur', website: 'https://vnit.ac.in' },
   { name: 'Veermata Jijabai Technological Institute', shortName: 'VJTI', type: 'Autonomous College', state: 'Maharashtra', city: 'Mumbai', district: 'Mumbai City', website: 'https://vjti.ac.in' },
@@ -130,7 +121,6 @@ const INSTITUTIONS = [
   { name: 'Vishwakarma Institute of Technology', shortName: 'VIT Pune', type: 'Autonomous College', state: 'Maharashtra', city: 'Pune', district: 'Pune', website: 'https://vit.edu' },
   { name: 'St. Xavier\'s College Mumbai', shortName: 'Xaviers Mumbai', type: 'Autonomous College', state: 'Maharashtra', city: 'Mumbai', district: 'Mumbai City', website: 'https://xaviers.edu' },
 
-  // ── DELHI (UT) ──────────────────────────────────────────────────────────────
   { name: 'Indian Institute of Technology Delhi', shortName: 'IIT Delhi', type: 'Institute of National Importance', state: 'Delhi', city: 'New Delhi', district: 'South Delhi', website: 'https://iitd.ac.in' },
   { name: 'Delhi Technological University', shortName: 'DTU', type: 'University', state: 'Delhi', city: 'Delhi', district: 'North West Delhi', website: 'https://dtu.ac.in' },
   { name: 'Netaji Subhas University of Technology', shortName: 'NSUT', type: 'University', state: 'Delhi', city: 'New Delhi', district: 'South West Delhi', website: 'https://nsut.ac.in' },
@@ -143,7 +133,6 @@ const INSTITUTIONS = [
   { name: 'St. Stephen\'s College', shortName: 'St. Stephens', type: 'College', state: 'Delhi', city: 'Delhi', district: 'North Delhi', website: 'https://ststephens.edu' },
   { name: 'Shri Ram College of Commerce', shortName: 'SRCC', type: 'College', state: 'Delhi', city: 'Delhi', district: 'North Delhi', website: 'https://srcc.edu' },
 
-  // ── UTTAR PRADESH ───────────────────────────────────────────────────────────
   { name: 'Indian Institute of Technology Kanpur', shortName: 'IIT Kanpur', type: 'Institute of National Importance', state: 'Uttar Pradesh', city: 'Kanpur', district: 'Kanpur Nagar', website: 'https://iitk.ac.in' },
   { name: 'Indian Institute of Technology (BHU) Varanasi', shortName: 'IIT BHU', type: 'Institute of National Importance', state: 'Uttar Pradesh', city: 'Varanasi', district: 'Varanasi', website: 'https://iitbhu.ac.in' },
   { name: 'Motilal Nehru National Institute of Technology Allahabad', shortName: 'MNNIT', type: 'Institute of National Importance', state: 'Uttar Pradesh', city: 'Prayagraj', district: 'Prayagraj', website: 'https://mnnit.ac.in' },
@@ -157,7 +146,6 @@ const INSTITUTIONS = [
   { name: 'Shiv Nadar University', shortName: 'SNU', type: 'University', state: 'Uttar Pradesh', city: 'Greater Noida', district: 'Gautam Buddha Nagar', website: 'https://snu.edu.in' },
   { name: 'Amity University Noida', shortName: 'Amity', type: 'University', state: 'Uttar Pradesh', city: 'Noida', district: 'Gautam Buddha Nagar', website: 'https://amity.edu' },
 
-  // ── WEST BENGAL ─────────────────────────────────────────────────────────────
   { name: 'Indian Institute of Technology Kharagpur', shortName: 'IIT Kharagpur', type: 'Institute of National Importance', state: 'West Bengal', city: 'Kharagpur', district: 'Paschim Medinipur', website: 'https://iitkgp.ac.in' },
   { name: 'Indian Institute of Engineering Science and Technology Shibpur', shortName: 'IIEST Shibpur', type: 'Institute of National Importance', state: 'West Bengal', city: 'Howrah', district: 'Howrah', website: 'https://iiests.ac.in' },
   { name: 'National Institute of Technology Durgapur', shortName: 'NIT Durgapur', type: 'Institute of National Importance', state: 'West Bengal', city: 'Durgapur', district: 'Paschim Bardhaman', website: 'https://nitdgp.ac.in' },
@@ -168,7 +156,6 @@ const INSTITUTIONS = [
   { name: 'St. Xavier\'s College Kolkata', shortName: 'SXCK', type: 'Autonomous College', state: 'West Bengal', city: 'Kolkata', district: 'Kolkata', website: 'https://sxccal.edu' },
   { name: 'Presidency University', shortName: 'Presidency', type: 'University', state: 'West Bengal', city: 'Kolkata', district: 'Kolkata', website: 'https://presiuniv.ac.in' },
 
-  // ── GUJARAT ─────────────────────────────────────────────────────────────────
   { name: 'Indian Institute of Technology Gandhinagar', shortName: 'IITGN', type: 'Institute of National Importance', state: 'Gujarat', city: 'Gandhinagar', district: 'Gandhinagar', website: 'https://iitgn.ac.in' },
   { name: 'Sardar Vallabhbhai National Institute of Technology Surat', shortName: 'SVNIT', type: 'Institute of National Importance', state: 'Gujarat', city: 'Surat', district: 'Surat', website: 'https://svnit.ac.in' },
   { name: 'Dhirubhai Ambani Institute of Information and Communication Technology', shortName: 'DA-IICT', type: 'University', state: 'Gujarat', city: 'Gandhinagar', district: 'Gandhinagar', website: 'https://daiict.ac.in' },
@@ -177,7 +164,6 @@ const INSTITUTIONS = [
   { name: 'Maharaja Sayajirao University of Baroda', shortName: 'MSU Baroda', type: 'University', state: 'Gujarat', city: 'Vadodara', district: 'Vadodara', website: 'https://msubaroda.ac.in' },
   { name: 'Gujarat Technological University', shortName: 'GTU', type: 'University', state: 'Gujarat', city: 'Ahmedabad', district: 'Ahmedabad', website: 'https://gtu.ac.in' },
 
-  // ── KERALA ──────────────────────────────────────────────────────────────────
   { name: 'National Institute of Technology Calicut', shortName: 'NIT Calicut', type: 'Institute of National Importance', state: 'Kerala', city: 'Kozhikode', district: 'Kozhikode', website: 'https://nitc.ac.in' },
   { name: 'Indian Institute of Technology Palakkad', shortName: 'IIT Palakkad', type: 'Institute of National Importance', state: 'Kerala', city: 'Palakkad', district: 'Palakkad', website: 'https://iitpkd.ac.in' },
   { name: 'APJ Abdul Kalam Technological University', shortName: 'KTU', type: 'University', state: 'Kerala', city: 'Thiruvananthapuram', district: 'Thiruvananthapuram', website: 'https://ktu.edu.in' },
@@ -185,7 +171,6 @@ const INSTITUTIONS = [
   { name: 'Cochin University of Science and Technology', shortName: 'CUSAT', type: 'University', state: 'Kerala', city: 'Kochi', district: 'Ernakulam', website: 'https://cusat.ac.in' },
   { name: 'TKM College of Engineering', shortName: 'TKMCE', type: 'College', state: 'Kerala', city: 'Kollam', district: 'Kollam', website: 'https://tkmce.ac.in' },
 
-  // ── RAJASTHAN ───────────────────────────────────────────────────────────────
   { name: 'Birla Institute of Technology and Science Pilani', shortName: 'BITS Pilani', type: 'Deemed University', state: 'Rajasthan', city: 'Pilani', district: 'Jhunjhunu', website: 'https://bits-pilani.ac.in' },
   { name: 'Malaviya National Institute of Technology Jaipur', shortName: 'MNIT Jaipur', type: 'Institute of National Importance', state: 'Rajasthan', city: 'Jaipur', district: 'Jaipur', website: 'https://mnit.ac.in' },
   { name: 'Indian Institute of Technology Jodhpur', shortName: 'IIT Jodhpur', type: 'Institute of National Importance', state: 'Rajasthan', city: 'Jodhpur', district: 'Jodhpur', website: 'https://iitj.ac.in' },
@@ -193,7 +178,6 @@ const INSTITUTIONS = [
   { name: 'University of Rajasthan', shortName: 'UNIRAJ', type: 'University', state: 'Rajasthan', city: 'Jaipur', district: 'Jaipur', website: 'https://uniraj.ac.in' },
   { name: 'Manipal University Jaipur', shortName: 'MUJ', type: 'University', state: 'Rajasthan', city: 'Jaipur', district: 'Jaipur', website: 'https://jaipur.manipal.edu' },
 
-  // ── PUNJAB ──────────────────────────────────────────────────────────────────
   { name: 'Indian Institute of Technology Ropar', shortName: 'IIT Ropar', type: 'Institute of National Importance', state: 'Punjab', city: 'Rupnagar', district: 'Rupnagar', website: 'https://iitrpr.ac.in' },
   { name: 'Thapar Institute of Engineering and Technology', shortName: 'TIET', type: 'Deemed University', state: 'Punjab', city: 'Patiala', district: 'Patiala', website: 'https://thapar.edu' },
   { name: 'Dr. B. R. Ambedkar National Institute of Technology Jalandhar', shortName: 'NIT Jalandhar', type: 'Institute of National Importance', state: 'Punjab', city: 'Jalandhar', district: 'Jalandhar', website: 'https://nitj.ac.in' },
@@ -201,7 +185,6 @@ const INSTITUTIONS = [
   { name: 'Panjab University', shortName: 'PU', type: 'University', state: 'Punjab', city: 'Chandigarh', district: 'Chandigarh', website: 'https://puchd.ac.in' },
   { name: 'Lovely Professional University', shortName: 'LPU', type: 'University', state: 'Punjab', city: 'Phagwara', district: 'Kapurthala', website: 'https://lpu.in' },
 
-  // ── HARYANA ─────────────────────────────────────────────────────────────────
   { name: 'National Institute of Technology Kurukshetra', shortName: 'NIT Kurukshetra', type: 'Institute of National Importance', state: 'Haryana', city: 'Kurukshetra', district: 'Kurukshetra', website: 'https://nitkkr.ac.in' },
   { name: 'Ashoka University', shortName: 'Ashoka', type: 'University', state: 'Haryana', city: 'Sonipat', district: 'Sonipat', website: 'https://ashoka.edu.in' },
   { name: 'O. P. Jindal Global University', shortName: 'JGU', type: 'University', state: 'Haryana', city: 'Sonipat', district: 'Sonipat', website: 'https://jgu.edu.in' },
@@ -209,7 +192,6 @@ const INSTITUTIONS = [
   { name: 'Kurukshetra University', shortName: 'KUK', type: 'University', state: 'Haryana', city: 'Kurukshetra', district: 'Kurukshetra', website: 'https://kuk.ac.in' },
   { name: 'Maharshi Dayanand University', shortName: 'MDU', type: 'University', state: 'Haryana', city: 'Rohtak', district: 'Rohtak', website: 'https://mdu.ac.in' },
 
-  // ── MADHYA PRADESH ──────────────────────────────────────────────────────────
   { name: 'Indian Institute of Technology Indore', shortName: 'IIT Indore', type: 'Institute of National Importance', state: 'Madhya Pradesh', city: 'Indore', district: 'Indore', website: 'https://iiti.ac.in' },
   { name: 'Maulana Azad National Institute of Technology Bhopal', shortName: 'MANIT Bhopal', type: 'Institute of National Importance', state: 'Madhya Pradesh', city: 'Bhopal', district: 'Bhopal', website: 'https://manit.ac.in' },
   { name: 'Atal Bihari Vajpayee Indian Institute of Information Technology and Management Gwalior', shortName: 'IIITM Gwalior', type: 'Institute of National Importance', state: 'Madhya Pradesh', city: 'Gwalior', district: 'Gwalior', website: 'https://iiitm.ac.in' },
@@ -217,7 +199,6 @@ const INSTITUTIONS = [
   { name: 'Shri Govindram Seksaria Institute of Technology and Science', shortName: 'SGSITS', type: 'Autonomous College', state: 'Madhya Pradesh', city: 'Indore', district: 'Indore', website: 'https://sgsits.ac.in' },
   { name: 'Vellore Institute of Technology Bhopal', shortName: 'VIT Bhopal', type: 'University', state: 'Madhya Pradesh', city: 'Sehore', district: 'Sehore', website: 'https://vitbhopal.ac.in' },
 
-  // ── BIHAR ───────────────────────────────────────────────────────────────────
   { name: 'Indian Institute of Technology Patna', shortName: 'IIT Patna', type: 'Institute of National Importance', state: 'Bihar', city: 'Patna', district: 'Patna', website: 'https://iitp.ac.in' },
   { name: 'National Institute of Technology Patna', shortName: 'NIT Patna', type: 'Institute of National Importance', state: 'Bihar', city: 'Patna', district: 'Patna', website: 'https://nitp.ac.in' },
   { name: 'All India Institute of Medical Sciences Patna', shortName: 'AIIMS Patna', type: 'Institute of National Importance', state: 'Bihar', city: 'Patna', district: 'Patna', website: 'https://aiimspatna.edu.in' },
@@ -225,7 +206,6 @@ const INSTITUTIONS = [
   { name: 'Aryabhatta Knowledge University', shortName: 'AKU Patna', type: 'University', state: 'Bihar', city: 'Patna', district: 'Patna', website: 'https://akubihar.ac.in' },
   { name: 'Birla Institute of Technology Patna', shortName: 'BIT Patna', type: 'College', state: 'Bihar', city: 'Patna', district: 'Patna', website: 'https://bitmesra.ac.in' },
 
-  // ── ODISHA ──────────────────────────────────────────────────────────────────
   { name: 'Indian Institute of Technology Bhubaneswar', shortName: 'IIT Bhubaneswar', type: 'Institute of National Importance', state: 'Odisha', city: 'Bhubaneswar', district: 'Khordha', website: 'https://iitbbs.ac.in' },
   { name: 'National Institute of Technology Rourkela', shortName: 'NIT Rourkela', type: 'Institute of National Importance', state: 'Odisha', city: 'Rourkela', district: 'Sundargarh', website: 'https://nitrkl.ac.in' },
   { name: 'Kalinga Institute of Industrial Technology', shortName: 'KIIT', type: 'Deemed University', state: 'Odisha', city: 'Bhubaneswar', district: 'Khordha', website: 'https://kiit.ac.in' },
@@ -233,112 +213,92 @@ const INSTITUTIONS = [
   { name: 'College of Engineering and Technology Bhubaneswar (OUTR)', shortName: 'OUTR', type: 'University', state: 'Odisha', city: 'Bhubaneswar', district: 'Khordha', website: 'https://outr.ac.in' },
   { name: 'Utkal University', shortName: 'Utkal', type: 'University', state: 'Odisha', city: 'Bhubaneswar', district: 'Khordha', website: 'https://utkaluniversity.ac.in' },
 
-  // ── JHARKHAND ───────────────────────────────────────────────────────────────
   { name: 'Indian Institute of Technology (ISM) Dhanbad', shortName: 'IIT ISM', type: 'Institute of National Importance', state: 'Jharkhand', city: 'Dhanbad', district: 'Dhanbad', website: 'https://iitism.ac.in' },
   { name: 'Birla Institute of Technology Mesra', shortName: 'BIT Mesra', type: 'Deemed University', state: 'Jharkhand', city: 'Ranchi', district: 'Ranchi', website: 'https://bitmesra.ac.in' },
   { name: 'National Institute of Technology Jamshedpur', shortName: 'NIT Jamshedpur', type: 'Institute of National Importance', state: 'Jharkhand', city: 'Jamshedpur', district: 'East Singhbhum', website: 'https://nitjsr.ac.in' },
   { name: 'Xavier Labour Relations Institute', shortName: 'XLRI', type: 'Institute of National Importance', state: 'Jharkhand', city: 'Jamshedpur', district: 'East Singhbhum', website: 'https://xlri.ac.in' },
   { name: 'Ranchi University', shortName: 'RU', type: 'University', state: 'Jharkhand', city: 'Ranchi', district: 'Ranchi', website: 'https://ranchiuniversity.ac.in' },
 
-  // ── CHHATTISGARH ────────────────────────────────────────────────────────────
   { name: 'National Institute of Technology Raipur', shortName: 'NIT Raipur', type: 'Institute of National Importance', state: 'Chhattisgarh', city: 'Raipur', district: 'Raipur', website: 'https://nitrr.ac.in' },
   { name: 'Indian Institute of Technology Bhilai', shortName: 'IIT Bhilai', type: 'Institute of National Importance', state: 'Chhattisgarh', city: 'Bhilai', district: 'Durg', website: 'https://iitbhilai.ac.in' },
   { name: 'International Institute of Information Technology Naya Raipur', shortName: 'IIIT Naya Raipur', type: 'University', state: 'Chhattisgarh', city: 'Naya Raipur', district: 'Raipur', website: 'https://iiitnr.ac.in' },
   { name: 'Chhattisgarh Swami Vivekanand Technical University', shortName: 'CSVTU', type: 'University', state: 'Chhattisgarh', city: 'Bhilai', district: 'Durg', website: 'https://csvtu.ac.in' },
 
-  // ── ASSAM ───────────────────────────────────────────────────────────────────
   { name: 'Indian Institute of Technology Guwahati', shortName: 'IIT Guwahati', type: 'Institute of National Importance', state: 'Assam', city: 'Guwahati', district: 'Kamrup', website: 'https://iitg.ac.in' },
   { name: 'National Institute of Technology Silchar', shortName: 'NIT Silchar', type: 'Institute of National Importance', state: 'Assam', city: 'Silchar', district: 'Cachar', website: 'https://nits.ac.in' },
   { name: 'Gauhati University', shortName: 'GU', type: 'University', state: 'Assam', city: 'Guwahati', district: 'Kamrup', website: 'https://gauhati.ac.in' },
   { name: 'Tezpur University', shortName: 'TU', type: 'University', state: 'Assam', city: 'Tezpur', district: 'Sonitpur', website: 'https://tezu.ernet.in' },
   { name: 'Assam Engineering College', shortName: 'AEC', type: 'College', state: 'Assam', city: 'Guwahati', district: 'Kamrup', website: 'https://aec.ac.in' },
 
-  // ── UTTARAKHAND ─────────────────────────────────────────────────────────────
   { name: 'Indian Institute of Technology Roorkee', shortName: 'IIT Roorkee', type: 'Institute of National Importance', state: 'Uttarakhand', city: 'Roorkee', district: 'Haridwar', website: 'https://iitr.ac.in' },
   { name: 'National Institute of Technology Uttarakhand', shortName: 'NIT UK', type: 'Institute of National Importance', state: 'Uttarakhand', city: 'Srinagar', district: 'Pauri Garhwal', website: 'https://nituk.ac.in' },
   { name: 'University of Petroleum and Energy Studies', shortName: 'UPES', type: 'University', state: 'Uttarakhand', city: 'Dehradun', district: 'Dehradun', website: 'https://upes.ac.in' },
   { name: 'Graphic Era University', shortName: 'GEU', type: 'Deemed University', state: 'Uttarakhand', city: 'Dehradun', district: 'Dehradun', website: 'https://geu.ac.in' },
   { name: 'Govind Ballabh Pant University of Agriculture and Technology', shortName: 'GBPUAT', type: 'University', state: 'Uttarakhand', city: 'Pantnagar', district: 'Udham Singh Nagar', website: 'https://gbpuat.ac.in' },
 
-  // ── HIMACHAL PRADESH ────────────────────────────────────────────────────────
   { name: 'Indian Institute of Technology Mandi', shortName: 'IIT Mandi', type: 'Institute of National Importance', state: 'Himachal Pradesh', city: 'Mandi', district: 'Mandi', website: 'https://iitmandi.ac.in' },
   { name: 'National Institute of Technology Hamirpur', shortName: 'NIT Hamirpur', type: 'Institute of National Importance', state: 'Himachal Pradesh', city: 'Hamirpur', district: 'Hamirpur', website: 'https://nith.ac.in' },
   { name: 'Jaypee University of Information Technology', shortName: 'JUIT Waknaghat', type: 'University', state: 'Himachal Pradesh', city: 'Waknaghat', district: 'Solan', website: 'https://juit.ac.in' },
   { name: 'Himachal Pradesh University', shortName: 'HPU', type: 'University', state: 'Himachal Pradesh', city: 'Shimla', district: 'Shimla', website: 'https://hpuniv.ac.in' },
 
-  // ── GOA ─────────────────────────────────────────────────────────────────────
   { name: 'Birla Institute of Technology and Science Pilani - K. K. Birla Goa Campus', shortName: 'BITS Goa', type: 'Deemed University', state: 'Goa', city: 'Zuarinagar', district: 'South Goa', website: 'https://bits-pilani.ac.in/goa' },
   { name: 'National Institute of Technology Goa', shortName: 'NIT Goa', type: 'Institute of National Importance', state: 'Goa', city: 'Cuncolim', district: 'South Goa', website: 'https://nitgoa.ac.in' },
   { name: 'Indian Institute of Technology Goa', shortName: 'IIT Goa', type: 'Institute of National Importance', state: 'Goa', city: 'Ponda', district: 'North Goa', website: 'https://iitgoa.ac.in' },
   { name: 'Goa University', shortName: 'GU Goa', type: 'University', state: 'Goa', city: 'Taleigao', district: 'North Goa', website: 'https://unigoa.ac.in' },
   { name: 'Goa College of Engineering', shortName: 'GEC', type: 'College', state: 'Goa', city: 'Farmagudi', district: 'North Goa', website: 'https://gec.ac.in' },
 
-  // ── JAMMU & KASHMIR (UT) ────────────────────────────────────────────────────
   { name: 'National Institute of Technology Srinagar', shortName: 'NIT Srinagar', type: 'Institute of National Importance', state: 'Jammu and Kashmir', city: 'Srinagar', district: 'Srinagar', website: 'https://nitsri.ac.in' },
   { name: 'Indian Institute of Technology Jammu', shortName: 'IIT Jammu', type: 'Institute of National Importance', state: 'Jammu and Kashmir', city: 'Jammu', district: 'Jammu', website: 'https://iitjammu.ac.in' },
   { name: 'University of Kashmir', shortName: 'KU Kashmir', type: 'University', state: 'Jammu and Kashmir', city: 'Srinagar', district: 'Srinagar', website: 'https://kashmiruniversity.net' },
   { name: 'University of Jammu', shortName: 'JU Jammu', type: 'University', state: 'Jammu and Kashmir', city: 'Jammu', district: 'Jammu', website: 'https://jammuuniversity.ac.in' },
   { name: 'Shri Mata Vaishno Devi University', shortName: 'SMVDU', type: 'University', state: 'Jammu and Kashmir', city: 'Katra', district: 'Reasi', website: 'https://smvdu.ac.in' },
 
-  // ── CHANDIGARH (UT) ─────────────────────────────────────────────────────────
   { name: 'Punjab Engineering College', shortName: 'PEC Chandigarh', type: 'Deemed University', state: 'Chandigarh', city: 'Chandigarh', district: 'Chandigarh', website: 'https://pec.ac.in' },
   { name: 'Postgraduate Institute of Medical Education and Research', shortName: 'PGIMER', type: 'Institute of National Importance', state: 'Chandigarh', city: 'Chandigarh', district: 'Chandigarh', website: 'https://pgimer.edu.in' },
   { name: 'Chandigarh College of Engineering and Technology', shortName: 'CCET', type: 'College', state: 'Chandigarh', city: 'Chandigarh', district: 'Chandigarh', website: 'https://ccet.ac.in' },
 
-  // ── PUDUCHERRY (UT) ─────────────────────────────────────────────────────────
   { name: 'Pondicherry University', shortName: 'PU Pondicherry', type: 'University', state: 'Puducherry', city: 'Puducherry', district: 'Puducherry', website: 'https://pondiuni.edu.in' },
   { name: 'National Institute of Technology Puducherry', shortName: 'NITPY', type: 'Institute of National Importance', state: 'Puducherry', city: 'Karaikal', district: 'Karaikal', website: 'https://nitpy.ac.in' },
   { name: 'Jawaharlal Institute of Postgraduate Medical Education and Research', shortName: 'JIPMER', type: 'Institute of National Importance', state: 'Puducherry', city: 'Puducherry', district: 'Puducherry', website: 'https://jipmer.edu.in' },
   { name: 'Puducherry Technological University', shortName: 'PTU Pondicherry', type: 'University', state: 'Puducherry', city: 'Puducherry', district: 'Puducherry', website: 'https://ptupuducherry.ac.in' },
 
-  // ── TRIPURA ─────────────────────────────────────────────────────────────────
   { name: 'National Institute of Technology Agartala', shortName: 'NIT Agartala', type: 'Institute of National Importance', state: 'Tripura', city: 'Agartala', district: 'West Tripura', website: 'https://nita.ac.in' },
   { name: 'Tripura University', shortName: 'TU Agartala', type: 'University', state: 'Tripura', city: 'Suryamaninagar', district: 'West Tripura', website: 'https://tripurauniv.ac.in' },
 
-  // ── MEGHALAYA ───────────────────────────────────────────────────────────────
   { name: 'National Institute of Technology Meghalaya', shortName: 'NIT Meghalaya', type: 'Institute of National Importance', state: 'Meghalaya', city: 'Shillong', district: 'East Khasi Hills', website: 'https://nitm.ac.in' },
   { name: 'North-Eastern Hill University', shortName: 'NEHU', type: 'University', state: 'Meghalaya', city: 'Shillong', district: 'East Khasi Hills', website: 'https://nehu.ac.in' },
   { name: 'Indian Institute of Management Shillong', shortName: 'IIM Shillong', type: 'Institute of National Importance', state: 'Meghalaya', city: 'Shillong', district: 'East Khasi Hills', website: 'https://iimshillong.ac.in' },
 
-  // ── MANIPUR ─────────────────────────────────────────────────────────────────
   { name: 'National Institute of Technology Manipur', shortName: 'NIT Manipur', type: 'Institute of National Importance', state: 'Manipur', city: 'Imphal', district: 'Imphal West', website: 'https://nitmanipur.ac.in' },
   { name: 'Indian Institute of Information Technology Manipur', shortName: 'IIIT Manipur', type: 'Institute of National Importance', state: 'Manipur', city: 'Imphal', district: 'Imphal West', website: 'https://iiitmanipur.ac.in' },
   { name: 'Manipur University', shortName: 'MU Imphal', type: 'University', state: 'Manipur', city: 'Imphal', district: 'Imphal West', website: 'https://manipuruniv.ac.in' },
 
-  // ── MIZORAM ─────────────────────────────────────────────────────────────────
   { name: 'National Institute of Technology Mizoram', shortName: 'NIT Mizoram', type: 'Institute of National Importance', state: 'Mizoram', city: 'Aizawl', district: 'Aizawl', website: 'https://nitmz.ac.in' },
   { name: 'Mizoram University', shortName: 'MZU', type: 'University', state: 'Mizoram', city: 'Aizawl', district: 'Aizawl', website: 'https://mzu.edu.in' },
 
-  // ── NAGALAND ────────────────────────────────────────────────────────────────
   { name: 'National Institute of Technology Nagaland', shortName: 'NIT Nagaland', type: 'Institute of National Importance', state: 'Nagaland', city: 'Chumukedima', district: 'Chumukedima', website: 'https://nitnagaland.ac.in' },
   { name: 'Nagaland University', shortName: 'NU', type: 'University', state: 'Nagaland', city: 'Lumami', district: 'Zunheboto', website: 'https://nagalanduniversity.ac.in' },
 
-  // ── ARUNACHAL PRADESH ───────────────────────────────────────────────────────
   { name: 'National Institute of Technology Arunachal Pradesh', shortName: 'NIT Arunachal', type: 'Institute of National Importance', state: 'Arunachal Pradesh', city: 'Jote', district: 'Papum Pare', website: 'https://nitap.ac.in' },
   { name: 'North Eastern Regional Institute of Science and Technology', shortName: 'NERIST', type: 'Deemed University', state: 'Arunachal Pradesh', city: 'Nirjuli', district: 'Papum Pare', website: 'https://nerist.ac.in' },
   { name: 'Rajiv Gandhi University', shortName: 'RGU', type: 'University', state: 'Arunachal Pradesh', city: 'Doimukh', district: 'Papum Pare', website: 'https://rgu.ac.in' },
 
-  // ── SIKKIM ──────────────────────────────────────────────────────────────────
   { name: 'National Institute of Technology Sikkim', shortName: 'NIT Sikkim', type: 'Institute of National Importance', state: 'Sikkim', city: 'Ravangla', district: 'Namchi', website: 'https://nitsikkim.ac.in' },
   { name: 'Sikkim Manipal Institute of Technology', shortName: 'SMIT', type: 'University', state: 'Sikkim', city: 'Majitar', district: 'Pakyong', website: 'https://smu.edu.in/smit' },
   { name: 'Sikkim University', shortName: 'SU', type: 'University', state: 'Sikkim', city: 'Gangtok', district: 'Gangtok', website: 'https://cus.ac.in' },
 
-  // ── ANDAMAN AND NICOBAR ISLANDS (UT) ─────────────────────────────────────────
   { name: 'Dr. B. R. Ambedkar Institute of Technology', shortName: 'DBRAIT', type: 'College', state: 'Andaman and Nicobar Islands', city: 'Port Blair', district: 'South Andaman', website: 'https://dbrait.andaman.gov.in' },
   { name: 'Andaman and Nicobar Islands Institute of Medical Sciences', shortName: 'ANIIMS', type: 'College', state: 'Andaman and Nicobar Islands', city: 'Port Blair', district: 'South Andaman', website: 'https://aniims.org' },
   { name: 'Jawaharlal Nehru Rajkeeya Mahavidyalaya', shortName: 'JNRM', type: 'College', state: 'Andaman and Nicobar Islands', city: 'Port Blair', district: 'South Andaman', website: 'https://jnrm.and.nic.in' },
 
-  // ── LADAKH (UT) ─────────────────────────────────────────────────────────────
   { name: 'University of Ladakh', shortName: 'UOL', type: 'University', state: 'Ladakh', city: 'Leh', district: 'Leh', website: 'https://universityofladakh.ac.in' },
   { name: 'Eliezer Joldan Memorial College Leh', shortName: 'EJM College', type: 'College', state: 'Ladakh', city: 'Leh', district: 'Leh', website: 'https://ejmcollegeleh.in' },
   { name: 'Government Degree College Kargil', shortName: 'GDC Kargil', type: 'College', state: 'Ladakh', city: 'Kargil', district: 'Kargil', website: 'https://gdckargil.in' },
 
-  // ── DADRA AND NAGAR HAVELI AND DAMAN AND DIU (UT) ───────────────────────────
   { name: 'Dr. S. & S. S. Ghandhy Government Engineering College (Silvassa Campus / GEC)', shortName: 'GEC Daman', type: 'College', state: 'Dadra and Nagar Haveli and Daman and Diu', city: 'Daman', district: 'Daman', website: 'https://daman.nic.in' },
   { name: 'Government College Daman', shortName: 'GC Daman', type: 'College', state: 'Dadra and Nagar Haveli and Daman and Diu', city: 'Daman', district: 'Daman', website: 'https://daman.nic.in' },
   { name: 'Dr. APJ Abdul Kalam Government College Silvassa', shortName: 'APJAKGC Silvassa', type: 'College', state: 'Dadra and Nagar Haveli and Daman and Diu', city: 'Silvassa', district: 'Dadra and Nagar Haveli', website: 'https://dnh.gov.in' },
 
-  // ── LAKSHADWEEP (UT) ────────────────────────────────────────────────────────
   { name: 'Calicut University Centre Kadmat', shortName: 'CUC Kadmat', type: 'College', state: 'Lakshadweep', city: 'Kadmat Island', district: 'Lakshadweep', website: 'https://uoc.ac.in' },
   { name: 'Government Jawaharlal Nehru College Kavaratti', shortName: 'JNC Kavaratti', type: 'College', state: 'Lakshadweep', city: 'Kavaratti', district: 'Lakshadweep', website: 'https://lakshadweep.gov.in' },
   { name: 'Mahatma Gandhi College Andrott', shortName: 'MG College Andrott', type: 'College', state: 'Lakshadweep', city: 'Andrott Island', district: 'Lakshadweep', website: 'https://lakshadweep.gov.in' },
@@ -359,10 +319,10 @@ export async function seedColleges() {
       const normalizedName = inst.name.trim().toLowerCase();
       return {
         updateOne: {
-          filter: { 
-            normalizedName, 
-            state: inst.state.trim(), 
-            city: (inst.city || '').trim() 
+          filter: {
+            normalizedName,
+            state: inst.state.trim(),
+            city: (inst.city || '').trim()
           },
           update: {
             $set: {
@@ -385,9 +345,8 @@ export async function seedColleges() {
     const result = await College.bulkWrite(operations);
     console.log(`[SEED RESULT] Upserted: ${result.upsertedCount}, Modified: ${result.modifiedCount}, Matched: ${result.matchedCount}`);
 
-    // Verify all 28 States and 8 UTs are covered
     const dbStates = await College.distinct('state', { isActive: true });
-    
+
     const statesFound = ALL_28_STATES.filter(s => dbStates.includes(s));
     const utsFound = ALL_8_UTS.filter(u => dbStates.includes(u));
 
@@ -401,7 +360,6 @@ export async function seedColleges() {
     const totalInstitutions = await College.countDocuments({ isActive: true });
     console.log(`Total Active Institutions:  ${totalInstitutions}`);
 
-    // Breakdown per state/UT
     console.log('\nBreakdown per State / UT:');
     const breakdown = await College.aggregate([
       { $match: { isActive: true } },
@@ -429,7 +387,6 @@ export async function seedColleges() {
   }
 }
 
-// Execute directly if run via CLI
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   seedColleges()
     .then(() => {

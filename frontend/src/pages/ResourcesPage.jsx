@@ -39,7 +39,7 @@ export default function ResourcesPage() {
         await navigator.share({ title: 'StudyArena Resource', url });
         return;
       } catch {
-        // clipboard fallback
+
       }
     }
     try {
@@ -47,7 +47,7 @@ export default function ResourcesPage() {
       setCopiedId(id);
       setTimeout(() => setCopiedId(null), 2000);
     } catch {
-      // ignore
+
     }
   };
 
@@ -148,7 +148,6 @@ export default function ResourcesPage() {
                 <h2 className="mt-4 font-display text-xl leading-tight">{r.title}</h2>
                 <p className="mt-2 line-clamp-2 min-h-6 text-sm leading-5 text-muted-foreground">{r.description || 'No description added.'}</p>
 
-                {/* Attachments List */}
                 {attList.length > 0 && (
                   <div className="mt-4 space-y-2">
                     <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Attachments ({attList.length})</span>

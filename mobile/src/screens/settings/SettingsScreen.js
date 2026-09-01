@@ -88,7 +88,7 @@ const SettingsScreen = ({ navigation }) => {
   const [showPinSetup, setShowPinSetup] = useState(false);
   const [showPinConfirm, setShowPinConfirm] = useState(false);
   const [showTimeoutSelect, setShowTimeoutSelect] = useState(false);
-  const [lockAction, setLockAction] = useState('disable'); // 'disable' | 'change'
+  const [lockAction, setLockAction] = useState('disable');
   const [pinBuffer, setPinBuffer] = useState('');
   const [pinError, setPinError] = useState('');
 
@@ -111,11 +111,11 @@ const SettingsScreen = ({ navigation }) => {
           return;
         }
       } catch (e) {
-        // Fallback to PIN
+
       }
     }
 
-    // Fallback to PIN if biometric cancelled/failed or not enabled
+
     setShowPinConfirm(true);
   };
 
@@ -180,7 +180,7 @@ const SettingsScreen = ({ navigation }) => {
           detail="Make the space fit how you work best."
         />
 
-        {/* Profile Section */}
+
         <View style={styles.section}>
           <View style={styles.profileHeader}>
             <View style={styles.imageContainer}>
@@ -220,7 +220,7 @@ const SettingsScreen = ({ navigation }) => {
               <Input
                 value={form.displayName}
                 onChangeText={t => setFormValue('displayName', t)}
-                placeholder="E.g. Vamsi"
+                placeholder="Enter your display name"
                 maxLength={60}
                 editable={!isSaving}
               />
@@ -306,7 +306,7 @@ const SettingsScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Interface Section */}
+
         <View style={styles.section}>
           <Text style={styles.sectionEyebrow}>Interface</Text>
           <Text style={styles.sectionTitle}>Appearance & Alerts</Text>
@@ -340,7 +340,7 @@ const SettingsScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Privacy & Security Section */}
+
         <View style={styles.section}>
           <Text style={styles.sectionEyebrow}>Privacy</Text>
           <Text style={styles.sectionTitle}>App Lock</Text>
@@ -398,7 +398,7 @@ const SettingsScreen = ({ navigation }) => {
                           await updateBiometricEnabled(true);
                         }
                       } catch (e) {
-                        // User cancelled or failed
+
                       }
                     } else {
                       await updateBiometricEnabled(false);
@@ -449,7 +449,7 @@ const SettingsScreen = ({ navigation }) => {
           )}
         </View>
 
-        {/* App Version & Updates Section */}
+
         <View style={styles.section}>
           <Text style={styles.sectionEyebrow}>Updates</Text>
           <Text style={styles.sectionTitle}>App Version & Updates</Text>
@@ -477,7 +477,7 @@ const SettingsScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Account Section */}
+
         <View style={[styles.section, styles.dangerSection]}>
           <Text style={[styles.sectionTitle, { color: colors.destructive }]}>Account</Text>
           <Text style={styles.sectionDetail}>Log out of your current session.</Text>
@@ -486,7 +486,7 @@ const SettingsScreen = ({ navigation }) => {
           </Button>
         </View>
 
-        {/* Bottom Banner */}
+
         <View style={styles.banner}>
           <Trophy size={24} color={colors.accent} />
           <Text style={styles.bannerTitle}>A workspace with a pulse</Text>
@@ -500,7 +500,7 @@ const SettingsScreen = ({ navigation }) => {
         </View>
       </ScrollView>
 
-      {/* PIN Setup Modal */}
+
       <Modal visible={showPinSetup} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -540,7 +540,7 @@ const SettingsScreen = ({ navigation }) => {
         </View>
       </Modal>
 
-      {/* PIN Confirm Modal (for changing or disabling) */}
+
       <Modal visible={showPinConfirm} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -587,7 +587,7 @@ const SettingsScreen = ({ navigation }) => {
         </View>
       </Modal>
 
-      {/* Auto-lock Timeout Selection Modal */}
+
       <Modal visible={showTimeoutSelect} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContentWide}>
@@ -724,8 +724,8 @@ const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.crea
     gap: spacing.md,
   },
   syncBanner: {
-    backgroundColor: colors.accent + '1A', // 10%
-    borderColor: colors.accent + '33', // 20%
+    backgroundColor: colors.accent + '1A',
+    borderColor: colors.accent + '33',
     borderWidth: 1,
     borderRadius: radii.xl,
     padding: spacing.md,
@@ -788,16 +788,16 @@ const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.crea
     color: colors.mutedForeground,
   },
   dangerSection: {
-    backgroundColor: colors.destructive + '0D', // 5% opacity
-    borderColor: colors.destructive + '33', // 20% opacity
+    backgroundColor: colors.destructive + '0D',
+    borderColor: colors.destructive + '33',
   },
   logoutBtn: {
     marginTop: spacing.xl,
     alignSelf: 'flex-start',
   },
   banner: {
-    backgroundColor: colors.accent + '1A', // 10% opacity
-    borderColor: colors.accent + '33', // 20% opacity
+    backgroundColor: colors.accent + '1A',
+    borderColor: colors.accent + '33',
     borderWidth: 1,
     borderRadius: radii.xl,
     padding: spacing.xl,

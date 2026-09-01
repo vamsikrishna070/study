@@ -18,12 +18,10 @@ export default function ProtectedRoute({ children }) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  // Check if SRM user needs academic onboarding
   const isSrm = Boolean(user?.university?.toLowerCase().includes('srm'));
   const lacksAcademicDetails = !user?.degree || !user?.branch;
   const needsOnboarding = isSrm && lacksAcademicDetails;
 
-  // Don't intercept settings route so they can manually fix profile there if they want
   if (needsOnboarding && location.pathname !== '/settings') {
     return <Onboarding onComplete={() => window.location.reload()} />;
   }

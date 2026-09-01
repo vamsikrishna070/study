@@ -49,7 +49,6 @@
 @media (min-width: 768px) { .mobile-nav { display: none; } }
 .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
 
-/* Scrollbar hiding utilities */
 .scrollbar-none::-webkit-scrollbar,
 .no-scrollbar::-webkit-scrollbar {
   display: none;

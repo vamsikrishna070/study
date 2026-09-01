@@ -15,6 +15,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useGetDashboard } from "../services/apiHooks.js";
+import { useAuth } from "../context/AuthContext.jsx";
 import Shell from "../components/Shell.jsx";
 import {
   LoadingBlock,
@@ -26,6 +27,7 @@ import TodayAttendanceCard from "../components/dashboard/TodayAttendanceCard.jsx
 import TodayTimetableCard from "../components/dashboard/TodayTimetableCard.jsx";
 
 export function DashboardPage() {
+  const { user: authUser } = useAuth();
   const query = useGetDashboard();
   const data = query.data;
   if (query.isLoading)
@@ -46,14 +48,19 @@ export function DashboardPage() {
     );
 
   const {
-    user,
-    stats,
-    subjects,
-    upcomingExams,
-    todayTasks,
-    recentActivity,
+    user: dashboardUser,
+    stats = {},
+    subjects = [],
+    upcomingExams = [],
+    todayTasks = [],
+    recentActivity = [],
     dayName,
-  } = data;
+  } = data || {};
+
+  const user = dashboardUser || authUser || {};
+  const displayName = user?.displayName || user?.officialName || user?.name || 'Scholar';
+  const firstName = displayName.split(" ")[0] || "Scholar";
+  const initial = displayName.charAt(0).toUpperCase() || "S";
 
   return (
     <Shell>
@@ -68,7 +75,7 @@ export function DashboardPage() {
               }).format(new Date())}
             </p>
             <h1 className="mt-2 flex items-center gap-4 font-display text-5xl leading-[.95] tracking-tight sm:text-6xl">
-              {user.profileImageUrl ? (
+              {user?.profileImageUrl ? (
                 <img
                   src={user.profileImageUrl}
                   alt="Profile"
@@ -76,14 +83,14 @@ export function DashboardPage() {
                 />
               ) : (
                 <div className="flex h-16 w-16 items-center justify-center rounded-full bg-accent/10 text-2xl font-bold text-accent shadow-sm border border-accent/20 sm:h-[4.5rem] sm:w-[4.5rem]">
-                  {user.name?.charAt(0).toUpperCase() || "S"}
+                  {initial}
                 </div>
               )}
               <div>
                 Hi,
                 <span className="text-accent">
                   {" "}
-                  {user.name?.split(" ")[0] || "Scholar"}.
+                  {firstName}.
                 </span>
               </div>
             </h1>
@@ -156,7 +163,6 @@ export function DashboardPage() {
           ))}
         </section>
 
-        {/* Official SRM AP Attendance & Today's Timetable Section */}
         <section className="grid gap-6 lg:grid-cols-2">
           <TodayAttendanceCard />
           <TodayTimetableCard />

@@ -20,7 +20,6 @@ import { StatusBar } from 'expo-status-bar';
 
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 
-// Inner app to consume theme
 const MainApp = () => {
   const { colors, theme, isDark } = useAppTheme();
   return (

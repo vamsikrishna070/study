@@ -3,11 +3,6 @@ import * as ImagePicker from 'expo-image-picker';
 import { validatePdfFile } from '../services/documentService';
 import client from '../api/client';
 
-/**
- * Uploads a local file { uri, name, mimeType } to the backend /upload endpoint
- * @param {Object} file { uri: string, name: string, mimeType: string, type: string }
- * @returns {Promise<Object>} Backend response data: { url, publicId, originalName, mimeType, size }
- */
 export const uploadFileToServer = async (file) => {
   if (!file || !file.uri) {
     throw new Error('Invalid file provided for upload.');
@@ -34,12 +29,6 @@ export const uploadFileToServer = async (file) => {
   return response.data?.data || response.data;
 };
 
-/**
- * Pick any document (PDF, DOCX, PPT, etc.) and upload it to the server
- * Supports Adobe Acrobat, Google Drive, Downloads, and all Android document providers.
- * @param {Object} options DocumentPicker options
- * @returns {Promise<Object|null>} Uploaded file metadata or null if cancelled
- */
 export const pickAndUploadDocument = async (options = {}) => {
   const result = await DocumentPicker.getDocumentAsync({
     type: options.type || ['application/pdf', '*/*'],
@@ -59,7 +48,6 @@ export const pickAndUploadDocument = async (options = {}) => {
   const fileName = asset.name || 'document.pdf';
   let mimeType = asset.mimeType || 'application/pdf';
 
-  // If selecting a PDF, perform post-selection validation
   if (options.isPdf || fileName.toLowerCase().endsWith('.pdf')) {
     const isPdfValid = await validatePdfFile(asset.uri);
     if (!isPdfValid && !fileName.toLowerCase().endsWith('.pdf')) {
@@ -83,11 +71,6 @@ export const pickAndUploadDocument = async (options = {}) => {
   };
 };
 
-/**
- * Pick an image from photo library and upload it to the server
- * @param {Object} options ImagePicker options
- * @returns {Promise<Object|null>} Uploaded file metadata or null if cancelled
- */
 export const pickAndUploadImage = async (options = {}) => {
   const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (!permission.granted) {

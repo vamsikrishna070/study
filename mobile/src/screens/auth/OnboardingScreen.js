@@ -16,7 +16,7 @@ const OnboardingScreen = ({ navigation }) => {
 
   const isSrm = user?.university?.toLowerCase().includes('srm');
   const [mode, setMode] = useState(isSrm ? null : 'manual');
-  
+
   const [srmUsername, setSrmUsername] = useState('');
   const [srmPassword, setSrmPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -64,13 +64,13 @@ const OnboardingScreen = ({ navigation }) => {
         section: section.trim(),
         semester: Number(semester) || 1,
       };
-      
+
       const updatedUser = await updateProfile(payload);
       if (setUser) setUser(updatedUser.user || updatedUser);
       finishOnboarding();
     } catch (error) {
       console.error('Onboarding profile update failed:', error);
-      finishOnboarding(); // Proceed anyway
+      finishOnboarding();
     } finally {
       setLoading(false);
     }
@@ -82,29 +82,29 @@ const OnboardingScreen = ({ navigation }) => {
         <View style={styles.card}>
           <Text style={styles.title}>Sync from SRM Portal</Text>
           <Text style={styles.subtitle}>Automatically fetch your profile, subjects, and academic records.</Text>
-          
+
           {errorMsg ? <Text style={styles.error}>{errorMsg}</Text> : null}
-          
+
           <View style={{ marginTop: 24, gap: 16 }}>
             <Field label="Registration Number">
-              <Input 
-                value={srmUsername} 
-                onChangeText={setSrmUsername} 
-                placeholder="e.g. AP2411001000" 
+              <Input
+                value={srmUsername}
+                onChangeText={setSrmUsername}
+                placeholder="e.g. AP2411001000"
                 editable={!loading}
               />
             </Field>
-            
+
             <Field label="Portal Password">
-              <Input 
-                value={srmPassword} 
-                onChangeText={setSrmPassword} 
-                placeholder="Enter your portal password" 
-                secureTextEntry 
+              <Input
+                value={srmPassword}
+                onChangeText={setSrmPassword}
+                placeholder="Enter your portal password"
+                secureTextEntry
                 editable={!loading}
               />
             </Field>
-            
+
             <View style={{ marginTop: 8, gap: 12 }}>
               <Button onPress={handleSyncSubmit} disabled={loading} style={{ width: '100%' }}>
                 {loading ? <ActivityIndicator color="#fff" style={{ marginRight: 8 }} /> : <Lock color="#fff" size={18} style={{ marginRight: 8 }} />}
@@ -127,47 +127,47 @@ const OnboardingScreen = ({ navigation }) => {
         <View style={styles.card}>
           <Text style={styles.title}>Set up manually</Text>
           <Text style={styles.subtitle}>Enter your academic details to get started.</Text>
-          
+
           {errorMsg ? <Text style={styles.error}>{errorMsg}</Text> : null}
-          
+
           <View style={{ marginTop: 24, gap: 16 }}>
             <Field label="Degree">
-              <Input 
-                value={degree} 
-                onChangeText={setDegree} 
-                placeholder="e.g. B.Tech" 
+              <Input
+                value={degree}
+                onChangeText={setDegree}
+                placeholder="e.g. B.Tech"
                 editable={!loading}
               />
             </Field>
-            
+
             <Field label="Branch">
-              <Input 
-                value={branch} 
-                onChangeText={setBranch} 
-                placeholder="e.g. Computer Science" 
+              <Input
+                value={branch}
+                onChangeText={setBranch}
+                placeholder="e.g. Computer Science"
                 editable={!loading}
               />
             </Field>
-            
+
             <Field label="Section (Optional)">
-              <Input 
-                value={section} 
-                onChangeText={setSection} 
-                placeholder="e.g. A" 
+              <Input
+                value={section}
+                onChangeText={setSection}
+                placeholder="e.g. A"
                 editable={!loading}
               />
             </Field>
-            
+
             <Field label="Semester">
-              <Input 
-                value={semester} 
-                onChangeText={setSemester} 
-                placeholder="1 to 12" 
+              <Input
+                value={semester}
+                onChangeText={setSemester}
+                placeholder="1 to 12"
                 keyboardType="numeric"
                 editable={!loading}
               />
             </Field>
-            
+
             <View style={{ marginTop: 8, gap: 12 }}>
               <Button onPress={handleManualSubmit} disabled={loading} style={{ width: '100%' }}>
                 <Save color="#fff" size={18} style={{ marginRight: 8 }} />
@@ -196,7 +196,7 @@ const OnboardingScreen = ({ navigation }) => {
         <Text style={styles.subtitle}>
           We noticed you are studying at {user?.university || 'SRM AP'}. Connect your portal to instantly fetch your subjects, timetable, and attendance.
         </Text>
-        
+
         <View style={{ marginTop: 32, gap: 16 }}>
           <Button onPress={() => setMode('sync')} style={{ width: '100%' }}>
             <Lock color="#fff" size={20} style={{ marginRight: 8 }} />

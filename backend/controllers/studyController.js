@@ -595,7 +595,6 @@ export async function createResource(req, res) {
       .status(400)
       .json({ success: false, message: "Title is required" });
 
-  // Normalize attachments — handle JSON string from multipart/form-data
   if (req.body.attachments && typeof req.body.attachments === 'string') {
     try { req.body.attachments = JSON.parse(req.body.attachments); } catch { req.body.attachments = []; }
   }
@@ -618,7 +617,6 @@ export async function updateResource(req, res) {
       .status(404)
       .json({ success: false, message: "Resource not found" });
 
-  // Normalize attachments — handle JSON string from multipart/form-data
   if (req.body.attachments && typeof req.body.attachments === 'string') {
     try { req.body.attachments = JSON.parse(req.body.attachments); } catch { req.body.attachments = []; }
   }
@@ -690,7 +688,6 @@ export async function getDashboard(req, res) {
     today,
   );
 
-  // Calculate real streak
   const allSessions = await StudySession.find({ user: req.user._id }).sort({
     startedAt: -1,
   });
@@ -699,12 +696,12 @@ export async function getDashboard(req, res) {
   for (const session of allSessions) {
     const sDate = dayStart(session.startedAt);
     if (sDate.getTime() === current.getTime()) {
-      // counted
+
     } else if (sDate.getTime() === current.getTime() - 86400000) {
       streak++;
       current = sDate;
     } else if (sDate.getTime() < current.getTime() - 86400000) {
-      break; // Gap found
+      break;
     }
   }
   if (

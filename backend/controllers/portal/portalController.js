@@ -57,10 +57,14 @@ export async function connectPortal(req, res) {
 export async function getStatus(req, res) {
   try {
     const userId = req.user._id;
-    console.log(`[PORTAL] Account lookup for user ${userId}`);
     const data = await getPortalAccountData(userId);
-    console.log(`[PORTAL] Account found: ${data.isConnected}, status: ${data.connectionStatus}, enrolled: ${data.enrolledSubjectsCount || 0}`);
-    res.json({ success: true, data });
+    res.json({
+      success: true,
+      cached: true,
+      syncing: Boolean(data.isSyncing),
+      lastSyncedAt: data.lastSuccessfulSync || null,
+      data,
+    });
   } catch (error) {
     console.error('[PortalController] getStatus error:', error.message);
     res.status(500).json({ success: false, message: 'We couldn\'t load your SRM Portal status right now. Please try again.' });
@@ -71,13 +75,34 @@ export async function syncPortal(req, res) {
   try {
     console.log(`[PORTAL] Manual sync request for user ${req.user._id}`);
     const data = await reSyncPortalData(req.user._id);
-    res.json({ success: true, data, message: 'Portal data refreshed successfully' });
+    return res.json({
+      success: true,
+      data,
+      cached: Boolean(data.syncWarning),
+      lastSyncedAt: data.lastSuccessfulSync || new Date().toISOString(),
+      message: 'Portal data refreshed successfully',
+    });
   } catch (error) {
     console.error('[PortalController] syncPortal error:', error.message);
-    if (error.message?.includes('session expired')) {
-      return res.status(401).json({ success: false, message: 'Your SRM Portal session has expired. Please re-enter your credentials.', action: 'reconnect' });
+    const isSessionErr =
+      error.message?.includes('session expired') ||
+      error.message?.includes('PORTAL_SESSION_EXPIRED') ||
+      error.code === 'INVALID_CREDENTIALS';
+
+    if (isSessionErr) {
+      return res.status(401).json({
+        success: false,
+        code: 'PORTAL_SESSION_EXPIRED',
+        message: 'Your SRM Portal session has expired. Please re-enter your credentials.',
+        action: 'reconnect',
+      });
     }
-    res.status(500).json({ success: false, message: 'We couldn\'t sync your academic information right now. Please try again.' });
+
+    return res.status(502).json({
+      success: false,
+      code: error.code || 'SYNC_FAILED',
+      message: error.message || 'We couldn\'t sync your academic information right now. Please try again.',
+    });
   }
 }
 
@@ -106,11 +131,24 @@ export async function getTodayAttendance(req, res) {
     const userId = req.user._id;
     console.log(`[PORTAL] GET /api/portal/attendance/today for User ID: ${userId}`);
     const data = await getCurrentAttendance(userId);
-    console.log(`[PORTAL] Attendance loaded: ${data.subjectStats?.length || 0} subject-wise logs, ${data.attendance?.length || 0} today slots`);
-    res.json({ success: true, data });
+    console.log(`[PORTAL] Attendance loaded: ${data.subjectStats?.length || 0} subject-wise logs, ${data.attendance?.length || 0} today slots, overall: ${data.overallAttendance?.percentage || 0}%`);
+    res.json({
+      success: true,
+      data,
+      cached: data.cached || false,
+      lastSyncedAt: data.lastSynced || new Date().toISOString(),
+    });
   } catch (error) {
-    console.error('[PortalController] getTodayAttendance error:', error.message);
-    res.status(500).json({ success: false, message: 'We couldn\'t load today\'s attendance right now. Please try again.' });
+    console.error('[PortalController] getTodayAttendance ERROR DETAILS:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+    });
+    res.status(500).json({
+      success: false,
+      message: "We couldn't load today's attendance right now. Please try again.",
+      error: error.message,
+    });
   }
 }
 
@@ -133,13 +171,18 @@ export async function markAttendance(req, res) {
       return res.status(statusCode).json(result);
     }
 
-    res.json(result);
+    res.json({
+      success: true,
+      message: result.message || 'Attendance marked successfully!',
+      data: result,
+    });
   } catch (error) {
     console.error('[PortalController] markAttendance error:', error.message);
     res.status(500).json({
       success: false,
       code: 'PORTAL_UNAVAILABLE',
       message: 'SRM portal is currently unavailable. Please try again.',
+      error: error.message,
     });
   }
 }
@@ -151,9 +194,18 @@ export async function getTimetableData(req, res) {
     const data = await getTimetable(userId);
     const dayCount = Object.keys(data.timetable || {}).length;
     console.log(`[PORTAL] Timetable loaded: ${dayCount} days schedule`);
-    res.json({ success: true, data });
+    res.json({
+      success: true,
+      data,
+      cached: true,
+      lastSyncedAt: data.lastSynced || new Date().toISOString(),
+    });
   } catch (error) {
     console.error('[PortalController] getTimetableData error:', error.message);
-    res.status(500).json({ success: false, message: 'We couldn\'t load the timetable right now. Please try again.' });
+    res.status(500).json({
+      success: false,
+      message: "We couldn't load the timetable right now. Please try again.",
+      error: error.message,
+    });
   }
 }

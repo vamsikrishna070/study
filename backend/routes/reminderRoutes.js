@@ -13,7 +13,7 @@ router.post('/', asyncHandler(async (req, res) => {
   const { remindAt, scheduleType } = req.body;
   if ((!scheduleType || scheduleType === 'one-time') && remindAt) {
     const remindTime = new Date(remindAt).getTime();
-    // Allow a 5 second network latency buffer
+
     if (isNaN(remindTime) || remindTime <= (Date.now() - 5000)) {
       return res.status(400).json({
         success: false,

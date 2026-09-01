@@ -78,16 +78,13 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                 return
             }
 
-            // Check exact alarm permission on Android 12+ (API 31+)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
                 promise.reject("PERMISSION_DENIED", "Exact alarm permission not granted.")
                 return
             }
 
-            // Calculate trigger time in milliseconds
             val triggerAtMillis = timestamp.toLong()
 
-            // Defensive check: Do not schedule alarms in the past
             if (triggerAtMillis <= System.currentTimeMillis()) {
                 Log.w(TAG, "Refusing to schedule alarm in the past: $triggerAtMillis <= ${System.currentTimeMillis()}")
                 promise.reject("INVALID_TIMESTAMP", "Alarm trigger time must be strictly in the future.")
@@ -112,11 +109,9 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
-            // Schedule the alarm using setAlarmClock for high reliability
             val info = AlarmManager.AlarmClockInfo(triggerAtMillis, pendingIntent)
             alarmManager.setAlarmClock(info, pendingIntent)
 
-            // Persist the alarm state for device reboot recovery
             val prefs = getPrefs()
             val alarmData = JSONObject().apply {
                 put("id", id)
@@ -155,7 +150,6 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
 
             alarmManager?.cancel(pendingIntent)
 
-            // Remove from persistence
             val prefs = getPrefs()
             prefs.edit().remove(id).apply()
 
@@ -175,7 +169,6 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
             val context = reactApplicationContext
             var player: MediaPlayer? = null
 
-            // 1. Try custom soundUri if provided
             if (!soundUri.isNullOrBlank()) {
                 try {
                     val cleanPath = when {
@@ -222,7 +215,6 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                 }
             }
 
-            // 2. Fallback to built-in raw sound resources if custom sound couldn't be loaded
             if (player == null) {
                 val cleanSoundId = when {
                     soundId.isBlank() || soundId == "default" || soundId == "custom" -> "default_alarm"

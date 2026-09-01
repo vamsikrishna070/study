@@ -32,11 +32,6 @@ class AudioPlayerManager {
     }
   }
 
-  /**
-   * Resolves raw audio URI (content://, file://, https://) to a verified playable source
-   * @param {string} rawUri
-   * @returns {Promise<{ playableUri: string, scheme: string, exists: boolean, size: number }>}
-   */
   async resolvePlayableUri(rawUri) {
     if (!rawUri || typeof rawUri !== 'string') {
       throw new Error('Invalid or missing audio URI.');
@@ -44,7 +39,6 @@ class AudioPlayerManager {
 
     const trimmed = rawUri.trim();
 
-    // 1. Android content:// URI: reliably copy into persistent app storage
     if (trimmed.startsWith('content://')) {
       const audioDir = getOrCreateDirectory('document', AUDIO_DOCS_DIR_NAME);
       const targetFilename = `audio_${Date.now()}.m4a`;
@@ -81,7 +75,6 @@ class AudioPlayerManager {
       };
     }
 
-    // 2. Local file:// URI: verify exists === true and size > 0
     if (trimmed.startsWith('file://')) {
       const file = new File(trimmed);
       const exists = file.exists;
@@ -99,7 +92,6 @@ class AudioPlayerManager {
       };
     }
 
-    // 3. Remote URL (https:// or http://)
     if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
       try {
         new URL(trimmed);
@@ -115,7 +107,6 @@ class AudioPlayerManager {
       };
     }
 
-    // 4. Fallback for relative or local paths
     const fallbackFile = new File(trimmed);
     const exists = fallbackFile.exists;
     const size = fallbackFile.size || 0;
@@ -128,11 +119,6 @@ class AudioPlayerManager {
     };
   }
 
-  /**
-   * Plays the audio URI using Expo SDK 54 expo-audio API
-   * @param {string} rawUri
-   * @param {Function} onStatusUpdate - Callback receiving { status, currentTime, duration, error }
-   */
   async play(rawUri, onStatusUpdate) {
     let resolvedUri = '';
     let scheme = '';
@@ -150,7 +136,6 @@ class AudioPlayerManager {
 
     const trimmed = rawUri.trim();
 
-    // If currently paused on this exact URI, resume
     if (this.currentUri === trimmed && this.currentPlayer) {
       try {
         this.statusCallback = onStatusUpdate;
@@ -167,7 +152,6 @@ class AudioPlayerManager {
       }
     }
 
-    // Stop and release previous player
     await this.stop();
 
     this.currentUri = trimmed;
@@ -177,7 +161,6 @@ class AudioPlayerManager {
     try {
       await this.ensureAudioMode();
 
-      // Resolve playable URI
       const resolved = await this.resolvePlayableUri(trimmed);
       resolvedUri = resolved.playableUri;
       scheme = resolved.scheme;
@@ -187,7 +170,6 @@ class AudioPlayerManager {
       this.currentScheme = scheme;
       this.currentSize = size;
 
-      // Create AudioPlayer
       let player;
       try {
         player = createAudioPlayer(resolvedUri);
@@ -202,7 +184,6 @@ class AudioPlayerManager {
 
       this.currentPlayer = player;
 
-      // Status listener using SDK 54 AudioStatus fields
       this.subscription = player.addListener('playbackStatusUpdate', (audioStatus) => {
         if (!audioStatus) return;
 
@@ -238,7 +219,6 @@ class AudioPlayerManager {
         }
       });
 
-      // Start playback
       try {
         player.play();
         status = 'playing';
@@ -261,9 +241,6 @@ class AudioPlayerManager {
     }
   }
 
-  /**
-   * Pauses the currently playing audio
-   */
   async pause() {
     if (this.currentPlayer) {
       try {
@@ -281,9 +258,6 @@ class AudioPlayerManager {
     }
   }
 
-  /**
-   * Resumes playback
-   */
   async resume() {
     if (this.currentPlayer) {
       try {
@@ -301,9 +275,6 @@ class AudioPlayerManager {
     }
   }
 
-  /**
-   * Stops and releases the player to free native resources
-   */
   async stop() {
     try {
       if (this.subscription) {

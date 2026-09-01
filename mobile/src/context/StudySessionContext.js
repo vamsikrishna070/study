@@ -14,7 +14,6 @@ export const StudySessionProvider = ({ children }) => {
   const intervalRef = useRef(null);
   const appStateRef = useRef(AppState.currentState);
 
-  // Calculate elapsed seconds accurately from timestamps
   const calculateElapsed = useCallback((session) => {
     if (!session || !session.startedAt) return 0;
     const startMs = new Date(session.startedAt).getTime();
@@ -29,7 +28,6 @@ export const StudySessionProvider = ({ children }) => {
     return Math.max(0, Math.floor((nowMs - startMs - pausedMs) / 1000));
   }, []);
 
-  // Restore active session on launch
   useEffect(() => {
     const restoreSession = async () => {
       try {
@@ -50,7 +48,6 @@ export const StudySessionProvider = ({ children }) => {
     restoreSession();
   }, [calculateElapsed]);
 
-  // Save session state to AsyncStorage whenever activeSession updates
   useEffect(() => {
     if (!isInitialized) return;
     if (activeSession) {
@@ -60,7 +57,6 @@ export const StudySessionProvider = ({ children }) => {
     }
   }, [activeSession, isInitialized]);
 
-  // Timer interval for UI tick (calculates from timestamp, not increment)
   useEffect(() => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
@@ -68,7 +64,7 @@ export const StudySessionProvider = ({ children }) => {
     }
 
     if (activeSession && activeSession.status === 'running') {
-      // Set initial
+
       setElapsedSeconds(calculateElapsed(activeSession));
 
       intervalRef.current = setInterval(() => {
@@ -88,14 +84,13 @@ export const StudySessionProvider = ({ children }) => {
     };
   }, [activeSession, calculateElapsed]);
 
-  // AppState listener to handle background / foreground transitions seamlessly
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState) => {
       if (
         appStateRef.current.match(/inactive|background/) &&
         nextAppState === 'active'
       ) {
-        // App returned to foreground: recalculate exact timestamp offset immediately
+
         if (activeSession) {
           setElapsedSeconds(calculateElapsed(activeSession));
         }
@@ -108,7 +103,6 @@ export const StudySessionProvider = ({ children }) => {
     };
   }, [activeSession, calculateElapsed]);
 
-  // Start new timer session
   const startSession = async ({
     subjectId = null,
     subjectName = '',
@@ -136,7 +130,6 @@ export const StudySessionProvider = ({ children }) => {
     return newSession;
   };
 
-  // Pause running session
   const pauseSession = () => {
     if (!activeSession || activeSession.status !== 'running') return;
     const pausedAt = new Date().toISOString();
@@ -148,7 +141,6 @@ export const StudySessionProvider = ({ children }) => {
     setActiveSession(updated);
   };
 
-  // Resume paused session
   const resumeSession = () => {
     if (!activeSession || activeSession.status !== 'paused') return;
     const now = Date.now();
@@ -165,7 +157,6 @@ export const StudySessionProvider = ({ children }) => {
     setActiveSession(updated);
   };
 
-  // End and prepare final payload for completion
   const endSession = () => {
     if (!activeSession) return null;
     const endedAt = new Date().toISOString();
@@ -192,7 +183,6 @@ export const StudySessionProvider = ({ children }) => {
     return finalSession;
   };
 
-  // Clear/discard active session
   const discardSession = () => {
     setActiveSession(null);
     setElapsedSeconds(0);

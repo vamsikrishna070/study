@@ -2,14 +2,14 @@ import React from 'react';
 import { TouchableOpacity, Text, View, StyleSheet, ActivityIndicator } from 'react-native';
 import { typography, radii, spacing, useAppTheme, useStyles } from '../../theme/theme';
 
-export function Button({ 
-  children, 
-  variant = 'primary', 
-  onPress, 
-  disabled, 
+export function Button({
+  children,
+  variant = 'primary',
+  onPress,
+  disabled,
   loading,
-  style, 
-  textStyle 
+  style,
+  textStyle
 }) {
   const { colors, typography, spacing, radii, theme } = useAppTheme();
   const styles = useStyles(createStyles);
@@ -28,7 +28,7 @@ export function Button({
         };
       case 'danger':
         return {
-          button: { backgroundColor: `${colors.destructive}1A` }, // 10% opacity hex
+          button: { backgroundColor: `${colors.destructive}1A` },
           text: { color: colors.destructive }
         };
       case 'primary':

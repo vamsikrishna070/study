@@ -27,15 +27,17 @@ export default function Shell({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user } = useAuth();
 
-  // Filter nav items: only show SRM Portal for SRM AP students
   const visibleNavItems = navItems.filter(
     (item) => item.href !== '/portal' || isSrmApStudent(user)
   );
-  
+
   if (!user) return children;
 
+  const displayName = user?.displayName || user?.officialName || user?.name || 'Student';
+  const initials = displayName.split(' ').map(p => p[0]).join('').slice(0, 2) || 'U';
+
   const ProfileAvatar = ({ className }) => {
-    if (user.profileImageUrl) {
+    if (user?.profileImageUrl) {
       return (
         <div className={cx("overflow-hidden rounded-full border border-border/50", className)}>
           <img src={user.profileImageUrl} alt="Profile" className="h-full w-full object-cover" />
@@ -44,7 +46,7 @@ export default function Shell({ children }) {
     }
     return (
       <div className={cx("flex items-center justify-center rounded-full bg-primary/20 text-xs font-bold text-primary", className)}>
-        {user.name?.split(' ').map(p => p[0]).join('').slice(0, 2) || 'U'}
+        {initials}
       </div>
     );
   };
@@ -52,7 +54,7 @@ export default function Shell({ children }) {
   return (
     <div className="grain app-shell md:flex min-h-screen">
       {mobileOpen && <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden" onClick={() => setMobileOpen(false)} />}
-      
+
       <aside className={cx('desktop-sidebar fixed inset-y-0 left-0 z-50 hidden w-[248px] flex-col bg-card/95 backdrop-blur-md md:flex border-r border-border', mobileOpen && '!flex')}>
         <div className="flex h-full flex-col px-5 py-7 overflow-y-auto">
           <Link to="/" className="mb-8 flex items-center gap-3 px-2" data-testid="link-brand">
@@ -72,20 +74,20 @@ export default function Shell({ children }) {
               </Link>
             ))}
           </nav>
-          
+
           <div className="mt-auto pt-6">
             <Link to="/settings" onClick={() => setMobileOpen(false)} className={cx('flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition-colors', location === '/settings' ? 'bg-sidebar-accent' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent')} data-testid="link-settings">
               <ProfileAvatar className="h-8 w-8" />
               <div className="min-w-0 flex-1">
-                <div className="truncate">{user.name}</div>
-                <div className="text-[10px] font-normal opacity-50 truncate">{user.degree} {user.branch ? `/ ${user.branch}` : ''}</div>
+                <div className="truncate">{displayName}</div>
+                <div className="text-[10px] font-normal opacity-50 truncate">{user?.degree || ''} {user?.branch ? `/ ${user.branch}` : ''}</div>
               </div>
               <SettingsIcon size={15} className="opacity-60" />
             </Link>
           </div>
         </div>
       </aside>
-      
+
       <div className="min-w-0 flex-1 md:ml-[248px] flex flex-col min-h-screen">
         <header className="sticky top-0 z-30 flex h-[72px] items-center justify-between border-b border-border/70 bg-background/90 px-5 backdrop-blur-md sm:px-8 lg:px-12">
           <div className="md:hidden flex items-center gap-2 font-display text-xl leading-none">
@@ -102,12 +104,12 @@ export default function Shell({ children }) {
             </Link>
           </div>
         </header>
-        
+
         <main className="page-in mx-auto w-full max-w-[1420px] px-5 py-8 sm:px-8 lg:px-12 lg:py-10 pb-28 md:pb-10 flex-1">
           {children}
         </main>
       </div>
-      
+
       <nav className="mobile-nav fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t border-border bg-card/95 px-2 py-2 backdrop-blur-md pb-safe md:hidden">
         {navItems.filter(item => ['/', '/subjects', '/tasks', '/exams'].includes(item.href)).map(({ href, label, icon: Icon }) => (
           <Link to={href} key={href} onClick={() => setMobileOpen(false)} className={cx('flex flex-col items-center gap-1 rounded-lg px-3 py-1.5 text-[10px] font-bold transition-colors', location === href ? 'text-accent' : 'text-muted-foreground')} data-testid={`link-mobile-${label.toLowerCase()}`}>

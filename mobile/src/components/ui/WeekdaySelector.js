@@ -13,7 +13,7 @@ const DAYS = [
 ];
 
 export function WeekdaySelector({
-  value = [], // Array of day numbers [0-6]
+  value = [],
   onValueChange,
   style,
 }) {

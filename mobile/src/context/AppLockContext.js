@@ -14,7 +14,7 @@ export const useAppLock = () => useContext(AppLockContext);
 const AppLockProvider = ({ children }) => {
   const [isLockEnabled, setIsLockEnabled] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
-  const [lockTimeout, setLockTimeout] = useState(0); // in ms, 0 means immediately
+  const [lockTimeout, setLockTimeout] = useState(0);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricStatus, setBiometricStatus] = useState({ hasHardware: false, isEnrolled: false, supportedTypes: [] });
@@ -23,7 +23,7 @@ const AppLockProvider = ({ children }) => {
   const lastBackgroundTime = useRef(Date.now());
   const isLoaded = useRef(false);
 
-  // Initialize
+
   useEffect(() => {
     const init = async () => {
       try {
@@ -43,13 +43,13 @@ const AppLockProvider = ({ children }) => {
         setBiometricStatus({ hasHardware, isEnrolled, supportedTypes });
         setBiometricAvailable(hasHardware && isEnrolled);
 
-        // Explicit user preference: default to false if missing or not 'true'
+
         const isBioPrefEnabled = storedBiometric === 'true';
         setBiometricEnabled(isBioPrefEnabled);
 
         if (storedPin) {
           setIsLockEnabled(true);
-          setIsLocked(true); // Always require unlock on fresh launch if enabled
+          setIsLocked(true);
         }
 
         if (storedTimeout) {
@@ -68,7 +68,7 @@ const AppLockProvider = ({ children }) => {
     init();
   }, []);
 
-  // Listen to AppState
+
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextAppState => {
       if (!isLoaded.current || !isLockEnabled) {
@@ -76,12 +76,12 @@ const AppLockProvider = ({ children }) => {
         return;
       }
 
-      // App goes to background
+
       if (appState.current.match(/active/) && nextAppState.match(/inactive|background/)) {
         lastBackgroundTime.current = Date.now();
       }
 
-      // App comes to foreground
+
       if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
         const timeSpentInBackground = Date.now() - lastBackgroundTime.current;
         if (timeSpentInBackground >= lockTimeout) {

@@ -56,7 +56,6 @@ const SyllabusScreen = ({ route, navigation }) => {
   const [error, setError] = useState(null);
   const [expandedUnits, setExpandedUnits] = useState({});
 
-  // Extraction Review Modal state
   const [reviewVisible, setReviewVisible] = useState(false);
   const [parsedUnits, setParsedUnits] = useState([]);
   const [extracting, setExtracting] = useState(false);
@@ -66,7 +65,6 @@ const SyllabusScreen = ({ route, navigation }) => {
     try {
       setError(null);
 
-      // Load all subjects for selector
       const subsRes = await getSubjects();
       const subsData = subsRes.data || subsRes || [];
       setAllSubjects(subsData);
@@ -130,7 +128,6 @@ const SyllabusScreen = ({ route, navigation }) => {
 
       if (!uploaded || !uploaded.url) return;
 
-      // Update subject
       await updateSubject(subjectId, {
         syllabusFile: {
           url: uploaded.url,
@@ -248,7 +245,6 @@ const SyllabusScreen = ({ route, navigation }) => {
     const isCompleted = topic.status === 'completed' || topic.completed;
     const newStatus = isCompleted ? 'not-started' : 'completed';
 
-    // Optimistic update
     setTopics((prev) =>
       prev.map((t) =>
         (t._id || t.id) === (topic._id || topic.id)
@@ -260,7 +256,7 @@ const SyllabusScreen = ({ route, navigation }) => {
     try {
       await updateTopicCompletion(topic._id || topic.id, !isCompleted);
     } catch (e) {
-      // Revert on error
+
       setTopics((prev) =>
         prev.map((t) =>
           (t._id || t.id) === (topic._id || topic.id)
@@ -326,7 +322,6 @@ const SyllabusScreen = ({ route, navigation }) => {
           }
         />
 
-        {/* Subject Selector Dropdown */}
         {allSubjects.length > 0 && (
           <View style={styles.pickerSection}>
             <SelectPicker
@@ -358,7 +353,7 @@ const SyllabusScreen = ({ route, navigation }) => {
 
         {subjectId && !error && (
           <View style={styles.content}>
-            {/* Attached Syllabus Document Card */}
+
             {currentSubject?.syllabusFile?.url ? (
               <DocumentPreviewCard
                 file={currentSubject.syllabusFile}
@@ -386,7 +381,6 @@ const SyllabusScreen = ({ route, navigation }) => {
               </TouchableOpacity>
             )}
 
-            {/* Overall Syllabus Progress */}
             {totalTopics > 0 && (
               <View style={styles.progressCard}>
                 <View style={styles.progressHeader}>
@@ -409,7 +403,6 @@ const SyllabusScreen = ({ route, navigation }) => {
               </View>
             )}
 
-            {/* Units & Topics List */}
             {units.length === 0 ? (
               <View style={styles.emptyUnitsBox}>
                 <Layers size={32} color={colors.mutedForeground} />
@@ -539,7 +532,6 @@ const SyllabusScreen = ({ route, navigation }) => {
         )}
       </ScrollView>
 
-      {/* Review Modal */}
       <SyllabusReviewModal
         visible={reviewVisible}
         subjectId={subjectId}

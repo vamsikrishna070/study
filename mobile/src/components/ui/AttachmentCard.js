@@ -42,12 +42,11 @@ export function AttachmentCard({
   const { colors, typography, spacing, radii } = useAppTheme();
   const styles = useStyles(createStyles);
 
-  const [playbackState, setPlaybackState] = useState('idle'); // 'idle' | 'loading' | 'playing' | 'paused' | 'finished' | 'error'
+  const [playbackState, setPlaybackState] = useState('idle');
   const [errorMessage, setErrorMessage] = useState('');
 
   if (!attachment) return null;
 
-  // Normalize properties across all backend schemas and client picker formats
   const rawUrl =
     attachment.url ||
     attachment.uri ||
@@ -70,7 +69,6 @@ export function AttachmentCard({
   const isPdf = kind === 'pdf';
   const isYouTube = kind === 'link' && (/youtube\.com|youtu\.be/i.test(rawUrl) || rawType === 'youtube');
 
-  // Handle Play/Pause/Resume for Audio
   const handleToggleAudio = async () => {
     if (!rawUrl) {
       setErrorMessage('Audio reference is missing or unavailable.');
@@ -103,7 +101,7 @@ export function AttachmentCard({
         await openAttachment(attachment);
       } catch (e) {
         if (__DEV__) console.warn('openAttachment error:', e);
-        // Fallback to viewDocument just in case, though openAttachment handles it
+
         try {
           await viewDocument(rawUrl, originalName || 'Attachment');
         } catch (innerE) {
@@ -119,7 +117,6 @@ export function AttachmentCard({
     'Attachment';
   const sizeText = formatFileSize(size);
 
-  // ─── AUDIO ATTACHMENT VIEW ──────────────────────────────────────────────────
   if (isAudio) {
     return (
       <View style={[styles.card, styles.audioCard, style]}>
@@ -150,7 +147,6 @@ export function AttachmentCard({
             )}
           </View>
 
-          {/* Inline Play / Pause Button Bar */}
           <TouchableOpacity
             style={[
               styles.audioPlayBar,
@@ -197,7 +193,6 @@ export function AttachmentCard({
     );
   }
 
-  // ─── GENERAL / DOCUMENT / IMAGE / VIDEO ATTACHMENT VIEW ────────────────────
   const getIcon = () => {
     if (isYouTube) return <Video size={20} color="#ff0000" />;
     if (isPdf) return <FileText size={20} color={colors.accent} />;

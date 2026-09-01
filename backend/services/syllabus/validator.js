@@ -1,20 +1,5 @@
-/**
- * Universal Extraction Validation and Confidence Scoring Module.
- * Validates extracted syllabus structure against domain rules, evaluates source coverage ratio,
- * checks for leakage/anomalies, and computes calibrated numerical confidence with contextual warnings.
- */
 
-/**
- * Validates the extracted syllabus data and computes an overall confidence score.
- * @param {object} params
- * @param {Array} params.theoryUnits
- * @param {Array} params.labExperiments
- * @param {string} params.courseName
- * @param {string} params.courseCode
- * @param {object} params.parseMetadata
- * @param {string} [params.sourceText='']
- * @returns {{ confidence: number, confidenceLevel: 'high' | 'medium' | 'low', warnings: string[], valid: boolean, coverageRatio: number }}
- */
+
 export function validateExtraction({
   theoryUnits = [],
   labExperiments = [],
@@ -30,11 +15,9 @@ export function validateExtraction({
   const expCount = labExperiments.length;
   const totalTopics = theoryUnits.reduce((sum, u) => sum + (u.topics?.length || 0), 0);
 
-  // 1. Text extraction / OCR Quality Score (Weight: 20%)
   const pageScore = parseMetadata.confidence || (parseMetadata.ocrUsed ? 0.9 : 0.95);
   score += 0.2 * Math.min(1, Math.max(0, pageScore));
 
-  // 2. Unit Count Plausibility (Weight: 20%)
   if (unitCount >= 3 && unitCount <= 8) {
     score += 0.2;
   } else if (unitCount >= 1 && unitCount <= 12) {
@@ -42,14 +25,13 @@ export function validateExtraction({
     if (unitCount === 1) warnings.push('Only 1 unit was detected. Check if the document has multiple units.');
     if (unitCount > 8) warnings.push(`Unusually high unit count (${unitCount} units).`);
   } else if (unitCount === 0 && expCount > 0) {
-    // Lab-only document
+
     score += 0.18;
     warnings.push('No theory units detected; only laboratory experiments found.');
   } else {
     warnings.push('No syllabus units or experiments detected in document.');
   }
 
-  // 3. Topic Density Plausibility (Weight: 20%)
   if (unitCount > 0) {
     const avgTopics = totalTopics / unitCount;
     if (avgTopics >= 3 && avgTopics <= 30) {
@@ -63,7 +45,6 @@ export function validateExtraction({
     score += 0.2;
   }
 
-  // 4. Metadata Detection (Weight: 15%)
   if (courseName && courseCode) {
     score += 0.15;
   } else if (courseName || courseCode) {
@@ -74,7 +55,6 @@ export function validateExtraction({
     warnings.push('Neither course title nor course code could be detected.');
   }
 
-  // 5. Source Content Coverage Check (Weight: 15%)
   let coverageRatio = 1.0;
   if (sourceText && sourceText.length > 200) {
     const extractedChars =
@@ -83,7 +63,6 @@ export function validateExtraction({
         0
       ) + labExperiments.reduce((sum, e) => sum + e.title.length, 0);
 
-    // Rough ratio of captured syllabus content vs total syllabus source text
     coverageRatio = Math.min(1.0, extractedChars / Math.max(1, sourceText.length * 0.35));
     if (coverageRatio < 0.4) {
       warnings.push('Lower source text coverage detected. Some sections may have been omitted.');
@@ -95,7 +74,6 @@ export function validateExtraction({
     score += 0.15;
   }
 
-  // 6. Theory / Lab Isolation Check (Weight: 10%)
   let contaminationFound = false;
   for (const unit of theoryUnits) {
     for (const topic of unit.topics || []) {
@@ -118,10 +96,6 @@ export function validateExtraction({
 
   const finalScore = Math.round(Math.min(1, Math.max(0.1, score)) * 100) / 100;
 
-  // Strict Threshold Mapping:
-  // 0.90 - 1.00 = HIGH
-  // 0.75 - 0.89 = MEDIUM
-  // Below 0.75  = LOW
   let confidenceLevel = 'high';
   if (finalScore < 0.75) {
     confidenceLevel = 'low';

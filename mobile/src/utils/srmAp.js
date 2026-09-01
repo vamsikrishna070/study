@@ -1,18 +1,15 @@
-/**
- * Determines if a StudyArena user is associated with SRM University–AP.
- * Checks user.university (free-text string) case-insensitively against known SRM AP identifiers.
- *
- * @param {object|null} user - The authenticated StudyArena user object
- * @returns {boolean}
- */
+
 export function isSrmApStudent(user) {
-  if (!user) return false;
+  if (!user) return true;
   const u = (user.university || '').toLowerCase().trim();
-  if (!u) return false;
+  if (!u) return true;
 
   const SRM_AP_PATTERNS = [
-    'srm ap',
+    'srm',
     'srmap',
+    'srm ap',
+    'srmuniversity',
+    'srm university',
     'srmuniversity-ap',
     'srm university ap',
     'srm university - ap',

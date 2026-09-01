@@ -1,7 +1,4 @@
-/**
- * Laboratory Experiment Extraction Module.
- * Extracts laboratory experiments and practical tasks independently from theory units.
- */
+
 
 import { cleanOcrTypo } from './normalizer.js';
 import { detectTableSchema } from './tableExtractor.js';
@@ -37,9 +34,7 @@ const TABLE_HEADER_WORDS = [
   'utilization',
 ];
 
-/**
- * Identifies if a line is composed predominantly of table column header words.
- */
+
 function isTableHeaderLine(line) {
   if (!line || typeof line !== 'string') return true;
   const words = line.toLowerCase().replace(/[^a-z\s]/g, '').trim().split(/\s+/).filter(Boolean);
@@ -48,23 +43,21 @@ function isTableHeaderLine(line) {
   return headerWordCount / words.length >= 0.4;
 }
 
-/**
- * Cleans an individual lab experiment title.
- */
+
 function cleanExperimentTitle(text, schema) {
   if (!text || typeof text !== 'string') return '';
 
   let cleaned = text
     .replace(/^(?:Exp(?:eriment)?\.?\s*(?:No\.?)?\s*\d+[:.\-–—]?|\bPrograms?\s*\d*[:.\-–—]?|\d+[.)\]:-]?\s*)/i, '')
     .replace(/\s+(?:CLO|CO)\s*\d+(?:\s*,\s*\d+)*$/i, '')
-    // Strip arbitrary trailing table metadata columns (Hours, CLOs, References) robustly
+
     .replace(/\s+\d+(?:\.\d+)?\s+[\w\d,\s\[\]\.\-]+$/i, '')
     .replace(/\s+\d{1,2}(?:\.\d+)?(?:\s+\d+(?:\s*,\s*\d+)*)+$/, '')
     .replace(/(?:Course\s+Unit(?:ization|isation)\s+Plan\s*[-–—]?\s*(?:Theory|Lab)?).*$/i, '')
     .replace(/\s{2,}/g, ' ')
     .trim();
 
-  // If schema indicates trailing metadata, pluck it dynamically
+
   if (schema && schema.isDetected && schema.trailingMetadataCount > 0) {
     const parts = cleaned.split(/\s+/);
     if (parts.length > schema.trailingMetadataCount + 1) {
@@ -79,11 +72,7 @@ function cleanExperimentTitle(text, schema) {
   return cleanOcrTypo(cleaned);
 }
 
-/**
- * Extracts structured lab experiments from segmented lab section lines.
- * @param {string[]} labLines
- * @returns {Array<{ experimentNumber: number, title: string, name: string, confidence: number }>}
- */
+
 export function extractLabExperiments(labLines) {
   if (!labLines || labLines.length === 0) return [];
 
@@ -91,7 +80,7 @@ export function extractLabExperiments(labLines) {
   let currentBuffer = '';
   let currentExpNumber = 0;
 
-  // Matches "Exp 1", "Exp. No. 1", "Experiment 1", "Program 1", "1. Title", "1 Title", or standalone "1"
+
   const EXP_START_REGEX = /^(?:Exp(?:eriment)?\.?\s*(?:No\.?)?\s*(\d+)|\bPrograms?\s*(\d+)|^(\d+)(?:\s*[:.\-–—]|\s+|$))/i;
   const ACTION_START_REGEX = /^(?:Write\s+a\s+program|Implement(?:ation)?\s+|Design\s+|Build\s+|Given\s+a\s+dataset|Installation\s+of|Introduction\s+to\s+Python|Machine\s+Learning\s+packages|Programs?\s+for|Converting\s+|Divide\s+and\s+conquer|Greedy\s+Approach|Dynamic\s+Programming)\b/i;
 
@@ -108,7 +97,7 @@ export function extractLabExperiments(labLines) {
     const alphaCount = (cleanTitle.match(/[a-zA-Z]/g) || []).length;
 
     if (alphaCount >= 4 && !isTableHeaderLine(cleanTitle)) {
-      // Deduplicate case-insensitively
+
       const exists = experiments.some((e) => e.title.toLowerCase() === cleanTitle.toLowerCase());
       if (!exists) {
         experiments.push({
@@ -126,12 +115,12 @@ export function extractLabExperiments(labLines) {
     const line = labLines[i].trim();
     if (!line || isTableHeaderLine(line)) continue;
 
-    // Skip table column number rows (e.g. "2 4 4" or "2 5 3, 9" or "4 1, 2 5" or standalone "30")
+
     if (/^\d{1,2}(?:\.\d+)?(?:\s+\d+(?:\s*,\s*\d+)*)+$/.test(line) || /^Total\s+(?:Contact\s+)?Hours/i.test(line)) {
       continue;
     }
 
-    // Skip standalone numbers if they look like contact hours (e.g. "30", "45", "100%")
+
     if (/^(?:30|45|50|60|100%?)$/.test(line)) {
       continue;
     }
@@ -154,7 +143,7 @@ export function extractLabExperiments(labLines) {
       currentExpNumber = currentExpNumber + 1;
       currentBuffer = line;
     } else {
-      // Continuation of previous experiment description
+
       if (currentBuffer) {
         currentBuffer += ` ${line}`;
       } else {

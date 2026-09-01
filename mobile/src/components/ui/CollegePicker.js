@@ -12,14 +12,14 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
-import { 
-  GraduationCap, 
-  Search, 
-  X, 
-  Check, 
-  MapPin, 
-  Building2, 
-  ChevronDown, 
+import {
+  GraduationCap,
+  Search,
+  X,
+  Check,
+  MapPin,
+  Building2,
+  ChevronDown,
   ArrowLeft,
   Pencil,
   CircleQuestionMark
@@ -31,7 +31,7 @@ import { getColleges, getCollegeStates } from '../../api/colleges';
 export function CollegePicker({
   collegeId = null,
   collegeName = '',
-  onSelect, // ({ collegeId, collegeName }) => void
+  onSelect,
   label = 'College / University',
   placeholder = 'Search your college or university',
   disabled = false,
@@ -44,8 +44,7 @@ export function CollegePicker({
   const [modalVisible, setModalVisible] = useState(false);
   const [isManualMode, setIsManualMode] = useState(false);
   const [manualInput, setManualInput] = useState('');
-  
-  // Search & Filter state
+
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedState, setSelectedState] = useState('');
   const [statesList, setStatesList] = useState([]);
@@ -55,7 +54,6 @@ export function CollegePicker({
 
   const debounceTimeout = useRef(null);
 
-  // Load States list when modal opens
   useEffect(() => {
     if (modalVisible && statesList.length === 0) {
       getCollegeStates()
@@ -64,7 +62,6 @@ export function CollegePicker({
     }
   }, [modalVisible, statesList.length]);
 
-  // Fetch colleges with debounce
   const fetchColleges = useCallback(async (search, state) => {
     setLoading(true);
     setError(null);
@@ -83,7 +80,6 @@ export function CollegePicker({
     }
   }, []);
 
-  // Trigger search on search/state change
   useEffect(() => {
     if (!modalVisible) return;
 
@@ -155,7 +151,7 @@ export function CollegePicker({
 
   return (
     <View style={[styles.wrapper, style]}>
-      {/* Trigger Box */}
+
       <TouchableOpacity
         style={[
           styles.trigger,
@@ -166,9 +162,9 @@ export function CollegePicker({
         activeOpacity={0.7}
       >
         <View style={styles.triggerLeft}>
-          <GraduationCap 
-            size={18} 
-            color={hasSelection ? colors.primary : colors.mutedForeground} 
+          <GraduationCap
+            size={18}
+            color={hasSelection ? colors.primary : colors.mutedForeground}
             style={{ marginRight: 10 }}
           />
           <View style={{ flex: 1 }}>
@@ -191,8 +187,8 @@ export function CollegePicker({
 
         <View style={styles.triggerActions}>
           {hasSelection && !disabled && (
-            <TouchableOpacity 
-              onPress={handleClear} 
+            <TouchableOpacity
+              onPress={handleClear}
               style={styles.clearBtn}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
@@ -203,7 +199,6 @@ export function CollegePicker({
         </View>
       </TouchableOpacity>
 
-      {/* Modal */}
       <Modal
         visible={modalVisible}
         animationType="slide"
@@ -215,7 +210,7 @@ export function CollegePicker({
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.modalOverlay}
         >
-          {/* Backdrop */}
+
           <TouchableOpacity
             style={styles.backdrop}
             activeOpacity={1}
@@ -223,14 +218,13 @@ export function CollegePicker({
           />
 
           <View style={[styles.sheetContainer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-            {/* Drag Handle */}
+
             <View style={styles.sheetHandle} />
 
-            {/* Modal Header */}
             <View style={styles.sheetHeader}>
               {isManualMode ? (
-                <TouchableOpacity 
-                  onPress={() => setIsManualMode(false)} 
+                <TouchableOpacity
+                  onPress={() => setIsManualMode(false)}
                   style={styles.backBtn}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
@@ -256,8 +250,8 @@ export function CollegePicker({
             </View>
 
             {isManualMode ? (
-              /* ── Manual Entry Form ───────────────────────────────────────── */
-              <ScrollView 
+
+              <ScrollView
                 contentContainerStyle={styles.manualContent}
                 keyboardShouldPersistTaps="handled"
               >
@@ -297,9 +291,8 @@ export function CollegePicker({
                 </TouchableOpacity>
               </ScrollView>
             ) : (
-              /* ── Search & Filter List ────────────────────────────────────── */
               <View style={styles.searchListWrapper}>
-                {/* Search Bar */}
+
                 <View style={styles.searchBarContainer}>
                   <Search size={18} color={colors.mutedForeground} style={styles.searchIcon} />
                   <TextInput
@@ -318,7 +311,6 @@ export function CollegePicker({
                   )}
                 </View>
 
-                {/* State/UT Pills Bar */}
                 <View style={styles.stateBarWrapper}>
                   <ScrollView
                     horizontal
@@ -368,7 +360,6 @@ export function CollegePicker({
                   </ScrollView>
                 </View>
 
-                {/* Results List */}
                 {loading ? (
                   <View style={styles.centerBox}>
                     <ActivityIndicator size="small" color={colors.primary} />
@@ -377,8 +368,8 @@ export function CollegePicker({
                 ) : error ? (
                   <View style={styles.centerBox}>
                     <Text style={styles.errorText}>{error}</Text>
-                    <TouchableOpacity 
-                      style={styles.retryBtn} 
+                    <TouchableOpacity
+                      style={styles.retryBtn}
                       onPress={() => fetchColleges(searchQuery, selectedState)}
                     >
                       <Text style={styles.retryBtnText}>Retry</Text>
@@ -447,7 +438,6 @@ export function CollegePicker({
                   />
                 )}
 
-                {/* Bottom Unlisted Action Link */}
                 <View style={styles.bottomBar}>
                   <TouchableOpacity
                     style={styles.unlistedLink}

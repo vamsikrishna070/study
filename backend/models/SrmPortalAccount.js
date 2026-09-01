@@ -23,7 +23,7 @@ const srmPortalAccountSchema = new mongoose.Schema({
     unique: true, 
     index: true 
   },
-  srmUsername: { type: String, required: true, trim: true },
+  srmUsername: { type: String, required: true, trim: true, index: true },
   encryptedPassword: { type: String, required: true, select: false },
   encryptedSessionId: { type: String, default: '' },
   sessionTime: { type: String, default: '' },

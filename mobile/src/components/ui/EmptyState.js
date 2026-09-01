@@ -20,7 +20,7 @@ export function EmptyState({ icon: Icon, title, detail, action, style }) {
 
 const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.create({
   container: {
-    backgroundColor: `${colors.card}80`, // 50% opacity hex
+    backgroundColor: `${colors.card}80`,
     borderRadius: radii.xxl,
     borderWidth: 1,
     borderColor: colors.cardBorder,

@@ -11,7 +11,7 @@ export default function VoiceRecorder({ onSave, onCancel }) {
   const [duration, setDuration] = useState(0);
   const [title, setTitle] = useState('Voice Note');
   const [permissionError, setPermissionError] = useState('');
-  
+
   const chunksRef = useRef([]);
   const timerRef = useRef(null);
   const audioRef = useRef(null);
@@ -31,7 +31,7 @@ export default function VoiceRecorder({ onSave, onCancel }) {
       setPermissionError('');
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
-      
+
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
@@ -49,11 +49,11 @@ export default function VoiceRecorder({ onSave, onCancel }) {
       recorder.start();
       setMediaRecorder(recorder);
       setRecording(true);
-      
+
       timerRef.current = setInterval(() => {
         setDuration(prev => prev + 1);
       }, 1000);
-      
+
     } catch (err) {
       setPermissionError('Microphone access denied or not available.');
       console.error(err);
@@ -88,7 +88,7 @@ export default function VoiceRecorder({ onSave, onCancel }) {
 
   const handleSave = () => {
     if (audioBlob) {
-      // Create a JS File object from the blob so it can be uploaded easily
+
       const file = new File([audioBlob], `${title.replace(/\s+/g, '_')}.webm`, { type: audioBlob.type });
       onSave({ file, title, duration, type: 'recording' });
     }
@@ -97,7 +97,7 @@ export default function VoiceRecorder({ onSave, onCancel }) {
   return (
     <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border bg-muted/20 p-6 text-center">
       {permissionError && <p className="mb-4 text-sm text-destructive">{permissionError}</p>}
-      
+
       {!audioUrl && !recording && (
         <div className="flex flex-col items-center space-y-4">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -135,7 +135,7 @@ export default function VoiceRecorder({ onSave, onCancel }) {
             className="w-full rounded-xl border border-border bg-card px-4 py-2.5 text-center font-bold focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             placeholder="Enter recording title"
           />
-          
+
           <div className="flex items-center justify-between rounded-full border border-border bg-card px-4 py-3">
             <audio
               ref={audioRef}

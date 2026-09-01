@@ -49,7 +49,6 @@ export default function PortalCalendar() {
           <p className="mt-1 text-sm text-muted-foreground">Official SRM AP academic schedules, key deadlines, and holidays.</p>
         </div>
 
-        {/* Tab Selector */}
         <div className="flex gap-2 border-b border-border pb-3">
           <button
             onClick={() => setActiveTab('odd')}
@@ -86,9 +85,8 @@ export default function PortalCalendar() {
           </button>
         </div>
 
-        {/* Events Grid */}
         <div className="grid gap-6 lg:grid-cols-3">
-          {/* Key Academic Events */}
+
           <div className="lg:col-span-2 space-y-4">
             <h2 className="font-display text-xl font-bold flex items-center gap-2">
               <CalendarIcon size={20} className="text-accent" />
@@ -110,7 +108,6 @@ export default function PortalCalendar() {
             </div>
           </div>
 
-          {/* Holidays Sidebar */}
           <div className="space-y-4">
             <h2 className="font-display text-xl font-bold flex items-center gap-2">
               <PartyPopper size={20} className="text-amber-500" />

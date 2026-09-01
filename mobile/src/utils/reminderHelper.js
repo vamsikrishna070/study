@@ -1,14 +1,8 @@
-/**
- * Helper utilities for Reminder scheduling and next-occurrence calculation.
- */
 
-/**
- * Validates selected date, time, and recurrence against the current live device moment.
- * Returns detailed, user-friendly error messages if the selection is in the past.
- */
+
 export const validateReminderDateTime = (selectedDate, selectedTime, scheduleType = 'one-time', weekdays = []) => {
   const now = new Date();
-  
+
   if (scheduleType === 'one-time' && (!selectedDate || isNaN(new Date(selectedDate).getTime()))) {
     return { isValid: false, error: 'Please select a valid date.' };
   }
@@ -46,7 +40,6 @@ export const validateReminderDateTime = (selectedDate, selectedTime, scheduleTyp
   const formatSelectedDateStr = (dateObj) =>
     dateObj.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
 
-  // For one-time reminders, the combined date & time must be strictly in the future
   if (scheduleType === 'one-time' || !scheduleType) {
     if (isPastDay(combined, now)) {
       return {
@@ -99,7 +92,7 @@ export const getNextTriggerTimestamp = (reminder) => {
 
   if (type === 'one-time') {
     const triggerTime = remindDate.getTime();
-    // Only return if it is strictly in the future
+
     if (triggerTime > now.getTime()) {
       return triggerTime;
     }
@@ -112,7 +105,7 @@ export const getNextTriggerTimestamp = (reminder) => {
     if (candidate.getTime() > now.getTime()) {
       return candidate.getTime();
     }
-    // Schedule for tomorrow at the same time
+
     candidate.setDate(candidate.getDate() + 1);
     return candidate.getTime();
   }
@@ -122,19 +115,17 @@ export const getNextTriggerTimestamp = (reminder) => {
       ? reminder.weekdays
       : [remindDate.getDay()];
 
-    // Search next 7 days for the earliest future match
     for (let offset = 0; offset < 7; offset++) {
       const candidate = new Date(now);
       candidate.setDate(candidate.getDate() + offset);
       candidate.setHours(targetHour, targetMinute, 0, 0);
 
-      const dayOfWeek = candidate.getDay(); // 0 (Sun) - 6 (Sat)
+      const dayOfWeek = candidate.getDay();
       if (selectedWeekdays.includes(dayOfWeek) && candidate.getTime() > now.getTime()) {
         return candidate.getTime();
       }
     }
 
-    // Next week fallback
     for (let offset = 7; offset < 14; offset++) {
       const candidate = new Date(now);
       candidate.setDate(candidate.getDate() + offset);
@@ -149,12 +140,12 @@ export const getNextTriggerTimestamp = (reminder) => {
 
   if (type === 'monthly') {
     const dayOfMonth = reminder.repeatDayOfMonth || remindDate.getDate();
-    // Try current month
+
     const candidate = new Date(now.getFullYear(), now.getMonth(), dayOfMonth, targetHour, targetMinute, 0, 0);
     if (candidate.getTime() > now.getTime()) {
       return candidate.getTime();
     }
-    // Try next month
+
     const nextMonthCandidate = new Date(now.getFullYear(), now.getMonth() + 1, dayOfMonth, targetHour, targetMinute, 0, 0);
     return nextMonthCandidate.getTime();
   }
@@ -166,7 +157,7 @@ export const getNextTriggerTimestamp = (reminder) => {
     if (candidate.getTime() > now.getTime()) {
       return candidate.getTime();
     }
-    // Next year
+
     const nextYearCandidate = new Date(now.getFullYear() + 1, month, day, targetHour, targetMinute, 0, 0);
     return nextYearCandidate.getTime();
   }

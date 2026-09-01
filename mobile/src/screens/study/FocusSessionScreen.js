@@ -8,15 +8,15 @@ import {
   SafeAreaView,
   StatusBar,
 } from 'react-native';
-import { 
-  Pause, 
-  Play, 
-  CircleCheck, 
-  X, 
-  BookOpen, 
-  Target, 
-  Flame, 
-  Sparkles 
+import {
+  Pause,
+  Play,
+  CircleCheck,
+  X,
+  BookOpen,
+  Target,
+  Flame,
+  Sparkles
 } from 'lucide-react-native';
 import { StudySessionContext } from '../../context/StudySessionContext';
 import { useAppDialog } from '../../components/ui/AppDialog';
@@ -36,14 +36,12 @@ export default function FocusSessionScreen({ navigation }) {
     discardSession,
   } = useContext(StudySessionContext);
 
-  // If no active session, return to StartSession
   useEffect(() => {
     if (!activeSession) {
       navigation.replace('StartSession');
     }
   }, [activeSession, navigation]);
 
-  // Intercept hardware back button to prevent accidental exit
   useEffect(() => {
     const onBackPress = () => {
       handleCancelPrompt();
@@ -95,7 +93,6 @@ export default function FocusSessionScreen({ navigation }) {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
-      {/* Top Bar with Cancel / Exit */}
       <View style={styles.topBar}>
         <View style={styles.brandRow}>
           <Sparkles size={16} color={colors.accent} style={{ marginRight: 6 }} />
@@ -111,9 +108,8 @@ export default function FocusSessionScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-      {/* Main Focus Card */}
       <View style={styles.focusCenter}>
-        {/* Status Chip */}
+
         <View style={[styles.statusBadge, isPaused && styles.statusBadgePaused]}>
           <View style={[styles.statusDot, isPaused && styles.statusDotPaused]} />
           <Text style={[styles.statusText, isPaused && styles.statusTextPaused]}>
@@ -121,12 +117,10 @@ export default function FocusSessionScreen({ navigation }) {
           </Text>
         </View>
 
-        {/* Large Digital Timer */}
         <View style={styles.timerWrapper}>
           <Text style={styles.timerText}>{formatTimer(elapsedSeconds)}</Text>
         </View>
 
-        {/* Subject & Topic Card */}
         <View style={styles.subjectCard}>
           <View style={styles.subjectHeader}>
             <BookOpen size={16} color={colors.accent} style={{ marginRight: 6 }} />
@@ -152,10 +146,9 @@ export default function FocusSessionScreen({ navigation }) {
         </View>
       </View>
 
-      {/* Bottom Action Controls */}
       <View style={styles.bottomControls}>
         <View style={styles.controlsRow}>
-          {/* Pause / Resume Button */}
+
           {isPaused ? (
             <TouchableOpacity
               style={[styles.actionBtn, styles.resumeBtn]}
@@ -176,7 +169,6 @@ export default function FocusSessionScreen({ navigation }) {
             </TouchableOpacity>
           )}
 
-          {/* End Session Button */}
           <TouchableOpacity
             style={[styles.actionBtn, styles.endBtn]}
             onPress={handleEnd}

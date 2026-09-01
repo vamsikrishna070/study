@@ -16,7 +16,7 @@ export function AppLockScreen() {
   const [enteredPin, setEnteredPin] = useState('');
   const [errorText, setErrorText] = useState('');
 
-  // Prompt biometric on mount ONLY if locked, enabled, biometricEnabled preference is true, and hardware/enrollment available
+
   useEffect(() => {
     if (isLocked && isLockEnabled) {
       setEnteredPin('');
@@ -46,7 +46,7 @@ export function AppLockScreen() {
       if (result.success) {
         unlock();
       } else {
-        // User cancelled or failed
+
         setPinMode(true);
       }
     } catch (e) {

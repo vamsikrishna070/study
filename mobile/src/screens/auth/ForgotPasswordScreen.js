@@ -23,11 +23,11 @@ const ForgotPasswordScreen = ({ navigation }) => {
     setLoading(true);
     try {
       await forgotPassword(email);
-      // Backend returns 404 if not found now, so success means it exists
+
       navigation.navigate('VerifyOtp', { email, mode: 'password-reset' });
     } catch (error) {
       if (error.response) {
-        // Specifically expecting "This email is not registered. Please check the email address or create an account." on 404
+
         setErrorMsg(error.response.data?.message || 'Failed to send reset code.');
       } else {
         setErrorMsg('Unable to connect to StudyArena. Please check your internet connection.');
@@ -82,8 +82,8 @@ const ForgotPasswordScreen = ({ navigation }) => {
           </View>
 
           <View style={styles.footer}>
-            <Text 
-              style={styles.footerLink} 
+            <Text
+              style={styles.footerLink}
               onPress={() => navigation.navigate('Login')}
             >
               Back to log in

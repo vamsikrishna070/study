@@ -46,7 +46,6 @@ export default function PortalResults() {
           </div>
         </div>
 
-        {/* Ledger Table */}
         <div className="overflow-hidden rounded-2xl border border-card-border bg-card shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">

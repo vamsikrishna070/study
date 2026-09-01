@@ -14,12 +14,11 @@ if (env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY) {
 
 export function startScheduler() {
   console.log('Push Notification Scheduler started');
-  
-  // Run every minute
+
   setInterval(async () => {
     try {
       const now = new Date();
-      // Find one-time reminders that are due and haven't fired
+
       const dueReminders = await Reminder.find({
         enabled: true,
         remindAt: { $lte: now },
@@ -30,14 +29,13 @@ export function startScheduler() {
       });
 
       for (const reminder of dueReminders) {
-        // Simple logic: if daily/weekly, check if it already fired today
+
         if (reminder.scheduleType !== 'one-time') {
           if (reminder.lastFiredAt && (now.getTime() - reminder.lastFiredAt.getTime()) < 12 * 60 * 60 * 1000) {
-            continue; // Already fired recently
+            continue;
           }
         }
 
-        // Mark as fired
         reminder.lastFiredAt = now;
         if (reminder.scheduleType === 'one-time') {
           reminder.enabled = false;
@@ -48,7 +46,6 @@ export function startScheduler() {
         }
         await reminder.save();
 
-        // Save in app notification
         await Notification.create({
           user: reminder.user,
           title: reminder.title,
@@ -57,7 +54,6 @@ export function startScheduler() {
           actionUrl: '/reminders'
         });
 
-        // Send push notification if enabled
         if (reminder.notificationEnabled) {
           const subs = await PushSubscription.find({ user: reminder.user });
           const payload = JSON.stringify({
@@ -74,7 +70,7 @@ export function startScheduler() {
               );
             } catch (err) {
               if (err.statusCode === 410 || err.statusCode === 404) {
-                // Subscription has expired or is no longer valid
+
                 await sub.deleteOne();
               }
             }

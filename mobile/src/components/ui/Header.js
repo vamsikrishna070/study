@@ -4,24 +4,24 @@ import { Menu, Target, ArrowLeft } from 'lucide-react-native';
 import { useNavigation, DrawerActions, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthContext } from '../../context/AuthContext';
-import { typography, spacing, radii, useAppTheme, useStyles } from '../../theme/theme';
+import { useAppTheme, useStyles } from '../../theme/theme';
 
 const getInitials = (name) => {
-  if (!name || typeof name !== 'string') return 'U';
+  if (!name || typeof name !== 'string') return 'S';
   return name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0].toUpperCase()).join('');
 };
 
 export const Header = ({ showBack, navigation: customNavigation }) => {
-  const { colors, typography, spacing, radii, theme } = useAppTheme();
+  const { colors, typography, spacing, radii } = useAppTheme();
   const styles = useStyles(createStyles);
-  
+
   const hookNavigation = useNavigation();
   const navigation = customNavigation || hookNavigation;
   const route = useRoute();
   const { user } = useContext(AuthContext);
   const insets = useSafeAreaInsets();
 
-  const shouldShowBack = showBack !== undefined ? showBack : !!route.params?.subjectId;
+  const shouldShowBack = showBack !== undefined ? showBack : Boolean(route.params?.subjectId);
 
   const handleLeftButtonPress = () => {
     if (shouldShowBack) {
@@ -31,13 +31,11 @@ export const Header = ({ showBack, navigation: customNavigation }) => {
       return;
     }
 
-    // 1. Direct drawer method on current navigation object
     if (typeof navigation.openDrawer === 'function') {
       navigation.openDrawer();
       return;
     }
 
-    // 2. Named drawer navigator by ID ('AppDrawer')
     if (typeof navigation.getParent === 'function') {
       const drawerById = navigation.getParent('AppDrawer');
       if (drawerById && typeof drawerById.openDrawer === 'function') {
@@ -45,7 +43,6 @@ export const Header = ({ showBack, navigation: customNavigation }) => {
         return;
       }
 
-      // 3. Parent chain traversal checking for openDrawer function
       let parent = navigation.getParent();
       while (parent) {
         if (typeof parent.openDrawer === 'function') {
@@ -55,7 +52,6 @@ export const Header = ({ showBack, navigation: customNavigation }) => {
         parent = typeof parent.getParent === 'function' ? parent.getParent() : null;
       }
 
-      // 4. Try dispatching DrawerActions on parent chain
       let dispatchParent = navigation.getParent();
       while (dispatchParent) {
         try {
@@ -66,7 +62,6 @@ export const Header = ({ showBack, navigation: customNavigation }) => {
       }
     }
 
-    // 5. Fallback: if not inside a drawer and can go back, go back safely
     if (navigation.canGoBack()) {
       navigation.goBack();
     }
@@ -75,54 +70,53 @@ export const Header = ({ showBack, navigation: customNavigation }) => {
   const handleProfilePress = () => {
     if (typeof navigation.navigate === 'function') {
       try {
-        navigation.navigate('Settings');
+        navigation.navigate('Profile');
       } catch (_) {
         try {
-          navigation.navigate('DrawerRoot', { screen: 'Settings' });
-        } catch (e) {
-          console.log('[Header] Navigation to Settings failed:', e.message);
-        }
+          navigation.navigate('Settings');
+        } catch (_) {}
       }
     }
   };
+
+  const displayName = user?.displayName || user?.officialName || user?.name || 'Student';
 
   return (
     <View style={[styles.headerContainer, { paddingTop: insets.top }]}>
       <View style={styles.headerContent}>
         <View style={styles.leftSection}>
-          <TouchableOpacity 
-            onPress={handleLeftButtonPress} 
+          <TouchableOpacity
+            onPress={handleLeftButtonPress}
             style={styles.menuBtn}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            accessibilityLabel={shouldShowBack ? "Go back" : "Open navigation menu"}
+            accessibilityLabel={shouldShowBack ? 'Go back' : 'Open navigation menu'}
           >
-            {shouldShowBack ? <ArrowLeft size={26} color={colors.foreground} /> : <Menu size={26} color={colors.foreground} />}
+            {shouldShowBack ? <ArrowLeft size={22} color={colors.foreground} /> : <Menu size={22} color={colors.foreground} />}
           </TouchableOpacity>
         </View>
 
         <View style={styles.centerSection}>
           <View style={styles.brandContainer}>
             <View style={styles.logoIcon}>
-              <Target size={18} color={colors.primaryForeground} />
+              <Target size={16} color={colors.primaryForeground} />
             </View>
             <Text style={styles.brandText}>StudyArena</Text>
           </View>
         </View>
 
         <View style={styles.rightSection}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.profileBtn}
             onPress={handleProfilePress}
-            accessibilityLabel="Profile settings"
+            accessibilityLabel="Profile"
+            activeOpacity={0.8}
           >
             {user?.profileImageUrl ? (
-              <View style={styles.avatarContainer}>
-                <Image source={{ uri: user.profileImageUrl }} style={styles.avatarImage} />
-              </View>
+              <Image source={{ uri: user.profileImageUrl }} style={styles.avatarImage} />
             ) : (
-              <View style={[styles.avatarContainer, styles.avatarPlaceholder]}>
+              <View style={styles.avatarPlaceholder}>
                 <Text style={styles.avatarText}>
-                  {getInitials(user?.name)}
+                  {getInitials(displayName)}
                 </Text>
               </View>
             )}
@@ -142,20 +136,24 @@ const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.crea
   headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     height: 56,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: 16,
   },
   leftSection: {
-    flex: 1,
+    width: 48,
+    height: 48,
     alignItems: 'flex-start',
     justifyContent: 'center',
   },
   centerSection: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   rightSection: {
-    flex: 1,
+    width: 48,
+    height: 48,
     alignItems: 'flex-end',
     justifyContent: 'center',
   },
@@ -170,17 +168,17 @@ const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.crea
     alignItems: 'center',
   },
   logoIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: radii.md,
+    width: 26,
+    height: 26,
+    borderRadius: radii.sm,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: spacing.sm,
+    marginRight: spacing.xs + 2,
   },
   brandText: {
     fontFamily: typography.serif.medium,
-    fontSize: 20,
+    fontSize: 19,
     color: colors.foreground,
     letterSpacing: -0.5,
   },
@@ -190,24 +188,24 @@ const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.crea
     justifyContent: 'center',
     alignItems: 'flex-end',
   },
-  avatarContainer: {
+  avatarImage: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    overflow: 'hidden',
-  },
-  avatarImage: {
-    width: '100%',
-    height: '100%',
   },
   avatarPlaceholder: {
-    backgroundColor: colors.primary + '33', 
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
     fontFamily: typography.sans.bold,
-    fontSize: 14,
-    color: colors.primary,
+    fontSize: 13,
+    color: colors.primaryForeground,
   },
 });
+
+export default Header;

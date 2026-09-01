@@ -48,7 +48,7 @@ export default function VerifyEmail() {
     if (cooldown > 0) return;
     setError('');
     setSuccess('');
-    setCooldown(60); // 60 seconds cooldown
+    setCooldown(60);
 
     const res = await resendOtp(email);
     if (res.success) {
@@ -77,16 +77,16 @@ export default function VerifyEmail() {
         <form onSubmit={handleSubmit} className="mt-8 space-y-5">
           {error && <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
           {success && <div className="rounded-lg bg-green-500/10 p-3 text-sm text-green-600 dark:text-green-400">{success}</div>}
-          
+
           <Field label="Verification Code">
-            <input 
-              type="text" 
-              required 
+            <input
+              type="text"
+              required
               maxLength={6}
-              className={inputClass} 
-              value={otp} 
-              onChange={e => setOtp(e.target.value)} 
-              placeholder="Enter 6-digit OTP" 
+              className={inputClass}
+              value={otp}
+              onChange={e => setOtp(e.target.value)}
+              placeholder="Enter 6-digit OTP"
             />
           </Field>
 
@@ -97,7 +97,7 @@ export default function VerifyEmail() {
 
         <p className="mt-6 text-center text-sm text-muted-foreground">
           Didn't receive the code?{' '}
-          <button 
+          <button
             type="button"
             onClick={handleResend}
             disabled={cooldown > 0}

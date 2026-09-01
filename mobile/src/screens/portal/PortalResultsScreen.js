@@ -42,10 +42,10 @@ const PortalResultsScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <ScreenHeader title="Semester Results" showBack={true} />
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={[
-          styles.scrollContent, 
-          { 
+          styles.scrollContent,
+          {
             paddingTop: spacing.md,
             paddingBottom: Math.max(insets.bottom, 20) + 100,
           }
@@ -53,7 +53,6 @@ const PortalResultsScreen = ({ navigation }) => {
       >
         <Text style={styles.title}>Semester Results</Text>
 
-      {/* CGPA Summary */}
       <View style={styles.cgpaCard}>
         <Text style={styles.cgpaLabel}>CUMULATIVE GPA</Text>
         <Text style={styles.cgpaVal}>{cgpa}</Text>

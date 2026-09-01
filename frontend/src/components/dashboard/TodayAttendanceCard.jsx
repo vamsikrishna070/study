@@ -23,7 +23,7 @@ export default function TodayAttendanceCard() {
   const markMutation = useMarkAttendanceCode();
 
   const [code, setCode] = useState('');
-  const [feedback, setFeedback] = useState(null); // { type: 'success'|'error', text: '' }
+  const [feedback, setFeedback] = useState(null);
 
   const statusData = statusQuery.data;
   const attendanceData = attendanceQuery.data;
@@ -64,7 +64,6 @@ export default function TodayAttendanceCard() {
     statusQuery.refetch();
   };
 
-  // Not connected state
   if (statusQuery.isSuccess && !isConnected) {
     return (
       <div className="rounded-2xl border border-card-border bg-card p-6 shadow-sm">
@@ -103,7 +102,7 @@ export default function TodayAttendanceCard() {
 
   return (
     <div className="rounded-2xl border border-card-border bg-card p-6 shadow-sm space-y-5">
-      {/* Non-blocking session notification if expired */}
+
       {sessionExpired && (
         <div className="flex items-center justify-between gap-2 rounded-xl bg-amber-500/10 border border-amber-500/20 px-3 py-2 text-xs font-semibold text-amber-500">
           <div className="flex items-center gap-1.5">
@@ -116,7 +115,6 @@ export default function TodayAttendanceCard() {
         </div>
       )}
 
-      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/50 pb-4">
         <div>
           <div className="flex items-center gap-2">
@@ -142,7 +140,6 @@ export default function TodayAttendanceCard() {
         </button>
       </div>
 
-      {/* Code Input Form */}
       <form onSubmit={handleMarkCode} className="rounded-xl border border-border/60 bg-muted/20 p-4 space-y-3">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -174,7 +171,6 @@ export default function TodayAttendanceCard() {
           </div>
         </div>
 
-        {/* Feedback Alert */}
         {feedback && (
           <div
             className={cx(
@@ -190,7 +186,6 @@ export default function TodayAttendanceCard() {
         )}
       </form>
 
-      {/* Today's Classes List */}
       <div className="space-y-2">
         <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
           Scheduled Conduct Hours ({classes.length})

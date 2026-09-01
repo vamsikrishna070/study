@@ -1,7 +1,4 @@
-/**
- * Syllabus Extractor Service Facade.
- * Re-exports the complete modular syllabus extraction pipeline.
- */
+
 
 export {
   extractSyllabusFromBuffer,

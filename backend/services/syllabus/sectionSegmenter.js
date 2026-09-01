@@ -1,8 +1,4 @@
-/**
- * Universal Section Segmentation Module.
- * Segments the document into semantic partitions (Metadata, Theory, Lab, Outcomes, References, Evaluation)
- * BEFORE unit and experiment parsing. Supports diverse university syllabus layout conventions.
- */
+
 
 export const SECTION_TYPES = {
   METADATA: 'METADATA',
@@ -54,27 +50,18 @@ const TABLE_HEADER_WORDS = /^(?:Unit\s*No\.?|Unit\s*Name|Required|Contact|Hours?
 
 const UNIT_MARKER_REGEX = /^(?:UNIT|Unit|MODULE|Module|CHAPTER|Chapter|SECTION|Section|BLOCK|Block|PART|Part)\s*[:.\-–—]?\s*(?:[0-9IVXLCDM]+|FIRST|SECOND|THIRD|FOURTH|FIFTH|SIXTH|SEVENTH|EIGHTH|NINTH|TENTH)\b|^(?:[IVXLCDM]+)\.\s+[A-Z]/i;
 
-/**
- * Identifies whether a line is an explicit Theory section header
- */
 export function isTheorySectionHeader(line) {
   if (!line || typeof line !== 'string') return false;
   const trimmed = line.trim();
   return THEORY_SECTION_HEADERS.some((regex) => regex.test(trimmed));
 }
 
-/**
- * Identifies whether a line is an explicit Lab section header
- */
 export function isLabSectionHeader(line) {
   if (!line || typeof line !== 'string') return false;
   const trimmed = line.trim();
   return LAB_SECTION_HEADERS.some((regex) => regex.test(trimmed));
 }
 
-/**
- * Identifies whether a line marks a non-syllabus section (Outcomes, References, Evaluation)
- */
 export function isClosingSectionHeader(line) {
   if (!line || typeof line !== 'string') return false;
   const trimmed = line.trim();
@@ -87,11 +74,6 @@ export function isClosingSectionHeader(line) {
   );
 }
 
-/**
- * Segments document lines into structured partitions.
- * @param {string[]} lines
- * @returns {{ metadataLines: string[], theoryLines: string[], labLines: string[], hasTheory: boolean, hasLab: boolean }}
- */
 export function segmentDocumentSections(lines) {
   const metadataLines = [];
   const theoryLines = [];
@@ -103,19 +85,16 @@ export function segmentDocumentSections(lines) {
     const line = lines[i].trim();
     if (!line) continue;
 
-    // 1. Check for Lab Section Start
     if (isLabSectionHeader(line)) {
       currentSection = SECTION_TYPES.LAB;
       continue;
     }
 
-    // 2. Check for Explicit Theory Section Start
     if (isTheorySectionHeader(line)) {
       currentSection = SECTION_TYPES.THEORY;
       continue;
     }
 
-    // 3. If in LAB section, check for genuine non-table section closures
     if (currentSection === SECTION_TYPES.LAB) {
       if (isClosingSectionHeader(line)) {
         currentSection = SECTION_TYPES.REFERENCES;
@@ -125,7 +104,6 @@ export function segmentDocumentSections(lines) {
       continue;
     }
 
-    // 4. Check for Unit Markers or late syllabus topics (re-opens Theory section when in METADATA, OUTCOMES, or REFERENCES)
     if (currentSection !== SECTION_TYPES.LAB) {
       if (UNIT_MARKER_REGEX.test(line)) {
         currentSection = SECTION_TYPES.THEORY;
@@ -145,7 +123,6 @@ export function segmentDocumentSections(lines) {
       }
     }
 
-    // 5. Check for Non-Syllabus Sections (Outcomes, References, Evaluation)
     if (isClosingSectionHeader(line)) {
       if (REFERENCES_SECTION_HEADERS.some((r) => r.test(line))) {
         currentSection = SECTION_TYPES.REFERENCES;
@@ -157,7 +134,6 @@ export function segmentDocumentSections(lines) {
       continue;
     }
 
-    // 6. Append line to respective partition
     switch (currentSection) {
       case SECTION_TYPES.THEORY:
         theoryLines.push(line);
@@ -169,7 +145,7 @@ export function segmentDocumentSections(lines) {
         metadataLines.push(line);
         break;
       default:
-        // OUTCOMES, REFERENCES, EVALUATION lines are isolated from syllabus topics
+
         break;
     }
   }

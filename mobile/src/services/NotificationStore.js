@@ -1,10 +1,4 @@
-/**
- * NotificationStore
- *
- * Persists the mapping of { reminderId → localNotificationId } using AsyncStorage.
- * This is necessary because the backend Reminder model does not store notification IDs.
- * On app restart we use this to cancel/reschedule notifications correctly.
- */
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const STORAGE_KEY = '@studyarena:notif_ids';

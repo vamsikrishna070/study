@@ -6,8 +6,14 @@ import { LoadingBlock, QueryState, cx } from '../../components/shared.jsx';
 import { useGetPortalStatus } from '../../services/portalHooks.js';
 
 const SLOTS = [
-  "09:00 - 09:50", "10:00 - 10:50", "11:00 - 11:50", "12:00 - 12:50",
-  "01:00 - 01:50", "02:00 - 02:50", "03:00 - 03:50", "04:00 - 04:50"
+  "H1 • 09:00 - 09:50",
+  "H2 • 10:00 - 10:50",
+  "H3 • 11:00 - 11:50",
+  "H4 • 12:00 - 12:50",
+  "H5 • 13:00 - 13:50",
+  "H6 • 14:00 - 14:50",
+  "H7 • 15:00 - 15:50",
+  "H8 • 16:00 - 17:30"
 ];
 
 export default function PortalTimetable() {
@@ -34,7 +40,7 @@ export default function PortalTimetable() {
 
   const timetable = data?.timetable || [];
   const subjectsMap = data?.subjects || [];
-  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
   const currentDayData = timetable.find((d) => d.day?.toLowerCase() === selectedDay.toLowerCase()) || { subjects: [] };
 
@@ -49,7 +55,6 @@ export default function PortalTimetable() {
           <p className="mt-1 text-sm text-muted-foreground">Class schedule with room building codes and faculty details.</p>
         </div>
 
-        {/* Day Selector Tabs */}
         <div className="flex gap-2 border-b border-border pb-3 overflow-x-auto">
           {days.map((day) => (
             <button
@@ -67,7 +72,6 @@ export default function PortalTimetable() {
           ))}
         </div>
 
-        {/* Schedule List */}
         <div className="space-y-4">
           {currentDayData.subjects?.length === 0 ? (
             <div className="rounded-2xl border border-card-border bg-card p-10 text-center text-sm text-muted-foreground">

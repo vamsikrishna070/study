@@ -1,16 +1,16 @@
 import { useState } from 'react';
-import { 
-  FileText, 
-  Eye, 
-  Download, 
-  Share2, 
-  RefreshCw, 
-  Trash2, 
-  Sparkles, 
-  CheckCircle2, 
-  AlertCircle, 
-  Check, 
-  Loader2 
+import {
+  FileText,
+  Eye,
+  Download,
+  Share2,
+  RefreshCw,
+  Trash2,
+  Sparkles,
+  CheckCircle2,
+  AlertCircle,
+  Check,
+  Loader2
 } from 'lucide-react';
 import { Button, cx } from '../shared.jsx';
 import { viewDocument, getDownloadUrl } from '../../utils/documentViewer';
@@ -62,7 +62,7 @@ export function DocumentPreviewCard({
     if (downloading) return;
     setDownloading(true);
     try {
-      // Use fetch + blob for reliable cross-origin browser downloads
+
       const downloadUrl = getDownloadUrl(file.url);
       const res = await fetch(downloadUrl);
       const blob = await res.blob();
@@ -78,7 +78,7 @@ export function DocumentPreviewCard({
       setDownloadSuccess(true);
       setTimeout(() => setDownloadSuccess(false), 3000);
     } catch (err) {
-      // Fallback direct link download
+
       const downloadUrl = getDownloadUrl(file.url);
       const link = document.createElement('a');
       link.href = downloadUrl;
@@ -114,7 +114,7 @@ export function DocumentPreviewCard({
           setShareSuccess(true);
           setTimeout(() => setShareSuccess(false), 3000);
         } catch (copyErr) {
-          // ignore
+
         }
       }
     } finally {
@@ -130,9 +130,9 @@ export function DocumentPreviewCard({
 
   return (
     <div className={cx('rounded-2xl border border-card-border bg-card p-5 shadow-sm transition-all', className)}>
-      {/* File Info Header */}
+
       <div className="flex items-center gap-4">
-        <div 
+        <div
           className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
           style={{ backgroundColor: `${accentColor}1A` }}
         >
@@ -151,7 +151,6 @@ export function DocumentPreviewCard({
         </div>
       </div>
 
-      {/* Extraction Status Banner */}
       <div className="mt-4">
         {isExtracting ? (
           <div className="flex items-center gap-2.5 rounded-xl border border-primary/20 bg-primary/10 px-3.5 py-2.5 text-xs font-medium text-primary">
@@ -159,12 +158,12 @@ export function DocumentPreviewCard({
             <span>Extracting syllabus units & topics...</span>
           </div>
         ) : unitCount > 0 ? (
-          <div 
+          <div
             className="flex items-center gap-2.5 rounded-xl border px-3.5 py-2.5 text-xs font-semibold"
-            style={{ 
-              backgroundColor: `${accentColor}12`, 
+            style={{
+              backgroundColor: `${accentColor}12`,
               borderColor: `${accentColor}35`,
-              color: accentColor 
+              color: accentColor
             }}
           >
             <CheckCircle2 size={16} className="shrink-0" />
@@ -183,7 +182,6 @@ export function DocumentPreviewCard({
         )}
       </div>
 
-      {/* Primary Actions Grid */}
       <div className="mt-4 flex flex-wrap gap-2.5">
         <button
           type="button"
@@ -210,7 +208,6 @@ export function DocumentPreviewCard({
         )}
       </div>
 
-      {/* Auxiliary Action Row (Download, Share, Replace, Remove) */}
       <div className="mt-4 flex items-center justify-between border-t border-card-border pt-3 text-xs">
         <div className="flex items-center gap-1 sm:gap-2">
           <button

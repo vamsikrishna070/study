@@ -72,7 +72,6 @@ export default function PortalExams() {
           </button>
         </div>
 
-        {/* Official SRM Marks List */}
         {exams.length === 0 ? (
           <div className="rounded-2xl border border-card-border bg-card p-10 text-center text-sm text-muted-foreground">
             Marks are not available yet from the SRM AP Student Portal.
@@ -96,7 +95,6 @@ export default function PortalExams() {
                       </span>
                     </div>
 
-                    {/* Official SRM Marks Display */}
                     <div className="rounded-xl border border-border bg-background p-4 space-y-3">
                       <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground">
                         <span>OFFICIAL SRM MARKS</span>
@@ -116,7 +114,6 @@ export default function PortalExams() {
                         </div>
                       )}
 
-                      {/* Component Breakdown */}
                       {components.length > 0 && (
                         <div className="pt-2 border-t border-border/60 space-y-2">
                           <div className="font-mono text-[10px] uppercase text-muted-foreground tracking-wider font-bold">

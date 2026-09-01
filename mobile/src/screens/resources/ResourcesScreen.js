@@ -71,7 +71,7 @@ const ResourceIcon = ({ type, mimeType, color }) => {
   let iconColor = color || '#293656';
 
   if (type === 'youtube' || mimeType?.includes('youtube')) {
-    IconComponent = Video; // Fallback since Youtube icon is not available
+    IconComponent = Video;
     iconColor = '#ff0000';
   } else if (type === 'recording' || mimeType?.includes('audio')) {
     IconComponent = Music;
@@ -87,7 +87,6 @@ const ResourceIcon = ({ type, mimeType, color }) => {
     iconColor = color || '#df6b47';
   }
 
-  // Safety fallback: ensure IconComponent is valid
   if (!IconComponent) {
     IconComponent = ExternalLink;
     iconColor = color || '#293656';
@@ -199,7 +198,6 @@ const ResourcesScreen = ({ route, navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
-  // Modal State
   const [modalVisible, setModalVisible] = useState(paramOpenCreate);
   const [editingId, setEditingId] = useState(null);
   const [resourceType, setResourceType] = useState('link');
@@ -244,8 +242,7 @@ const ResourcesScreen = ({ route, navigation }) => {
     setRating(item.rating || 0);
     setWatched(item.watched ? 'true' : 'false');
     setTagsInput((item.tags || []).join(', '));
-    
-    // Make sure attachments from payload are populated
+
     let atts = item.attachments || [];
     if (atts.length === 0 && item.fileData && item.resourceType !== 'link' && item.resourceType !== 'youtube') {
       atts = [{
@@ -263,7 +260,6 @@ const ResourcesScreen = ({ route, navigation }) => {
     setModalVisible(true);
   };
 
-  // Voice recording modal
   const [voiceModalVisible, setVoiceModalVisible] = useState(false);
 
   const loadData = async () => {
@@ -586,7 +582,6 @@ const ResourcesScreen = ({ route, navigation }) => {
 
               <Text style={styles.cardTitle}>{item.title}</Text>
 
-              {/* Subject chip & Rating */}
               <View style={styles.metaRow}>
                 {!!(item.subjectCode ? `${item.subjectCode} - ${item.subject}` : (item.subject?.name || item.subject)) && (
                   <Text style={styles.subjectChip}>
@@ -607,7 +602,6 @@ const ResourcesScreen = ({ route, navigation }) => {
                 </Text>
               )}
 
-              {/* Attachments List */}
               {attList.length > 0 && (
                 <View style={{ marginTop: 10, gap: 8 }}>
                   <Text style={{ fontFamily: typography.mono.bold, fontSize: 10, color: colors.mutedForeground, letterSpacing: 0.8 }}>
@@ -622,7 +616,6 @@ const ResourcesScreen = ({ route, navigation }) => {
                     const isImageKind = kind === 'image';
                     const sizeText = formatFileSize(att.size);
 
-                    // Pick icon based on kind
                     const KindIcon = kind === 'pdf' ? FileText
                       : kind === 'image' ? ImageIcon
                       : kind === 'audio' ? Music
@@ -654,7 +647,7 @@ const ResourcesScreen = ({ route, navigation }) => {
                           borderColor: colors.cardBorder,
                         }}
                       >
-                        {/* File info row */}
+
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                           <View style={{
                             width: 34, height: 34, borderRadius: radii.sm,
@@ -673,7 +666,6 @@ const ResourcesScreen = ({ route, navigation }) => {
                           </View>
                         </View>
 
-                        {/* Image Preview */}
                         {isImageKind && attUrl && (
                           <Image
                             source={{ uri: attUrl }}
@@ -682,12 +674,10 @@ const ResourcesScreen = ({ route, navigation }) => {
                           />
                         )}
 
-                        {/* Audio Bar */}
                         {isAudioKind && attUrl && (
                           <ResourceAudioBar url={attUrl} title={att.name || item.title} />
                         )}
 
-                        {/* Action buttons row */}
                         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginTop: 10, gap: 10 }}>
                           {!isAudioKind && attUrl && (
                             <TouchableOpacity
@@ -726,7 +716,6 @@ const ResourcesScreen = ({ route, navigation }) => {
                 </View>
               )}
 
-              {/* Link Block */}
               {isLink && (item.url || item.fileData?.url) && (
                 <View style={{ marginTop: 10, padding: 12, backgroundColor: colors.muted + '20', borderRadius: radii.md, borderWidth: 1, borderColor: colors.cardBorder }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
@@ -745,7 +734,6 @@ const ResourcesScreen = ({ route, navigation }) => {
                 </View>
               )}
 
-              {/* Tags */}
               {item.tags?.length > 0 && (
                 <View style={styles.tagsRow}>
                   {item.tags.map((tag, i) => (
@@ -779,7 +767,6 @@ const ResourcesScreen = ({ route, navigation }) => {
         }}
       />
 
-      {/* Save Resource Modal */}
       <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={closeAndResetModal}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -820,7 +807,6 @@ const ResourcesScreen = ({ route, navigation }) => {
                 <Input value={title} onChangeText={setTitle} placeholder="Enter resource title" />
               </Field>
 
-              {/* Conditional Input based on Resource Type */}
               {isLinkType && (
                 <Field label={resourceType === 'youtube' ? 'YouTube URL' : 'Web Link URL'}>
                   <Input
@@ -833,7 +819,6 @@ const ResourcesScreen = ({ route, navigation }) => {
                 </Field>
               )}
 
-              {/* Attachments Section */}
               {(isFileType || isRecordingType) && (
                 <Field label={`Attachments (${attachments.length})`}>
                   {attachments.length > 0 && (
@@ -937,7 +922,6 @@ const ResourcesScreen = ({ route, navigation }) => {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Voice Recorder Modal */}
       <VoiceRecorderModal
         visible={voiceModalVisible}
         onClose={() => setVoiceModalVisible(false)}

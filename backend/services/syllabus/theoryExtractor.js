@@ -1,8 +1,4 @@
-/**
- * Theory Unit and Topic Extraction Module.
- * Universal engine supporting OBE tables, standard paragraphs, bulleted/numbered modules,
- * Roman numeral headings, and composite topic splitting.
- */
+
 
 import { parseUnitNumber, cleanOcrTypo, romanToArabic } from './normalizer.js';
 import { extractTheoryUnitsFromTable, isScannedTableSyllabus } from './tableExtractor.js';
@@ -11,15 +7,11 @@ import { stripMetadataColumns } from './spatialLayoutParser.js';
 const TABLE_HEADER_REGEX = /^(?:Unit\s*No\.?|Unit\s*Name|Required|Contact\s*Hours?|CLOs?|Addressed|References?|Used|Referen\s*cesUsed|Experiment\s*Name|Exp\.?\s*No\.?|sl\.?\s*no\.?|s\.?\s*no\.?|S\.No\.?|Hours?|Lecture\s*Hours?|Period|Marks?|Credits?|L\s*T\s*P\s*C)$/i;
 const PAGE_NUMBER_REGEX = /^--\s*\d+\s*(?:of\s*\d+)?\s*--$|^Page\s+\d+(?:\s+of\s+\d+)?$|^\d+\s*\/\s*\d+$/i;
 
-/**
- * Checks if a line is junk, textbook, outcome, or table header
- */
 export function isReferenceOrJunk(line) {
   if (!line || typeof line !== 'string') return true;
   let trimmed = line.trim();
   if (trimmed.length < 2) return true;
 
-  // Strip leading bullet symbols before checking junk keywords
   trimmed = trimmed.replace(/^[•●○▪▫➢✓\-*+o\s]+/, '').trim();
   if (trimmed.length < 2) return true;
 
@@ -27,7 +19,6 @@ export function isReferenceOrJunk(line) {
   if (PAGE_NUMBER_REGEX.test(trimmed)) return true;
   if (TABLE_HEADER_REGEX.test(trimmed)) return true;
 
-  // Evaluation, Bloom's, Outcomes, Designers, Requirements
   if (
     /^(?:Learning\s+Assessment|Recommended\s+Resources|Other\s+Resources|Bloom’s\s+Level|Course\s+Designers|Internal\s+Continuous|External\s+Evaluation|CLA-I|Mid-I|Lab\s+Performance|Cognitive\s+Task|Course\s+Objectives?|Course\s+Outcomes?|Program\s+Outcomes?|CO-PO\s+Mapping|Assessment\s+Pattern|Hardware\s+Requirements?|Software\s+Requirements?|System\s+Requirements?|SmartBridge\s+Educational)/i.test(
       trimmed
@@ -39,7 +30,6 @@ export function isReferenceOrJunk(line) {
   if (/^(?:CO\d|PO\d|PSO\d)\s*[:-]/i.test(trimmed)) return true;
   if (/^(?:Theory\s*\(\d+%\)|Practical\s*\(\d+%\)|External\s*Theory|External\s*Lab)/i.test(trimmed)) return true;
 
-  // Textbooks, Publishers, Authors
   if (
     /^(?:Text\s*Books?|Reference\s*Books?|Suggested\s*Readings?|References?|Prescribed\s*Books?|Web\s*Resources?|Online\s*Resources?)\s*[:-]?/i.test(
       trimmed
@@ -52,15 +42,11 @@ export function isReferenceOrJunk(line) {
   if (/^\d+\.\s+[A-Z][a-z]+.*(?:\(\d{4}\)|\d{4})/i.test(trimmed)) return true;
   if (/^Total\s+(?:Theory\s+|Lab\s+)?Contact\s+Hours?/i.test(trimmed)) return true;
 
-  // Standalone numbers, dates, or symbols
   if (/^[\d.,\s;:/\-_()|'’`"]+$/.test(trimmed) && !/[a-zA-Z]/.test(trimmed)) return true;
 
   return false;
 }
 
-/**
- * Splits text by a delimiter only when outside brackets and parentheses
- */
 export function splitOutsideBrackets(text, delimiter = ',') {
   const parts = [];
   let current = '';
@@ -83,9 +69,6 @@ export function splitOutsideBrackets(text, delimiter = ',') {
   return parts;
 }
 
-/**
- * Splits composite topic text into atomic topics while preserving bracketed content
- */
 export function splitCompositeTopic(text) {
   if (!text || typeof text !== 'string') return [];
 
@@ -100,7 +83,6 @@ export function splitCompositeTopic(text) {
 
   if (cleaned.length < 3 || isReferenceOrJunk(cleaned)) return [];
 
-  // Semicolon-separated topics (e.g. "Topic 1; Topic 2; Topic 3")
   if (cleaned.includes(';')) {
     const parts = splitOutsideBrackets(cleaned, ';')
       .map((p) => p.trim())
@@ -110,7 +92,6 @@ export function splitCompositeTopic(text) {
     }
   }
 
-  // Colon-led category: "Process Management: Process Concepts, CPU Scheduling, Operations on Processes"
   const colonMatch = cleaned.match(/^([^:]+):\s*(.+)$/);
   if (colonMatch) {
     const category = colonMatch[1].trim();
@@ -128,7 +109,6 @@ export function splitCompositeTopic(text) {
     }
   }
 
-  // Comma-separated paragraph with 3+ distinct topics
   const commaCount = (cleaned.match(/,/g) || []).length;
   if (commaCount >= 2 && cleaned.length > 35) {
     const parts = splitOutsideBrackets(cleaned, ',')
@@ -145,13 +125,7 @@ export function splitCompositeTopic(text) {
 const UNIT_HEADER_REGEX = /^(?:UNIT|Unit|MODULE|Module|CHAPTER|Chapter|SECTION|Section|PART|Part|BLOCK|Block)\s*[:.\-–—]?\s*([0-9IVXLCDM]+|FIRST|SECOND|THIRD|FOURTH|FIFTH|SIXTH|SEVENTH|EIGHTH|NINTH|TENTH)(?:[\s:.\-–—]+(.*))?$/i;
 const ROMAN_HEADING_REGEX = /^([IVXLCDM]+)\.\s+([A-Z].*)$/i;
 
-/**
- * Extracts theory units and their topics from segmented theory lines.
- * @param {string[]} theoryLines
- * @returns {Array<{ unitNumber: number, unitName: string, name: string, topics: Array<{ title: string, name: string, confidence: number }> }>}
- */
 export function extractTheoryUnits(theoryLines) {
-  // If the document is a scanned tabular syllabus, use the dedicated table extractor
   if (isScannedTableSyllabus(theoryLines)) {
     const tableUnits = extractTheoryUnitsFromTable(theoryLines);
     if (tableUnits.length >= 3 && tableUnits.every((u) => u.topics.length > 0)) {
@@ -172,7 +146,6 @@ export function extractTheoryUnits(theoryLines) {
     const cleanTitle = cleanOcrTypo(stripMetadataColumns(title));
     if (cleanTitle.length < 2 || isReferenceOrJunk(cleanTitle)) return;
 
-    // Deduplicate case-insensitively within this unit
     const exists = currentUnit.topics.some(
       (t) => t.title.toLowerCase().trim() === cleanTitle.toLowerCase().trim()
     );
@@ -191,7 +164,6 @@ export function extractTheoryUnits(theoryLines) {
       return;
     }
 
-    // Check if lines represent an OBE table with trailing credit/hour columns
     const hasTableColumns = pendingLines.some((l) =>
       /\s+\d{1,2}(?:\.\d+)?(?:\s+\d+(?:\s*,\s*\d+)*)+$/.test(l)
     );
@@ -224,7 +196,6 @@ export function extractTheoryUnits(theoryLines) {
         splitCompositeTopic(buffer).forEach(addTopicToCurrentUnit);
       }
     } else {
-      // Standard syllabus (bullets, numbered, or line-by-line)
       let buffer = '';
       for (const rawLine of pendingLines) {
         if (isReferenceOrJunk(rawLine)) continue;
@@ -266,7 +237,6 @@ export function extractTheoryUnits(theoryLines) {
       const unitNumber = parseUnitNumber(rawNum, units.length + 1);
       let rawTitle = (unitMatch[2] || '').trim();
 
-      // Check next line for title if header was just "UNIT 1"
       if (!rawTitle && i + 1 < theoryLines.length) {
         const nextLine = theoryLines[i + 1].trim();
         if (
@@ -278,11 +248,10 @@ export function extractTheoryUnits(theoryLines) {
           !/^\d+/.test(nextLine)
         ) {
           rawTitle = nextLine;
-          i++; // Consume next line
+          i++;
         }
       }
 
-      // Strip trailing hours or column numbers from title (e.g. "UNIT I 12" -> "12" stripped)
       rawTitle = rawTitle
         .replace(/\s*\(\s*\d+\s*(?:hours?|hrs?|lectures?|periods?)?\s*\)/i, '')
         .replace(/\s+\d+(?:\s+\d+)*\s*$/, '')
@@ -305,7 +274,6 @@ export function extractTheoryUnits(theoryLines) {
     }
 
     if (!currentUnit) {
-      // If no unit has started yet and document has NO explicit units, create a single natural content unit
       if (!hasExplicitUnits && line.length > 5 && !isReferenceOrJunk(line) && !TABLE_HEADER_REGEX.test(line)) {
         currentUnit = {
           unitNumber: 1,

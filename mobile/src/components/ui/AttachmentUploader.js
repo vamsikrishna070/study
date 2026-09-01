@@ -110,7 +110,7 @@ export function AttachmentUploader({
 
   return (
     <View style={[styles.container, style]}>
-      {/* Upload Action Buttons */}
+
       <View style={styles.buttonRow}>
         {allowDocuments && (
           <TouchableOpacity
@@ -160,7 +160,6 @@ export function AttachmentUploader({
         )}
       </View>
 
-      {/* Uploading indicator */}
       {uploading && (
         <View style={styles.uploadingBox}>
           <ActivityIndicator size="small" color={colors.accent} />
@@ -168,7 +167,6 @@ export function AttachmentUploader({
         </View>
       )}
 
-      {/* Link Input field */}
       {showLinkInput && (
         <View style={styles.linkRow}>
           <Input
@@ -190,7 +188,6 @@ export function AttachmentUploader({
         </View>
       )}
 
-      {/* Attachment List */}
       {attachments.length > 0 && (
         <View style={styles.listContainer}>
           {attachments.map((att, index) => (

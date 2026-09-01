@@ -69,13 +69,11 @@ const NotesScreen = ({ route, navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
-  // Search & Filter
   const [search, setSearch] = useState('');
   const [filterSubjectId, setFilterSubjectId] = useState(paramSubjectId || '');
   const [filterPriority, setFilterPriority] = useState('');
   const [showFilters, setShowFilters] = useState(false);
 
-  // Note Modal State
   const [modalVisible, setModalVisible] = useState(paramOpenCreate);
   const [editingId, setEditingId] = useState(null);
   const [title, setTitle] = useState('');
@@ -89,7 +87,6 @@ const NotesScreen = ({ route, navigation }) => {
   const [attachments, setAttachments] = useState([]);
   const [submitting, setSubmitting] = useState(false);
 
-  // Voice recording modal
   const [voiceModalVisible, setVoiceModalVisible] = useState(false);
 
   const loadData = async () => {
@@ -263,7 +260,6 @@ const NotesScreen = ({ route, navigation }) => {
     setAttachments((prev) => [...prev, { type: 'recording', ...recording }]);
   };
 
-  // Filter notes locally for search and priority
   const filteredNotes = data.filter((item) => {
     const subjectDisplayName = item.customSubject || item.subject?.name || item.subject || '';
     const matchesSearch =
@@ -331,7 +327,6 @@ const NotesScreen = ({ route, navigation }) => {
               }
             />
 
-            {/* Search & Filter Header */}
             <View style={styles.searchRow}>
               <View style={styles.searchInputContainer}>
                 <Search size={16} color={colors.mutedForeground} style={{ marginRight: 8 }} />
@@ -366,7 +361,6 @@ const NotesScreen = ({ route, navigation }) => {
               </TouchableOpacity>
             </View>
 
-            {/* Expandable Filter Box */}
             {showFilters && (
               <View style={styles.filterBox}>
                 <Field label="Filter by Subject">
@@ -414,8 +408,8 @@ const NotesScreen = ({ route, navigation }) => {
           const noteId = item._id || item.id;
           const priorityColor = getPriorityBadgeColor(item.priority);
           const atts = item.attachments || [];
-          const displaySubject = item.customSubject 
-            ? item.customSubject 
+          const displaySubject = item.customSubject
+            ? item.customSubject
             : (item.subjectCode ? `${item.subjectCode} - ${item.subject}` : (item.subject?.name || item.subject));
 
           return (
@@ -440,7 +434,6 @@ const NotesScreen = ({ route, navigation }) => {
 
               <Text style={styles.cardTitle}>{item.title}</Text>
 
-              {/* Subject and Topic Chips */}
               <View style={styles.chipRow}>
                 {!!displaySubject && (
                   <Text style={styles.subjectChip}>
@@ -458,7 +451,6 @@ const NotesScreen = ({ route, navigation }) => {
                 </Text>
               )}
 
-              {/* Tags */}
               {item.tags?.length > 0 && (
                 <View style={styles.tagsRow}>
                   {item.tags.map((tag, i) => (
@@ -469,7 +461,6 @@ const NotesScreen = ({ route, navigation }) => {
                 </View>
               )}
 
-              {/* Attachments Preview */}
               {atts.length > 0 && (
                 <View style={styles.attachmentsContainer}>
                   {atts.map((att, i) => (
@@ -505,7 +496,6 @@ const NotesScreen = ({ route, navigation }) => {
         }}
       />
 
-      {/* Note Create / Edit Modal */}
       <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={() => setModalVisible(false)}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -549,7 +539,6 @@ const NotesScreen = ({ route, navigation }) => {
                 </Field>
               </View>
 
-              {/* Custom Subject Input (when Other is selected) */}
               {subjectId === 'other' && (
                 <Field label="Custom Subject *" error={customSubjectError}>
                   <Input
@@ -593,7 +582,6 @@ const NotesScreen = ({ route, navigation }) => {
                 />
               </Field>
 
-              {/* Attachments Section */}
               <Field label="Attachments & Media">
                 <View style={styles.voiceBtnContainer}>
                   <TouchableOpacity
@@ -639,7 +627,6 @@ const NotesScreen = ({ route, navigation }) => {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Voice Recording Modal */}
       <VoiceRecorderModal
         visible={voiceModalVisible}
         onClose={() => setVoiceModalVisible(false)}

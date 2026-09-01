@@ -78,7 +78,6 @@ export default function PortalAttendance() {
           )}
         </div>
 
-        {/* Low Attendance Alert */}
         {lowAttendanceItems.length > 0 && (
           <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-amber-500">
             <div className="flex items-center gap-2 font-bold text-sm">
@@ -91,7 +90,6 @@ export default function PortalAttendance() {
           </div>
         )}
 
-        {/* Attendance Summary */}
         <div className="grid gap-5 sm:grid-cols-2">
           <div className="rounded-2xl border border-card-border bg-card p-6">
             <span className="font-mono text-xs text-muted-foreground uppercase tracking-wider">Enrolled Subjects</span>
@@ -106,7 +104,6 @@ export default function PortalAttendance() {
           </div>
         </div>
 
-        {/* Subject-Wise List */}
         <div className="space-y-4">
           <h2 className="font-display text-xl font-bold">Subject Wise Log</h2>
           {attendanceList.length === 0 ? (
@@ -132,7 +129,6 @@ export default function PortalAttendance() {
                       </span>
                     </div>
 
-                    {/* Progress bar */}
                     <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                       <div
                         className={cx('h-full transition-all duration-500', isLow ? 'bg-amber-500' : 'bg-emerald-500')}

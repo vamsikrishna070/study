@@ -4,7 +4,7 @@ import apiClient from '../../services/apiClient.js';
 import { Trash2, Plus, GripVertical, BookOpen, FlaskConical } from 'lucide-react';
 
 export default function SyllabusReviewModal({ subjectId, parsedData, onClose, onSuccess }) {
-  // Normalize units from backend format: { unitNumber, unitName, title, topics: [{ title, name, confidence }] }
+
   const normalizedUnits = (parsedData?.units || []).map((u, i) => ({
     name: u.unitName || u.name || u.title || `Unit ${u.unitNumber || i + 1}`,
     isLab: u.unitName?.toLowerCase().includes('laboratory') || u.name?.toLowerCase().includes('laboratory') || false,
@@ -53,7 +53,7 @@ export default function SyllabusReviewModal({ subjectId, parsedData, onClose, on
   const save = async () => {
     setSaving(true);
     try {
-      // Backend expects { units: [{ name, topics: [{ name }] }] }
+
       const payloadUnits = units.map(u => ({
         name: u.name,
         topics: u.topics.map(t => ({ name: t.name.trim() })).filter(t => t.name)
@@ -71,7 +71,6 @@ export default function SyllabusReviewModal({ subjectId, parsedData, onClose, on
 
   const totalTopics = units.reduce((acc, u) => acc + u.topics.length, 0);
 
-  // Compute smart eyebrow summary for Theory + Lab vs Theory-only vs Lab-only
   const theoryUnitsList = units.filter(u => !u.isLab);
   const labUnitsList = units.filter(u => u.isLab);
   const labExperimentsCount = labUnitsList.reduce((acc, u) => acc + u.topics.length, 0);

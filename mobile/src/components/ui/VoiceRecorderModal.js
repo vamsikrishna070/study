@@ -28,14 +28,14 @@ import { globalAudioPlayer } from '../../services/audioPlayerService';
 export function VoiceRecorderModal({
   visible,
   onClose,
-  onSave, // ({ url, publicId, originalName, mimeType, size, duration }) => void
+  onSave,
 }) {
   const { colors, typography, spacing, radii } = useAppTheme();
   const styles = useStyles(createStyles);
   const { showError, showDialog } = useAppDialog();
 
   const [title, setTitle] = useState('');
-  const [recordingStatus, setRecordingStatus] = useState('idle'); // 'idle' | 'recording' | 'stopped'
+  const [recordingStatus, setRecordingStatus] = useState('idle');
   const [recordUri, setRecordUri] = useState(null);
   const [duration, setDuration] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -43,7 +43,6 @@ export function VoiceRecorderModal({
 
   const timerRef = useRef(null);
 
-  // Official SDK 54+ expo-audio hook
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY, (status) => {
     if (status?.hasError) {
       console.error('[VOICE RECORDER] Recording status error:', status.error);
@@ -202,7 +201,6 @@ export function VoiceRecorderModal({
       const safeBase = title.replace(/[^a-zA-Z0-9_-]/g, '_') || 'Voice_Note';
       const fileName = `${safeBase}_${Date.now()}.m4a`;
 
-      // 1. First persist to internal app storage so local file is always permanent
       let persistentUri = recordUri;
       let verifiedSize = 0;
       try {
@@ -225,7 +223,6 @@ export function VoiceRecorderModal({
         duration,
       };
 
-      // 2. Upload to Cloudinary / server
       try {
         const res = await uploadFileToServer({
           uri: persistentUri || recordUri,
@@ -241,7 +238,7 @@ export function VoiceRecorderModal({
         }
       } catch (uploadErr) {
         console.warn('[VOICE RECORDER] Upload failed, retaining persistent local file:', uploadErr);
-        // Retain local persistentUri so note/resource still works offline
+
       }
 
       onSave?.(uploadedData);
@@ -280,7 +277,6 @@ export function VoiceRecorderModal({
               />
             </Field>
 
-            {/* Timer Display */}
             <View style={styles.timerContainer}>
               <Text style={styles.timerText}>{formatSeconds(duration)}</Text>
               <Text style={styles.statusText}>
@@ -292,7 +288,6 @@ export function VoiceRecorderModal({
               </Text>
             </View>
 
-            {/* Recording Controls */}
             <View style={styles.controlsRow}>
               {recordingStatus === 'idle' && (
                 <TouchableOpacity
@@ -348,7 +343,6 @@ export function VoiceRecorderModal({
             </View>
           </View>
 
-          {/* Footer Actions */}
           <View style={styles.footer}>
             <Button variant="quiet" onPress={onClose} disabled={uploading}>
               Cancel

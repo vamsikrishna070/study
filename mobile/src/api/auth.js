@@ -12,7 +12,7 @@ export const loginUser = async (email, password) => {
 
 export const registerUser = async (name, email, password) => {
   const response = await client.post('/auth/register', { name, email, password });
-  // Does not return a token since the user must verify their email
+
   return response.data;
 };
 

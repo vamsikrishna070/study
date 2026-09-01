@@ -1,16 +1,16 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { 
-  Sparkles, 
-  Layers, 
-  CloudUpload, 
-  ChevronRight, 
-  ChevronDown, 
-  CheckCircle2, 
-  Circle, 
-  Loader2, 
-  BookOpen, 
-  Upload 
+import {
+  Sparkles,
+  Layers,
+  CloudUpload,
+  ChevronRight,
+  ChevronDown,
+  CheckCircle2,
+  Circle,
+  Loader2,
+  BookOpen,
+  Upload
 } from 'lucide-react';
 import { formatSemester } from '../utils/semester.js';
 import apiClient from '../services/apiClient.js';
@@ -32,7 +32,6 @@ export default function Syllabus() {
   const [error, setError] = useState(null);
   const [expandedUnits, setExpandedUnits] = useState({});
 
-  // Extraction & Upload state
   const [uploadingPdf, setUploadingPdf] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [extractionStep, setExtractionStep] = useState('');
@@ -70,7 +69,7 @@ export default function Syllabus() {
       setTopics(topicsData);
 
       if (unitsData.length > 0) {
-        // Expand first unit by default
+
         const firstId = unitsData[0]._id || unitsData[0].id;
         setExpandedUnits(prev => ({ [firstId]: true, ...prev }));
       }
@@ -88,11 +87,10 @@ export default function Syllabus() {
   const currentSubject = allSubjects.find((s) => (s._id || s.id) === subjectId);
   const subjectColor = currentSubject?.color || 'var(--accent, #d97706)';
 
-  // Handle PDF file selection from native file picker
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    // Reset file input value so same file can be picked again
+
     e.target.value = '';
 
     if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
@@ -115,13 +113,11 @@ export default function Syllabus() {
       setExtractionError(null);
       setExtractionStep('Uploading syllabus PDF...');
 
-      // 1. Upload file to backend
       const uploaded = await uploadFile(file);
       if (!uploaded || !uploaded.url) {
         throw new Error('File upload failed.');
       }
 
-      // 2. Save syllabusFile on subject
       setExtractionStep('Attaching to subject...');
       await apiClient.patch(`/subjects/${subjectId}`, {
         syllabusFile: {
@@ -133,10 +129,9 @@ export default function Syllabus() {
         },
       });
 
-      // 3. Extract syllabus structure using backend extractor
       setExtractionStep('Extracting units & topics from syllabus...');
       setExtracting(true);
-      
+
       const res = await apiClient.post(`/subjects/${subjectId}/syllabus/extract`);
       const extracted = res.data?.data?.units || res.data?.units || [];
 
@@ -157,7 +152,6 @@ export default function Syllabus() {
     }
   };
 
-  // Re-extract from currently attached PDF
   const handleExtractExisting = async () => {
     if (!currentSubject?.syllabusFile?.url) return;
     setExtracting(true);
@@ -184,7 +178,6 @@ export default function Syllabus() {
     }
   };
 
-  // Remove attached syllabus PDF
   const handleRemoveSyllabus = async () => {
     if (!subjectId) return;
     try {
@@ -197,13 +190,11 @@ export default function Syllabus() {
     }
   };
 
-  // Toggle topic completion state
   const toggleTopic = async (topic) => {
     const isCompleted = topic.status === 'completed' || topic.completed;
     const newStatus = isCompleted ? 'not-started' : 'completed';
     const topicId = topic._id || topic.id;
 
-    // Optimistic UI update
     setTopics((prev) =>
       prev.map((t) =>
         (t._id || t.id) === topicId
@@ -213,15 +204,15 @@ export default function Syllabus() {
     );
 
     try {
-      await apiClient.patch(`/topics/${topicId}`, { 
+      await apiClient.patch(`/topics/${topicId}`, {
         status: newStatus,
-        completed: !isCompleted 
+        completed: !isCompleted
       });
       const subsRes = await apiClient.get('/subjects');
       const subsData = subsRes.data?.data || subsRes.data || [];
       setAllSubjects(subsData);
     } catch (e) {
-      // Revert state on error
+
       setTopics((prev) =>
         prev.map((t) =>
           (t._id || t.id) === topicId
@@ -243,7 +234,7 @@ export default function Syllabus() {
 
   return (
     <Shell>
-      {/* Hidden Native File Input */}
+
       <input
         type="file"
         ref={fileInputRef}
@@ -280,7 +271,6 @@ export default function Syllabus() {
         }
       />
 
-      {/* Subject Selector Bar */}
       {allSubjects.length > 0 && (
         <div className="mt-6 mb-8 flex flex-col gap-3 rounded-2xl border border-card-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between shadow-sm">
           <div className="flex flex-1 items-center gap-3">
@@ -335,7 +325,7 @@ export default function Syllabus() {
         </div>
       ) : (
         <div className="space-y-6">
-          {/* Active Extraction Progress Banner */}
+
           {(uploadingPdf || extracting) && (
             <div className="flex items-center gap-3 rounded-2xl border border-primary/25 bg-primary/10 p-5 text-sm font-semibold text-primary animate-pulse">
               <Loader2 size={20} className="animate-spin shrink-0" />
@@ -348,7 +338,6 @@ export default function Syllabus() {
             </div>
           )}
 
-          {/* Attached Syllabus Document Preview Card OR Upload Prompt */}
           {currentSubject?.syllabusFile?.url ? (
             <DocumentPreviewCard
               file={currentSubject.syllabusFile}
@@ -367,7 +356,7 @@ export default function Syllabus() {
               onClick={() => fileInputRef.current?.click()}
               className="group cursor-pointer rounded-2xl border-2 border-dashed border-card-border bg-card p-8 text-center transition-all hover:border-primary/60 hover:bg-card/90"
             >
-              <div 
+              <div
                 className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl transition-transform group-hover:scale-105"
                 style={{ backgroundColor: `${subjectColor}1A` }}
               >
@@ -378,7 +367,7 @@ export default function Syllabus() {
                 Upload your course PDF to automatically extract units and topics into your study plan
               </p>
               <div className="mt-4">
-                <span 
+                <span
                   className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold text-white shadow-sm"
                   style={{ backgroundColor: subjectColor }}
                 >
@@ -388,7 +377,6 @@ export default function Syllabus() {
             </div>
           )}
 
-          {/* Overall Completion Progress Card */}
           {totalTopics > 0 && (
             <div className="rounded-2xl border border-card-border bg-card p-5 shadow-sm">
               <div className="flex items-center justify-between mb-3">
@@ -409,7 +397,6 @@ export default function Syllabus() {
             </div>
           )}
 
-          {/* Units & Topics Accordion List */}
           {units.length === 0 ? (
             <div className="rounded-2xl border border-card-border bg-card p-10 text-center shadow-sm">
               <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-secondary text-muted-foreground">
@@ -446,13 +433,13 @@ export default function Syllabus() {
 
                 return (
                   <div key={uId} className="rounded-2xl border border-card-border bg-card overflow-hidden shadow-sm transition-all">
-                    {/* Unit Accordion Header */}
+
                     <button
                       type="button"
                       onClick={() => toggleUnit(uId)}
                       className="flex w-full items-center p-4 text-left hover:bg-secondary/40 transition-colors"
                     >
-                      <div 
+                      <div
                         className="mr-3.5 flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-xs font-bold font-mono"
                         style={{ backgroundColor: `${subjectColor}1A`, color: subjectColor }}
                       >
@@ -471,7 +458,6 @@ export default function Syllabus() {
                       </div>
                     </button>
 
-                    {/* Expandable Topics List */}
                     {isExpanded && (
                       <div className="border-t border-card-border bg-background/50 px-4 py-2">
                         {unitTopics.length === 0 ? (
@@ -529,7 +515,6 @@ export default function Syllabus() {
         </div>
       )}
 
-      {/* Syllabus Review & Confirmation Modal */}
       {reviewVisible && subjectId && (
         <SyllabusReviewModal
           subjectId={subjectId}

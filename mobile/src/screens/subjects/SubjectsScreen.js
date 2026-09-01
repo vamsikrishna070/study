@@ -67,7 +67,6 @@ const SubjectsScreen = ({ navigation }) => {
   const [visible, setVisible] = useState(false);
   const [editingSubject, setEditingSubject] = useState(null);
 
-  // Form states
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [credits, setCredits] = useState('4');
@@ -211,7 +210,6 @@ const SubjectsScreen = ({ navigation }) => {
         const created = res.data || res;
         setSubjects((prev) => [created, ...prev]);
 
-        // If syllabus was attached during creation, trigger background extraction
         if (created._id && syllabusFile?.url) {
           try {
             await extractSyllabus(
@@ -221,7 +219,7 @@ const SubjectsScreen = ({ navigation }) => {
               syllabusFile.originalName
             );
           } catch (_) {
-            // Extraction can be retried anytime in SubjectDetail
+
           }
         }
       }
@@ -318,7 +316,7 @@ const SubjectsScreen = ({ navigation }) => {
               style={styles.card}
               onPress={() => navigation.navigate('SubjectDetail', { id: subId, subject: item })}
             >
-              {/* Header Accent Bar */}
+
               <View style={[styles.cardAccentBar, { backgroundColor: subjectColor }]}>
                 <Text style={styles.cardAccentCode}>{item.code}</Text>
                 <View style={styles.cardAccentBadge}>
@@ -329,7 +327,6 @@ const SubjectsScreen = ({ navigation }) => {
                 </View>
               </View>
 
-              {/* Card Body */}
               <View style={styles.cardBody}>
                 <Text style={styles.cardTitle}>{item.name}</Text>
                 <Text style={styles.cardSubCode}>Code: {item.code}</Text>
@@ -343,7 +340,6 @@ const SubjectsScreen = ({ navigation }) => {
                   </Text>
                 )}
 
-                {/* Progress Track */}
                 <View style={styles.progressContainer}>
                   <View style={styles.progressHeader}>
                     <Text style={styles.progressLabel}>
@@ -366,7 +362,6 @@ const SubjectsScreen = ({ navigation }) => {
                   </View>
                 </View>
 
-                {/* Syllabus Document Snippet */}
                 <View style={styles.syllabusSnippetContainer}>
                   {hasSyllabus ? (
                     <View style={styles.syllabusAttachedBox}>
@@ -382,7 +377,6 @@ const SubjectsScreen = ({ navigation }) => {
                         </View>
                       </View>
 
-                      {/* Touch-Friendly Action Buttons */}
                       <View style={styles.syllabusActionsRow}>
                         <TouchableOpacity
                           style={[styles.syllabusActionBtn, { borderColor: subjectColor }]}
@@ -422,7 +416,6 @@ const SubjectsScreen = ({ navigation }) => {
                   )}
                 </View>
 
-                {/* Card Footer Actions */}
                 <View style={styles.cardFooter}>
                   <TouchableOpacity
                     style={styles.manageBtn}
@@ -457,7 +450,6 @@ const SubjectsScreen = ({ navigation }) => {
         }}
       />
 
-      {/* Add / Edit Subject Modal */}
       <Modal visible={visible} animationType="slide" transparent onRequestClose={() => setVisible(false)}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -572,7 +564,6 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
     container: { flex: 1, backgroundColor: colors.background },
     scroll: { padding: spacing.lg, paddingBottom: spacing.xxl },
 
-    // Redesigned Subject Card
     card: {
       padding: 0,
       borderRadius: radii.xxl,
@@ -636,7 +627,6 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
       marginTop: 6,
     },
 
-    // Progress Section
     progressContainer: {
       marginTop: spacing.md,
       paddingTop: spacing.md,
@@ -669,7 +659,6 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
       borderRadius: radii.pill,
     },
 
-    // Syllabus Snippet
     syllabusSnippetContainer: {
       marginTop: spacing.md,
     },
@@ -748,7 +737,6 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
       fontSize: 12,
     },
 
-    // Card Footer
     cardFooter: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -778,7 +766,6 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
       borderRadius: radii.sm,
     },
 
-    // Modal
     modalContainer: {
       flex: 1,
       justifyContent: 'flex-end',

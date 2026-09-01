@@ -77,7 +77,7 @@ export default function AttachmentCard({ attachment, onRemove, readonly }) {
         });
         return;
       } catch {
-        // Fallback to clipboard below
+
       }
     }
 
@@ -86,7 +86,7 @@ export default function AttachmentCard({ attachment, onRemove, readonly }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // ignore
+
     }
   };
 
@@ -120,7 +120,6 @@ export default function AttachmentCard({ attachment, onRemove, readonly }) {
           </div>
         </div>
 
-        {/* Action buttons */}
         <div className="flex shrink-0 items-center gap-1">
           {isRecording && attachment.url && (
             <Button
@@ -192,7 +191,6 @@ export default function AttachmentCard({ attachment, onRemove, readonly }) {
         </div>
       </div>
 
-      {/* Hidden audio element for playback */}
       {isRecording && attachment.url && (
         <audio
           ref={audioRef}

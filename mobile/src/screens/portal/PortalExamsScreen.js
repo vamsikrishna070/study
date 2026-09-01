@@ -76,10 +76,10 @@ const PortalExamsScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <ScreenHeader title="Exams & Performance" rightElement={syncButton} />
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={[
-          styles.scrollContent, 
-          { 
+          styles.scrollContent,
+          {
             paddingTop: spacing.md,
             paddingBottom: Math.max(insets.bottom, 20) + 100,
           }
@@ -87,7 +87,6 @@ const PortalExamsScreen = ({ navigation }) => {
       >
         <Text style={styles.title}>Exams & Assessment Marks</Text>
 
-      {/* Official SRM Marks List */}
       <View style={styles.stack}>
         {exams.length === 0 ? (
           <Text style={styles.emptyText}>Marks are not available yet from the SRM AP Student Portal.</Text>
@@ -108,7 +107,6 @@ const PortalExamsScreen = ({ navigation }) => {
 
                 <Text style={styles.nameText}>{exam.subject_name}</Text>
 
-                {/* Official Marks */}
                 <View style={styles.boxOfficial}>
                   <View style={styles.officialHeader}>
                     <Text style={styles.boxLabel}>OFFICIAL SRM MARKS</Text>
@@ -123,7 +121,6 @@ const PortalExamsScreen = ({ navigation }) => {
                     <Text style={styles.unpubText}>Marks not published by SRM yet.</Text>
                   )}
 
-                  {/* Components Breakdown */}
                   {components.length > 0 && (
                     <View style={styles.compBox}>
                       <Text style={styles.compTitle}>COMPONENT BREAKDOWN</Text>
@@ -182,16 +179,18 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
     syncBtn: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 4,
+      justifyContent: 'center',
       backgroundColor: colors.accent,
-      paddingHorizontal: spacing.sm,
-      paddingVertical: 4,
-      borderRadius: radii.sm,
+      paddingHorizontal: 12,
+      height: 36,
+      borderRadius: 14,
+      gap: 6,
+      minWidth: 72,
     },
     syncBtnText: {
       fontFamily: typography.sans.bold,
-      fontSize: 11,
-      color: colors.accentForeground,
+      fontSize: 13,
+      color: '#ffffff',
     },
     title: {
       fontFamily: typography.serif.bold,

@@ -21,10 +21,9 @@ export default function Search() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialQ = searchParams.get('q') || '';
   const [queryInput, setQueryInput] = useState(initialQ);
-  
+
   const { data: results, isLoading, error } = useSearch(initialQ, { enabled: initialQ.length > 1 });
 
-  // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => {
       if (queryInput !== initialQ) {
@@ -37,15 +36,15 @@ export default function Search() {
   return (
     <Shell>
       <PageHeading eyebrow="Find anything" title="Search Workspace" detail="Search across subjects, notes, tasks, and more." />
-      
+
       <div className="relative max-w-2xl mb-8">
         <SearchIcon size={18} className="absolute left-4 top-4 text-muted-foreground" />
-        <input 
+        <input
           autoFocus
-          className={cx(inputClass, 'pl-11 py-4 text-lg')} 
-          value={queryInput} 
-          onChange={(e) => setQueryInput(e.target.value)} 
-          placeholder="Search StudyArena..." 
+          className={cx(inputClass, 'pl-11 py-4 text-lg')}
+          value={queryInput}
+          onChange={(e) => setQueryInput(e.target.value)}
+          placeholder="Search StudyArena..."
         />
       </div>
 
@@ -56,7 +55,7 @@ export default function Search() {
           </p>
 
           {isLoading && <LoadingBlock lines={4} />}
-          
+
           {error && <div className="text-destructive">An error occurred while searching.</div>}
 
           {!isLoading && !error && results && results.length === 0 && (
@@ -79,7 +78,7 @@ export default function Search() {
                     <h3 className="mt-1 font-bold text-lg">{res.title}</h3>
                     <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{res.detail}</p>
                   </div>
-                  <Link 
+                  <Link
                     to={res.type === 'subject' ? `/subjects/${res.id}` : res.type === 'note' ? '/notes' : res.type === 'task' ? '/tasks' : res.type === 'exam' ? '/exams' : res.type === 'resource' ? '/resources' : '/'}
                     className="rounded-lg bg-secondary px-3 py-1.5 text-xs font-bold text-secondary-foreground hover:bg-muted"
                   >

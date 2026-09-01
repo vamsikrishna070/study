@@ -46,17 +46,16 @@ const PortalCalendarScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <ScreenHeader title="Academic Calendar" showBack={true} />
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={[
-          styles.scrollContent, 
-          { 
+          styles.scrollContent,
+          {
             paddingBottom: 100,
           }
         ]}
       >
         <Text style={styles.title}>Academic Calendar</Text>
 
-      {/* Tabs */}
       <View style={styles.tabRow}>
         <TouchableOpacity
           style={[styles.tabBtn, activeTab === 'odd' && styles.tabBtnActive]}
@@ -78,7 +77,6 @@ const PortalCalendarScreen = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
-      {/* Events */}
       <Text style={styles.sectionTitle}>SEMESTER EVENTS ({events.length})</Text>
       <View style={styles.stack}>
         {events.map((item) => (
@@ -92,7 +90,6 @@ const PortalCalendarScreen = ({ navigation }) => {
         ))}
       </View>
 
-      {/* Holidays */}
       {holidays.length > 0 && (
         <>
           <Text style={[styles.sectionTitle, { marginTop: spacing.lg }]}>HOLIDAYS ({holidays.length})</Text>

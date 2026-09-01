@@ -63,7 +63,6 @@ const SubjectDetailScreen = ({ route, navigation }) => {
   const [uploadingPdf, setUploadingPdf] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
-  // Review modal state
   const [reviewModalVisible, setReviewModalVisible] = useState(false);
   const [parsedUnits, setParsedUnits] = useState([]);
 
@@ -113,13 +112,10 @@ const SubjectDetailScreen = ({ route, navigation }) => {
     }));
   };
 
-  // ─── Topic Completion Toggle ──────────────────────────────────────────────────
-
   const handleToggleTopic = async (topic) => {
     const isCompleted = topic.status === 'completed' || topic.completed;
     const newStatus = isCompleted ? 'not-started' : 'completed';
 
-    // Optimistic update
     setTopics((prev) =>
       prev.map((t) =>
         (t._id || t.id) === (topic._id || topic.id)
@@ -132,7 +128,7 @@ const SubjectDetailScreen = ({ route, navigation }) => {
       await updateTopicCompletion(topic._id || topic.id, !isCompleted);
       loadData();
     } catch (err) {
-      // Revert on error
+
       setTopics((prev) =>
         prev.map((t) =>
           (t._id || t.id) === (topic._id || topic.id)
@@ -143,8 +139,6 @@ const SubjectDetailScreen = ({ route, navigation }) => {
       showError('Update Failed', 'Could not update topic status.');
     }
   };
-
-  // ─── Syllabus Upload / Replace / Remove ────────────────────────────────────────
 
   const handleUploadOrReplaceSyllabus = async () => {
     try {
@@ -157,7 +151,7 @@ const SubjectDetailScreen = ({ route, navigation }) => {
 
       if (uploaded && uploaded.url) {
         setUploadProgress(100);
-        // Patch subject with syllabusFile
+
         await updateSubject(subjectId, {
           syllabusFile: {
             url: uploaded.url,
@@ -168,7 +162,6 @@ const SubjectDetailScreen = ({ route, navigation }) => {
           },
         });
 
-        // Trigger extraction automatically
         setExtracting(true);
         try {
           const extractRes = await extractSyllabus(
@@ -243,8 +236,6 @@ const SubjectDetailScreen = ({ route, navigation }) => {
     }
   };
 
-  // ─── Metrics ──────────────────────────────────────────────────────────────────
-
   const totalTopics = topics.length;
   const completedTopics = topics.filter((t) => t.status === 'completed' || t.completed).length;
   const progressPercent = totalTopics > 0 ? Math.round((completedTopics / totalTopics) * 100) : 0;
@@ -294,7 +285,7 @@ const SubjectDetailScreen = ({ route, navigation }) => {
           />
         }
       >
-        {/* Hero Card */}
+
         <View style={styles.heroCard}>
           <View style={[styles.heroAccentBar, { backgroundColor: accentColor }]} />
           <View style={styles.heroContent}>
@@ -321,7 +312,6 @@ const SubjectDetailScreen = ({ route, navigation }) => {
               <Text style={styles.heroDesc}>{subject.description}</Text>
             )}
 
-            {/* Progress Section */}
             <View style={styles.progressContainer}>
               <View style={styles.progressHeader}>
                 <Text style={styles.progressLabel}>Syllabus Command</Text>
@@ -344,7 +334,6 @@ const SubjectDetailScreen = ({ route, navigation }) => {
           </View>
         </View>
 
-        {/* Syllabus Document Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>Syllabus Document</Text>
@@ -390,7 +379,6 @@ const SubjectDetailScreen = ({ route, navigation }) => {
           )}
         </View>
 
-        {/* Units & Topics Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>Units & Topics</Text>
@@ -435,7 +423,7 @@ const SubjectDetailScreen = ({ route, navigation }) => {
 
                 return (
                   <View key={uId} style={styles.unitAccordion}>
-                    {/* Unit Accordion Header */}
+
                     <TouchableOpacity
                       style={styles.unitHeader}
                       onPress={() => toggleUnitCollapse(uId)}
@@ -463,7 +451,6 @@ const SubjectDetailScreen = ({ route, navigation }) => {
                       )}
                     </TouchableOpacity>
 
-                    {/* Unit Topics Checklist */}
                     {!isCollapsed && (
                       <View style={styles.topicsContainer}>
                         {unitTopics.length === 0 ? (
@@ -507,7 +494,6 @@ const SubjectDetailScreen = ({ route, navigation }) => {
           )}
         </View>
 
-        {/* Workspace Modules Row */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Subject Workspace</Text>
           <View style={styles.moduleList}>
@@ -532,7 +518,6 @@ const SubjectDetailScreen = ({ route, navigation }) => {
         </View>
       </ScrollView>
 
-      {/* Syllabus Review Modal */}
       <SyllabusReviewModal
         visible={reviewModalVisible}
         subjectId={subjectId}
@@ -570,7 +555,6 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
     },
     scroll: { padding: spacing.lg, paddingBottom: spacing.xxl },
 
-    // Hero Card
     heroCard: {
       backgroundColor: colors.card,
       borderRadius: radii.xxl,
@@ -634,7 +618,6 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
       marginVertical: spacing.xs,
     },
 
-    // Progress Section
     progressContainer: {
       marginTop: spacing.md,
       paddingTop: spacing.md,
@@ -673,7 +656,6 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
       marginTop: 4,
     },
 
-    // Section Headers
     section: {
       marginBottom: spacing.xl,
     },
@@ -694,7 +676,6 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
       color: colors.mutedForeground,
     },
 
-    // No Syllabus State
     noSyllabusCard: {
       backgroundColor: colors.card,
       borderRadius: radii.xl,
@@ -741,7 +722,6 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
       color: '#ffffff',
     },
 
-    // Units Accordion
     emptyUnitsBox: {
       backgroundColor: colors.card,
       borderRadius: radii.xl,
@@ -841,7 +821,6 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
       opacity: 0.7,
     },
 
-    // Modules List
     moduleList: {
       gap: spacing.sm,
     },

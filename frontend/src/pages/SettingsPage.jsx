@@ -47,8 +47,8 @@ export default function SettingsPage() {
 
   const statusQuery = useGetPortalStatus();
   const isSynced = statusQuery.data?.isConnected;
-  const lastSyncDate = statusQuery.data?.lastSuccessfulSync 
-    ? new Date(statusQuery.data.lastSuccessfulSync).toLocaleString() 
+  const lastSyncDate = statusQuery.data?.lastSuccessfulSync
+    ? new Date(statusQuery.data.lastSuccessfulSync).toLocaleString()
     : "Recently";
 
   const [profileImageUrl, setProfileImageUrl] = useState(user?.profileImageUrl || "");
@@ -76,8 +76,7 @@ export default function SettingsPage() {
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
-  // Push notification state
-  const [pushState, setPushState] = useState("loading"); // loading | unsupported | denied | idle | subscribing | enabled | error
+  const [pushState, setPushState] = useState("loading");
   const [pushError, setPushError] = useState("");
 
   useEffect(() => {
@@ -103,7 +102,7 @@ export default function SettingsPage() {
         }
       }
     } catch (e) {
-      // ignore
+
     }
     setPushState("idle");
   };
@@ -140,8 +139,8 @@ export default function SettingsPage() {
   const save = async (e) => {
     e.preventDefault();
     setIsSaving(true);
-    const data = { 
-      ...form, 
+    const data = {
+      ...form,
       semester: Number(form.semester),
       profileImageUrl,
       profileImagePublicId
@@ -165,13 +164,12 @@ export default function SettingsPage() {
     setPushState("subscribing");
 
     try {
-      // Step 1: Check browser support
+
       if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
         setPushState("unsupported");
         return;
       }
 
-      // Step 2: Request permission
       const perm = await Notification.requestPermission();
       if (perm === "denied") {
         setPushState("denied");
@@ -183,7 +181,6 @@ export default function SettingsPage() {
         return;
       }
 
-      // Step 3: Register service worker
       let reg;
       try {
         reg = await navigator.serviceWorker.register("/sw.js");
@@ -195,7 +192,6 @@ export default function SettingsPage() {
         return;
       }
 
-      // Step 4: Subscribe to push
       let sub;
       try {
         const convertedKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
@@ -210,7 +206,6 @@ export default function SettingsPage() {
         return;
       }
 
-      // Step 5: Send to backend
       try {
         await subscribePush.mutateAsync(sub.toJSON());
       } catch (apiErr) {
@@ -235,11 +230,11 @@ export default function SettingsPage() {
       if (reg) {
         const sub = await reg.pushManager.getSubscription();
         if (sub) {
-          // Remove from backend
+
           try {
             await apiClient.post("/notifications/unsubscribe", { endpoint: sub.endpoint });
           } catch (e) {
-            // Backend may not have this endpoint yet; that's ok
+
           }
           await sub.unsubscribe();
         }
@@ -308,7 +303,6 @@ export default function SettingsPage() {
       );
     }
 
-    // idle, subscribing, or error
     return (
       <div>
         <div className="flex items-center justify-between">
@@ -355,22 +349,22 @@ export default function SettingsPage() {
                   </div>
                 ) : (
                   <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary font-display text-xl text-primary-foreground">
-                    {user?.name?.split(" ").map((p) => p[0]).join("").slice(0, 2)}
+                    {(user?.displayName || user?.officialName || user?.name || "Student").split(" ").map((p) => p[0]).join("").slice(0, 2) || "S"}
                   </div>
                 )}
-                
-                <div 
+
+                <div
                   onClick={() => fileInputRef.current?.click()}
                   className="absolute inset-0 flex cursor-pointer items-center justify-center rounded-full bg-black/40 opacity-0 transition-opacity group-hover:opacity-100"
                 >
                   <Camera size={20} className="text-white" />
                 </div>
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  onChange={handleImageUpload} 
-                  accept="image/jpeg, image/png, image/webp" 
-                  className="hidden" 
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleImageUpload}
+                  accept="image/jpeg, image/png, image/webp"
+                  className="hidden"
                 />
               </div>
 
@@ -381,7 +375,7 @@ export default function SettingsPage() {
                     {uploadingImage ? "Uploading..." : "A little context for a more personal workspace."}
                   </p>
                   {profileImageUrl && !uploadingImage && (
-                    <button 
+                    <button
                       onClick={handleRemoveImage}
                       className="text-xs font-semibold text-destructive hover:underline"
                     >

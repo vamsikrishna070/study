@@ -42,17 +42,17 @@ export async function register(req, res) {
   if (!name || !email || !password) return res.status(400).json({ success: false, message: 'Name, email, and password are required' });
   email = email.trim().toLowerCase();
   if (password.length < 6) return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
-  
+
   const existing = await User.findOne({ email });
   if (existing) {
     if (existing.isVerified) {
       return res.status(409).json({ success: false, message: 'An account with that email already exists' });
     } else {
-      // Allow re-registering if not verified
+
       await User.deleteOne({ _id: existing._id });
     }
   }
-  
+
   let validCollegeId = null;
   if (collegeId && typeof collegeId === 'string' && mongoose.Types.ObjectId.isValid(collegeId.trim())) {
     const collegeExists = await College.findOne({ _id: collegeId.trim(), isActive: true });
@@ -61,21 +61,21 @@ export async function register(req, res) {
     }
   }
 
-  const user = new User({ 
-    name: name.trim(), 
-    email, 
-    password, 
-    collegeId: validCollegeId, 
-    university: university ? university.trim() : '', 
-    degree: degree ? degree.trim() : '', 
-    branch: branch ? branch.trim() : '', 
-    batch: batch ? batch.trim() : '', 
-    semester: Number(semester) || 1 
+  const user = new User({
+    name: name.trim(),
+    email,
+    password,
+    collegeId: validCollegeId,
+    university: university ? university.trim() : '',
+    degree: degree ? degree.trim() : '',
+    branch: branch ? branch.trim() : '',
+    batch: batch ? batch.trim() : '',
+    semester: Number(semester) || 1
   });
-  
+
   const otp = generateOTP();
   user.otp = await bcrypt.hash(otp, 10);
-  user.otpExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+  user.otpExpires = new Date(Date.now() + 15 * 60 * 1000);
   user.isVerified = false;
 
   await user.save();
@@ -99,7 +99,7 @@ export async function verifyEmail(req, res) {
   const user = await User.findOne({ email }).select('+otp +otpExpires');
   if (!user) return res.status(404).json({ success: false, message: 'User not found' });
   if (user.isVerified) return res.status(400).json({ success: false, message: 'Account is already verified' });
-  
+
   if (!user.otp || !user.otpExpires || user.otpExpires < new Date()) {
     return res.status(400).json({ success: false, message: 'OTP expired. Please request a new OTP.' });
   }
@@ -196,7 +196,7 @@ export async function forgotPassword(req, res) {
 
   const otp = generateOTP();
   user.resetPasswordOtp = await bcrypt.hash(otp, 10);
-  user.resetPasswordExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+  user.resetPasswordExpires = new Date(Date.now() + 15 * 60 * 1000);
   await user.save();
 
   try {
@@ -216,7 +216,7 @@ export async function resetPassword(req, res) {
 
   const user = await User.findOne({ email }).select('+resetPasswordOtp +resetPasswordExpires');
   if (!user) return res.status(404).json({ success: false, message: 'Invalid request' });
-  
+
   if (!user.resetPasswordOtp || !user.resetPasswordExpires || user.resetPasswordExpires < new Date()) {
     return res.status(400).json({ success: false, message: 'OTP expired. Please request a new OTP.' });
   }
@@ -237,19 +237,19 @@ export async function me(req, res) {
 }
 
 export async function updateProfile(req, res) {
-  const { 
-    name, 
+  const {
+    name,
     displayName,
-    collegeId, 
-    university, 
+    collegeId,
+    university,
     registrationNumber,
-    degree, 
-    branch, 
+    degree,
+    branch,
     section,
-    batch, 
-    semester, 
-    profileImageUrl, 
-    profileImagePublicId 
+    batch,
+    semester,
+    profileImageUrl,
+    profileImagePublicId
   } = req.body;
 
   const user = await User.findById(req.user._id);
@@ -369,7 +369,6 @@ export async function recordActivity(req, res) {
 
     const lastActive = user.lastActiveDate || '';
 
-    // Same day -> return existing streak without incrementing
     if (lastActive === todayStr) {
       return res.json({
         success: true,
@@ -386,13 +385,13 @@ export async function recordActivity(req, res) {
 
     let newStreak = 1;
     if (!lastActive) {
-      // First-ever app activity
+
       newStreak = 1;
     } else if (lastActive === yesterdayStr) {
-      // Consecutive day
+
       newStreak = (user.currentStreak || 0) + 1;
     } else {
-      // Inactive 2+ days
+
       newStreak = 1;
     }
 

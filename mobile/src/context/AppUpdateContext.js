@@ -11,7 +11,7 @@ export const AppUpdateContext = createContext({
   showUpdateDialog: () => {},
 });
 
-const CHECK_COOLDOWN_MS = 4 * 60 * 60 * 1000; // 4 hours between automatic background checks
+const CHECK_COOLDOWN_MS = 4 * 60 * 60 * 1000;
 
 export function AppUpdateProvider({ children }) {
   const [updateInfo, setUpdateInfo] = useState(null);
@@ -53,16 +53,14 @@ export function AppUpdateProvider({ children }) {
     }
   }, [isChecking]);
 
-  // Initial non-blocking startup check
   useEffect(() => {
     const timer = setTimeout(() => {
       handlePerformCheck(false);
-    }, 2500); // 2.5s delay to prioritize critical UI and login hydration
+    }, 2500);
 
     return () => clearTimeout(timer);
   }, [handlePerformCheck]);
 
-  // AppState listener for background -> foreground transition
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState) => {
       if (nextAppState === 'active') {
@@ -80,7 +78,7 @@ export function AppUpdateProvider({ children }) {
       setIsDownloading(true);
       setDownloadError('');
       await openApkDownloadUrl(updateInfo.downloadUrl);
-      // If not forced, close dialog after triggering download
+
       if (!updateInfo.isForced) {
         setDialogVisible(false);
       }
@@ -93,7 +91,7 @@ export function AppUpdateProvider({ children }) {
 
   const handleDismiss = () => {
     if (updateInfo?.isForced) {
-      // Cannot dismiss forced update
+
       return;
     }
     setDialogVisible(false);
@@ -111,7 +109,6 @@ export function AppUpdateProvider({ children }) {
     >
       {children}
 
-      {/* Production-Quality Responsive Direct-APK Update Dialog */}
       {Boolean(updateInfo?.isUpdateAvailable) && (
         <UpdateDialog
           visible={dialogVisible}

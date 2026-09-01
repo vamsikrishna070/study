@@ -9,7 +9,7 @@ const firstDayOfMonth = (month, year) => new Date(year, month, 1).getDay();
 
 export default function Calendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
-  
+
   const { data: exams, isLoading: eLoading } = useGetExams();
   const { data: tasks, isLoading: tLoading } = useGetTasks();
   const { data: reminders, isLoading: rLoading } = useGetReminders();
@@ -18,7 +18,7 @@ export default function Calendar() {
 
   const month = currentDate.getMonth();
   const year = currentDate.getFullYear();
-  
+
   const monthName = currentDate.toLocaleString('default', { month: 'long' });
 
   const nextMonth = () => setCurrentDate(new Date(year, month + 1, 1));
@@ -27,8 +27,7 @@ export default function Calendar() {
 
   const daysCount = daysInMonth(month, year);
   const startDay = firstDayOfMonth(month, year);
-  
-  // Format dates strictly for equality checks
+
   const toDateString = (d) => {
     if (!d) return '';
     return new Date(d).toISOString().slice(0, 10);
@@ -45,7 +44,7 @@ export default function Calendar() {
   return (
     <Shell>
       <PageHeading eyebrow="Time mapped out" title="Calendar" detail="See where the heavy weeks land." />
-      
+
       {loading ? <LoadingBlock lines={8} /> : (
         <div className="rounded-2xl border border-card-border bg-card p-6 shadow-sm">
           <div className="mb-6 flex items-center justify-between">
@@ -66,26 +65,26 @@ export default function Calendar() {
                 {d}
               </div>
             ))}
-            
+
             {Array.from({ length: startDay }).map((_, i) => (
               <div key={`empty-${i}`} className="bg-card min-h-[100px] p-2 opacity-30" />
             ))}
-            
+
             {Array.from({ length: daysCount }).map((_, i) => {
               const day = i + 1;
               const isToday = toDateString(new Date()) === new Date(year, month, day + 1).toISOString().slice(0, 10);
               const events = getEventsForDay(i);
-              
+
               return (
                 <div key={day} className={cx("bg-card min-h-[100px] p-2 transition-colors hover:bg-secondary/20 group relative", isToday && 'bg-accent/5')}>
                   <div className={cx("w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold mb-1", isToday ? "bg-accent text-accent-foreground" : "text-muted-foreground")}>
                     {day}
                   </div>
-                  
+
                   <div className="space-y-1">
                     {events.map((evt, idx) => (
-                      <div 
-                        key={idx} 
+                      <div
+                        key={idx}
                         className={cx(
                           "truncate rounded px-1.5 py-0.5 text-[9px] font-semibold border-l-2",
                           evt.eventType === 'exam' ? 'border-destructive bg-destructive/10 text-destructive' :

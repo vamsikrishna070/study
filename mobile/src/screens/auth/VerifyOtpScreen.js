@@ -14,8 +14,8 @@ const VerifyOtpScreen = ({ route, navigation }) => {
   const { colors, typography, spacing, radii } = useAppTheme();
   const styles = useStyles(createStyles);
   const email = route.params?.email || '';
-  const mode = route.params?.mode || 'email-verification'; // 'email-verification' | 'password-reset'
-  
+  const mode = route.params?.mode || 'email-verification';
+
   const { verify } = useContext(AuthContext);
   const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -24,12 +24,11 @@ const VerifyOtpScreen = ({ route, navigation }) => {
   const [resending, setResending] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-  
-  const [cooldown, setCooldown] = useState(60); // Start with 60s countdown since OTP was just sent
+
+  const [cooldown, setCooldown] = useState(60);
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef(null);
 
-  // Gently request focus after navigation screen transition settles
   useFocusEffect(
     useCallback(() => {
       const timer = setTimeout(() => {
@@ -50,7 +49,7 @@ const VerifyOtpScreen = ({ route, navigation }) => {
   }, [cooldown]);
 
   const handleOtpChange = (val) => {
-    // Only accept numeric digits, maximum 6
+
     const cleaned = val.replace(/[^0-9]/g, '').slice(0, 6);
     setOtp(cleaned);
     if (errorMsg) setErrorMsg('');
@@ -58,13 +57,13 @@ const VerifyOtpScreen = ({ route, navigation }) => {
 
   const handleVerify = async () => {
     if (loading) return;
-    
+
     const cleanedOtp = otp.trim();
     if (!cleanedOtp || cleanedOtp.length !== 6) {
       setErrorMsg('Please enter the full 6-digit verification code.');
       return;
     }
-    
+
     if (mode === 'password-reset') {
       if (!newPassword || newPassword.length < 8) {
         setErrorMsg('New password must contain at least 8 characters.');
@@ -75,15 +74,15 @@ const VerifyOtpScreen = ({ route, navigation }) => {
         return;
       }
     }
-    
+
     setErrorMsg('');
     setSuccessMsg('');
     setLoading(true);
-    
+
     try {
       if (mode === 'email-verification') {
         await verify(email, cleanedOtp);
-        // Note: AppNavigator automatically renders MainNavigator with initial route Onboarding
+
       } else if (mode === 'password-reset') {
         await resetPassword(email, cleanedOtp, newPassword);
         setSuccessMsg('Password reset successfully! Redirecting to login...');
@@ -100,11 +99,11 @@ const VerifyOtpScreen = ({ route, navigation }) => {
 
   const handleResend = async () => {
     if (resending || loading || cooldown > 0) return;
-    
+
     setErrorMsg('');
     setSuccessMsg('');
     setResending(true);
-    
+
     try {
       const purpose = mode === 'email-verification' ? 'registration' : 'password_reset';
       await resendOtp(email, purpose);
@@ -129,7 +128,6 @@ const VerifyOtpScreen = ({ route, navigation }) => {
     }
   };
 
-  // Render 6 visual boxes for OTP digits
   const otpDigits = otp.padEnd(6, ' ').split('');
 
   return (
@@ -137,7 +135,7 @@ const VerifyOtpScreen = ({ route, navigation }) => {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -179,7 +177,7 @@ const VerifyOtpScreen = ({ route, navigation }) => {
                 activeOpacity={1}
                 onPress={() => inputRef.current?.focus()}
               >
-                {/* Visual 6-box OTP display */}
+
                 <View style={styles.otpBoxesContainer} pointerEvents="none">
                   {otpDigits.map((digit, index) => {
                     const isCurrentBox = isFocused && (otp.length === index || (otp.length === 6 && index === 5));
@@ -199,7 +197,6 @@ const VerifyOtpScreen = ({ route, navigation }) => {
                   })}
                 </View>
 
-                {/* Overlaid TextInput directly capturing numeric touch on Android & iOS */}
                 <TextInput
                   ref={inputRef}
                   value={otp}
@@ -254,7 +251,6 @@ const VerifyOtpScreen = ({ route, navigation }) => {
             </Button>
           </View>
 
-          {/* Resend OTP Row */}
           <View style={styles.resendSection}>
             <Text style={styles.resendPrompt}>Didn't receive the code? </Text>
             {cooldown > 0 ? (
@@ -275,7 +271,7 @@ const VerifyOtpScreen = ({ route, navigation }) => {
           </View>
 
           <View style={styles.backRow}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.backButton}
               onPress={() => navigation.navigate('Login')}
               activeOpacity={0.7}
