@@ -64,6 +64,10 @@ const serialize = (doc) => {
   const isTopicDone = value.completed === true || value.status === 'completed';
   const taskStatus = isTopicDone ? 'completed' : (value.status === 'in-progress' ? 'in_progress' : (value.status || 'pending'));
 
+  const subjectObj = value.subject && typeof value.subject === 'object' ? value.subject : null;
+  const subjectCode = subjectObj?.code || value.code || '';
+  const subjectColor = subjectObj?.color || value.color || '';
+
   return {
     ...value,
     id: id(doc),
