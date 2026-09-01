@@ -110,6 +110,9 @@ export const StudySessionProvider = ({ children }) => {
     taskId = null,
     examId = null,
     goal = '',
+    studyType = 'syllabus',
+    subjects = [],
+    outsideSyllabus = [],
   }) => {
     const startedAt = new Date().toISOString();
     const newSession = {
@@ -119,6 +122,9 @@ export const StudySessionProvider = ({ children }) => {
       taskId,
       examId,
       goal,
+      studyType,
+      subjects: Array.isArray(subjects) ? subjects : [],
+      outsideSyllabus: Array.isArray(outsideSyllabus) ? outsideSyllabus : [],
       startedAt,
       pausedAt: null,
       totalPausedMs: 0,
@@ -128,6 +134,14 @@ export const StudySessionProvider = ({ children }) => {
     setActiveSession(newSession);
     setElapsedSeconds(0);
     return newSession;
+  };
+
+  const updateActiveSessionData = (updater) => {
+    setActiveSession((prev) => {
+      if (!prev) return null;
+      const nextData = typeof updater === 'function' ? updater(prev) : { ...prev, ...updater };
+      return nextData;
+    });
   };
 
   const pauseSession = () => {
@@ -196,6 +210,7 @@ export const StudySessionProvider = ({ children }) => {
         elapsedSeconds,
         isInitialized,
         startSession,
+        updateActiveSessionData,
         pauseSession,
         resumeSession,
         endSession,

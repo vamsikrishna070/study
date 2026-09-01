@@ -69,6 +69,18 @@ const serialize = (doc) => {
   const subjectCode = subjectObj?.code || value.code || '';
   const subjectColor = subjectObj?.color || value.color || '';
 
+  const sessionSubjects = Array.isArray(value.subjects) && value.subjects.length > 0
+    ? value.subjects
+    : (value.subjectName || value.topic || subjId
+        ? [{
+            subjectId: subjId,
+            subjectName: value.subjectName || subjectName(value.subject, value.customSubject),
+            topics: value.topic ? [{ topicId: null, topicName: value.topic, completed: true }] : []
+          }]
+        : []);
+
+  const sessionOutside = Array.isArray(value.outsideSyllabus) ? value.outsideSyllabus : [];
+
   return {
     ...value,
     id: id(doc),
@@ -80,6 +92,9 @@ const serialize = (doc) => {
     subjectCode,
     subjectColor,
     customSubject: value.customSubject || "",
+    studyType: value.studyType || 'syllabus',
+    subjects: sessionSubjects,
+    outsideSyllabus: sessionOutside,
     status: taskStatus,
     completed: isTopicDone,
     addedAt: value.createdAt,
@@ -968,6 +983,180 @@ export async function getStudySessions(req, res) {
   });
 }
 
+async function sanitizeStudySessionSubjects(userId, subjectsInput, primarySubjectId, primarySubjectName, primaryTopic) {
+  const sanitized = [];
+  const completedTopicIds = [];
+
+  if (Array.isArray(subjectsInput) && subjectsInput.length > 0) {
+    for (const subItem of subjectsInput) {
+      const validSubId = subItem.subjectId && mongoose.Types.ObjectId.isValid(subItem.subjectId)
+        ? subItem.subjectId.toString()
+        : null;
+
+      let validSubName = (subItem.subjectName || '').trim();
+      if (validSubId) {
+        const dbSub = await Subject.findOne({ _id: validSubId, user: userId });
+        if (!dbSub) continue;
+        if (!validSubName) validSubName = dbSub.name;
+      }
+
+      const validTopics = [];
+      if (Array.isArray(subItem.topics)) {
+        for (const topItem of subItem.topics) {
+          const validTopId = topItem.topicId && mongoose.Types.ObjectId.isValid(topItem.topicId)
+            ? topItem.topicId.toString()
+            : null;
+
+          let validTopName = (topItem.topicName || topItem.name || '').trim();
+          if (validTopId) {
+            const dbTop = await Topic.findOne({ _id: validTopId, user: userId });
+            if (!dbTop) continue;
+            if (validSubId && dbTop.subject.toString() !== validSubId) continue;
+            if (!validTopName) validTopName = dbTop.title;
+          }
+
+          const isComp = Boolean(topItem.completed);
+          if (isComp && validTopId) {
+            completedTopicIds.push(validTopId);
+          }
+
+          if (validTopName || validTopId) {
+            validTopics.push({
+              topicId: validTopId,
+              topicName: validTopName,
+              completed: isComp,
+            });
+          }
+        }
+      }
+
+      if (validSubId || validSubName || validTopics.length > 0) {
+        sanitized.push({
+          subjectId: validSubId,
+          subjectName: validSubName,
+          topics: validTopics,
+        });
+      }
+    }
+  }
+
+  if (sanitized.length === 0 && (primarySubjectId || primarySubjectName || primaryTopic)) {
+    const validSubId = primarySubjectId && mongoose.Types.ObjectId.isValid(primarySubjectId)
+      ? primarySubjectId.toString()
+      : null;
+
+    let validSubName = (primarySubjectName || '').trim();
+    if (validSubId && !validSubName) {
+      const dbSub = await Subject.findOne({ _id: validSubId, user: userId });
+      if (dbSub) validSubName = dbSub.name;
+    }
+
+    const legacyTopicName = (primaryTopic || '').trim();
+    sanitized.push({
+      subjectId: validSubId,
+      subjectName: validSubName,
+      topics: legacyTopicName ? [{ topicId: null, topicName: legacyTopicName, completed: true }] : [],
+    });
+  }
+
+  return { sanitizedSubjects: sanitized, completedTopicIds };
+}
+
+function sanitizeOutsideSyllabus(outsideInput) {
+  const sanitized = [];
+  if (Array.isArray(outsideInput)) {
+    for (const outItem of outsideInput) {
+      const areaName = (outItem.area || '').trim();
+      const validTopics = [];
+      if (Array.isArray(outItem.topics)) {
+        for (const t of outItem.topics) {
+          const tName = (t.name || t.topicName || '').trim();
+          if (tName) {
+            validTopics.push({
+              name: tName,
+              completed: Boolean(t.completed),
+            });
+          }
+        }
+      }
+      if (areaName || validTopics.length > 0) {
+        sanitized.push({
+          area: areaName,
+          topics: validTopics,
+        });
+      }
+    }
+  }
+  return sanitized;
+}
+
+async function syncStudySessionSyllabus(userId, previousCompletedTopicIds = []) {
+  if (!userId) return;
+
+  const allCompletedSessions = await StudySession.find({
+    user: userId,
+    status: 'completed',
+  });
+
+  const sessionCompletedTopicIds = new Set();
+  const affectedSubjectIds = new Set();
+
+  allCompletedSessions.forEach((sess) => {
+    if (Array.isArray(sess.subjects)) {
+      sess.subjects.forEach((sub) => {
+        if (sub.subjectId) affectedSubjectIds.add(sub.subjectId.toString());
+        if (Array.isArray(sub.topics)) {
+          sub.topics.forEach((t) => {
+            if (t.completed && t.topicId) {
+              sessionCompletedTopicIds.add(t.topicId.toString());
+            }
+          });
+        }
+      });
+    }
+  });
+
+  for (const prevId of previousCompletedTopicIds) {
+    if (!prevId) continue;
+    const topicDoc = await Topic.findOne({ _id: prevId, user: userId });
+    if (!topicDoc) continue;
+
+    const isStillCompletedInSession = sessionCompletedTopicIds.has(prevId.toString());
+    if (isStillCompletedInSession) {
+      if (!topicDoc.completed || topicDoc.status !== 'completed') {
+        topicDoc.completed = true;
+        topicDoc.status = 'completed';
+        await topicDoc.save();
+      }
+    } else {
+      topicDoc.completed = false;
+      topicDoc.status = 'not-started';
+      await topicDoc.save();
+    }
+    if (topicDoc.subject) {
+      affectedSubjectIds.add(topicDoc.subject.toString());
+    }
+  }
+
+  for (const topicIdStr of sessionCompletedTopicIds) {
+    const topicDoc = await Topic.findOne({ _id: topicIdStr, user: userId });
+    if (topicDoc) {
+      if (!topicDoc.completed || topicDoc.status !== 'completed') {
+        topicDoc.completed = true;
+        topicDoc.status = 'completed';
+        await topicDoc.save();
+      }
+      if (topicDoc.subject) {
+        affectedSubjectIds.add(topicDoc.subject.toString());
+      }
+    }
+  }
+
+  for (const sId of affectedSubjectIds) {
+    await updateSubjectProgressHelper(sId, userId);
+  }
+}
+
 export async function createStudySession(req, res) {
   const {
     subjectId,
@@ -976,6 +1165,7 @@ export async function createStudySession(req, res) {
     taskId,
     examId,
     sessionType = 'timer',
+    studyType = 'syllabus',
     status = 'completed',
     startedAt = new Date(),
     endedAt,
@@ -985,6 +1175,8 @@ export async function createStudySession(req, res) {
     productivity,
     goal,
     notes,
+    subjects,
+    outsideSyllabus,
   } = req.body;
 
   const validSubjectId = (subjectId && mongoose.Types.ObjectId.isValid(subjectId)) ? subjectId : null;
@@ -1012,7 +1204,32 @@ export async function createStudySession(req, res) {
     computedDuration = Math.max(1, Math.round(elapsedMs / 60000));
   }
 
-  let finalSubjectName = customSubjectName || '';
+  const { sanitizedSubjects } = await sanitizeStudySessionSubjects(
+    req.user._id,
+    subjects,
+    validSubjectId,
+    customSubjectName,
+    topic
+  );
+
+  const sanitizedOutside = sanitizeOutsideSyllabus(outsideSyllabus);
+
+  let finalSubjectId = validSubjectId;
+  let finalSubjectName = (customSubjectName || '').trim();
+  let finalTopicName = (topic || '').trim();
+
+  if (sanitizedSubjects.length > 0) {
+    if (!finalSubjectId && sanitizedSubjects[0].subjectId) {
+      finalSubjectId = sanitizedSubjects[0].subjectId;
+    }
+    if (!finalSubjectName && sanitizedSubjects[0].subjectName) {
+      finalSubjectName = sanitizedSubjects[0].subjectName;
+    }
+    if (!finalTopicName && sanitizedSubjects[0].topics && sanitizedSubjects[0].topics.length > 0) {
+      finalTopicName = sanitizedSubjects[0].topics.map(t => t.topicName).filter(Boolean).join(', ');
+    }
+  }
+
   if (validSubjectId && !finalSubjectName) {
     const sub = await Subject.findOne({ _id: validSubjectId, user: req.user._id });
     if (sub) finalSubjectName = sub.name;
@@ -1020,12 +1237,13 @@ export async function createStudySession(req, res) {
 
   const item = await StudySession.create({
     user: req.user._id,
-    subject: validSubjectId,
+    subject: finalSubjectId,
     subjectName: finalSubjectName,
-    topic: (topic || '').trim(),
+    topic: finalTopicName,
     task: validTaskId,
     exam: validExamId,
     sessionType,
+    studyType: studyType || 'syllabus',
     status,
     startedAt: startDate,
     endedAt: endedAt ? new Date(endedAt) : (status === 'completed' ? new Date() : null),
@@ -1035,7 +1253,13 @@ export async function createStudySession(req, res) {
     productivity: productivity || null,
     goal: (goal || '').trim(),
     notes: (notes || '').trim(),
+    subjects: sanitizedSubjects,
+    outsideSyllabus: sanitizedOutside,
   });
+
+  if (status === 'completed') {
+    await syncStudySessionSyllabus(req.user._id);
+  }
 
   await item.populate([
     { path: 'subject', select: 'name code color' },
@@ -1052,6 +1276,19 @@ export async function updateStudySession(req, res) {
     return res.status(404).json({ success: false, message: 'Study Session not found' });
   }
 
+  const previousCompletedTopicIds = [];
+  if (Array.isArray(item.subjects)) {
+    item.subjects.forEach((sub) => {
+      if (Array.isArray(sub.topics)) {
+        sub.topics.forEach((t) => {
+          if (t.completed && t.topicId) {
+            previousCompletedTopicIds.push(t.topicId.toString());
+          }
+        });
+      }
+    });
+  }
+
   const {
     status,
     endedAt,
@@ -1062,6 +1299,11 @@ export async function updateStudySession(req, res) {
     notes,
     goal,
     topic,
+    subjectId,
+    subjectName: customSubjectName,
+    studyType,
+    subjects,
+    outsideSyllabus,
   } = req.body;
 
   if (status !== undefined) item.status = status;
@@ -1072,6 +1314,7 @@ export async function updateStudySession(req, res) {
   if (notes !== undefined) item.notes = notes.trim();
   if (goal !== undefined) item.goal = goal.trim();
   if (topic !== undefined) item.topic = topic.trim();
+  if (studyType !== undefined) item.studyType = studyType;
 
   if (durationMinutes !== undefined) {
     item.durationMinutes = Number(durationMinutes) || 0;
@@ -1080,7 +1323,32 @@ export async function updateStudySession(req, res) {
     item.durationMinutes = Math.max(1, Math.round(elapsedMs / 60000));
   }
 
+  if (subjects !== undefined) {
+    const { sanitizedSubjects } = await sanitizeStudySessionSubjects(
+      req.user._id,
+      subjects,
+      subjectId || item.subject,
+      customSubjectName || item.subjectName,
+      topic || item.topic
+    );
+    item.subjects = sanitizedSubjects;
+
+    if (sanitizedSubjects.length > 0) {
+      if (sanitizedSubjects[0].subjectId) item.subject = sanitizedSubjects[0].subjectId;
+      if (sanitizedSubjects[0].subjectName) item.subjectName = sanitizedSubjects[0].subjectName;
+      if (sanitizedSubjects[0].topics && sanitizedSubjects[0].topics.length > 0) {
+        item.topic = sanitizedSubjects[0].topics.map(t => t.topicName).filter(Boolean).join(', ');
+      }
+    }
+  }
+
+  if (outsideSyllabus !== undefined) {
+    item.outsideSyllabus = sanitizeOutsideSyllabus(outsideSyllabus);
+  }
+
   await item.save();
+  await syncStudySessionSyllabus(req.user._id, previousCompletedTopicIds);
+
   await item.populate([
     { path: 'subject', select: 'name code color' },
     { path: 'task', select: 'title' },
@@ -1096,7 +1364,23 @@ export async function deleteStudySession(req, res) {
     return res
       .status(404)
       .json({ success: false, message: "Study Session not found" });
+
+  const previousCompletedTopicIds = [];
+  if (Array.isArray(item.subjects)) {
+    item.subjects.forEach((sub) => {
+      if (Array.isArray(sub.topics)) {
+        sub.topics.forEach((t) => {
+          if (t.completed && t.topicId) {
+            previousCompletedTopicIds.push(t.topicId.toString());
+          }
+        });
+      }
+    });
+  }
+
   await item.deleteOne();
+  await syncStudySessionSyllabus(req.user._id, previousCompletedTopicIds);
+
   res.status(204).end();
 }
 

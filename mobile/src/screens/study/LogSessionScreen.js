@@ -11,36 +11,36 @@ import {
 import DateTimePicker from '@react-native-community/datetimepicker';
 import {
   Calendar as CalendarIcon,
-  Clock,
-  BookOpen,
-  PenLine
-} from 'lucide-react-native';
-import {
   Smile,
   Meh,
-  Frown
+  Frown,
+  Save,
+  PenLine
 } from 'lucide-react-native';
 import { Header } from '../../components/ui/Header';
 import { PageHeading } from '../../components/ui/PageHeading';
 import { Button } from '../../components/ui/Button';
 import { Field } from '../../components/ui/Field';
 import { Input } from '../../components/ui/Input';
-import { SelectPicker } from '../../components/ui/SelectPicker';
+import { Card } from '../../components/ui/Card';
+import { StudyTopicSelector } from '../../components/study/StudyTopicSelector';
 import { getSubjects } from '../../api/subjects';
-import { getTopics } from '../../api/syllabus';
 import { createStudySession } from '../../api/studySessions';
 import { useAppDialog } from '../../components/ui/AppDialog';
-import { typography, spacing, radii, useAppTheme, useStyles } from '../../theme/theme';
+import { useAppTheme, useStyles } from '../../theme/theme';
 
 export default function LogSessionScreen({ navigation }) {
-  const { colors, typography, spacing, radii } = useAppTheme();
+  const { colors } = useAppTheme();
   const styles = useStyles(createStyles);
   const { showSuccess, showError } = useAppDialog();
 
-  const [subjects, setSubjects] = useState([]);
-  const [selectedSubjectId, setSelectedSubjectId] = useState(null);
-  const [syllabusTopics, setSyllabusTopics] = useState([]);
-  const [topic, setTopic] = useState('');
+  const [availableSubjects, setAvailableSubjects] = useState([]);
+  const [studyType, setStudyType] = useState('syllabus');
+  const [selectedSubjects, setSelectedSubjects] = useState([]);
+  const [outsideSyllabus, setOutsideSyllabus] = useState([
+    { area: '', topics: [] }
+  ]);
+
   const [sessionDate, setSessionDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [durationMinutes, setDurationMinutes] = useState('45');
@@ -52,23 +52,19 @@ export default function LogSessionScreen({ navigation }) {
     getSubjects()
       .then((res) => {
         const list = res.data || res || [];
-        setSubjects(list);
-        if (list.length > 0) {
-          setSelectedSubjectId(list[0]._id || list[0].id);
+        setAvailableSubjects(list);
+        if (list.length > 0 && selectedSubjects.length === 0) {
+          setSelectedSubjects([
+            {
+              subjectId: list[0]._id || list[0].id,
+              subjectName: list[0].name,
+              topics: [],
+            },
+          ]);
         }
       })
       .catch(() => {});
   }, []);
-
-  useEffect(() => {
-    if (!selectedSubjectId) {
-      setSyllabusTopics([]);
-      return;
-    }
-    getTopics(selectedSubjectId)
-      .then((res) => setSyllabusTopics(res.data || res || []))
-      .catch(() => setSyllabusTopics([]));
-  }, [selectedSubjectId]);
 
   const onDateChange = (_event, selected) => {
     setShowDatePicker(false);
@@ -86,23 +82,42 @@ export default function LogSessionScreen({ navigation }) {
 
     try {
       setSaving(true);
-      const chosenSubject = subjects.find((s) => (s._id || s.id) === selectedSubjectId);
+
+      let primarySubjectId = null;
+      let primarySubjectName = 'General Study';
+      let primaryTopic = 'General Study';
+
+      if (studyType === 'syllabus' && selectedSubjects.length > 0) {
+        primarySubjectId = selectedSubjects[0].subjectId || null;
+        primarySubjectName = selectedSubjects[0].subjectName || 'General Study';
+        if (selectedSubjects[0].topics && selectedSubjects[0].topics.length > 0) {
+          primaryTopic = selectedSubjects[0].topics.map((t) => t.topicName).join(', ');
+        }
+      } else if (studyType === 'outside_syllabus' && outsideSyllabus.length > 0) {
+        primarySubjectName = outsideSyllabus[0].area || 'Outside Syllabus';
+        if (outsideSyllabus[0].topics && outsideSyllabus[0].topics.length > 0) {
+          primaryTopic = outsideSyllabus[0].topics.map((t) => t.name).join(', ');
+        }
+      }
 
       const payload = {
-        subjectId: selectedSubjectId || null,
-        subjectName: chosenSubject?.name || 'General Study',
-        topic: topic.trim() || 'General Study',
+        subjectId: primarySubjectId,
+        subjectName: primarySubjectName,
+        topic: primaryTopic,
         sessionType: 'manual',
+        studyType,
         status: 'completed',
         startedAt: sessionDate.toISOString(),
         endedAt: new Date(sessionDate.getTime() + mins * 60000).toISOString(),
         durationMinutes: mins,
         productivity,
         notes: notes.trim(),
+        subjects: selectedSubjects,
+        outsideSyllabus,
       };
 
       await createStudySession(payload);
-      showSuccess('Session Logged', 'Your manual study session has been added to history.');
+      showSuccess('Session Logged', 'Your manual study session and syllabus progress have been updated.');
       navigation.replace('StudyHistory');
     } catch (err) {
       console.error('[LogSession] Save error:', err);
@@ -111,11 +126,6 @@ export default function LogSessionScreen({ navigation }) {
       setSaving(false);
     }
   };
-
-  const subjectOptions = subjects.map((s) => ({
-    label: `${s.name} (${s.code || 'Sub'})`,
-    value: s._id || s.id,
-  }));
 
   return (
     <View style={styles.container}>
@@ -126,244 +136,181 @@ export default function LogSessionScreen({ navigation }) {
       >
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <PageHeading
-            eyebrow="Manual Log"
-            title="Log Study Session"
-            detail="Record study time completed offline or without the live timer."
+            eyebrow="Manual Entry"
+            title="Log Past Study Session"
+            detail="Record study time completed offline or outside the timer."
           />
 
-          <View style={styles.form}>
-            <Field label="Subject">
-              <SelectPicker
-                value={selectedSubjectId}
-                onValueChange={setSelectedSubjectId}
-                options={subjectOptions}
-                placeholder="Select your subject"
-              />
+          <Card style={styles.formCard}>
+            <StudyTopicSelector
+              studyType={studyType}
+              onStudyTypeChange={setStudyType}
+              availableSubjects={availableSubjects}
+              selectedSubjects={selectedSubjects}
+              onSelectedSubjectsChange={setSelectedSubjects}
+              outsideSyllabus={outsideSyllabus}
+              onOutsideSyllabusChange={setOutsideSyllabus}
+              showCompletionCheckboxes={true}
+            />
+
+            <Field label="Session Date">
+              <TouchableOpacity
+                style={styles.datePickerBtn}
+                onPress={() => setShowDatePicker(true)}
+                activeOpacity={0.7}
+              >
+                <CalendarIcon size={18} color={colors.accent} style={{ marginRight: 8 }} />
+                <Text style={styles.datePickerText}>
+                  {sessionDate.toLocaleDateString(undefined, {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })}
+                </Text>
+              </TouchableOpacity>
+              {showDatePicker && (
+                <DateTimePicker
+                  value={sessionDate}
+                  mode="date"
+                  display="default"
+                  onChange={onDateChange}
+                  maximumDate={new Date()}
+                />
+              )}
             </Field>
 
-            <Field label="Topic / Concept">
+            <Field label="Duration (Minutes)">
               <Input
-                value={topic}
-                onChangeText={setTopic}
-                placeholder="What topic are you studying?"
+                value={durationMinutes}
+                onChangeText={setDurationMinutes}
+                keyboardType="numeric"
+                placeholder="45"
               />
             </Field>
 
-            <View style={styles.row}>
-              <View style={styles.halfCol}>
-                <Field label="Date">
-                  <TouchableOpacity
-                    style={styles.pickerTrigger}
-                    onPress={() => setShowDatePicker(true)}
-                    activeOpacity={0.7}
-                  >
-                    <CalendarIcon size={16} color={colors.accent} />
-                    <Text style={styles.pickerTriggerText}>
-                      {sessionDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                    </Text>
-                  </TouchableOpacity>
-                </Field>
-              </View>
-
-              <View style={styles.halfCol}>
-                <Field label="Duration (Minutes)">
-                  <Input
-                    value={durationMinutes}
-                    onChangeText={setDurationMinutes}
-                    keyboardType="numeric"
-                    placeholder="Enter duration in minutes"
-                  />
-                </Field>
-              </View>
-            </View>
-
-            {showDatePicker && (
-              <DateTimePicker
-                value={sessionDate}
-                mode="date"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                onChange={onDateChange}
-              />
-            )}
-
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Productivity Rating</Text>
-              <View style={styles.productivityGrid}>
+            <Field label="How productive was this session?">
+              <View style={styles.prodRow}>
                 <TouchableOpacity
-                  style={[
-                    styles.productivityCard,
-                    productivity === 'productive' && styles.productivityCardActive,
-                  ]}
+                  style={[styles.prodOption, productivity === 'productive' && styles.prodOptionActive]}
                   onPress={() => setProductivity('productive')}
                   activeOpacity={0.7}
                 >
-                  <Smile
-                    size={20}
-                    color={productivity === 'productive' ? colors.accent : colors.mutedForeground}
-                  />
-                  <Text
-                    style={[
-                      styles.productivityLabel,
-                      productivity === 'productive' && styles.productivityLabelActive,
-                    ]}
-                  >
+                  <Smile size={18} color={productivity === 'productive' ? colors.accent : colors.mutedForeground} />
+                  <Text style={[styles.prodText, productivity === 'productive' && styles.prodTextActive]}>
                     Productive
                   </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[
-                    styles.productivityCard,
-                    productivity === 'average' && styles.productivityCardActive,
-                  ]}
+                  style={[styles.prodOption, productivity === 'average' && styles.prodOptionActive]}
                   onPress={() => setProductivity('average')}
                   activeOpacity={0.7}
                 >
-                  <Meh
-                    size={20}
-                    color={productivity === 'average' ? colors.accent : colors.mutedForeground}
-                  />
-                  <Text
-                    style={[
-                      styles.productivityLabel,
-                      productivity === 'average' && styles.productivityLabelActive,
-                    ]}
-                  >
+                  <Meh size={18} color={productivity === 'average' ? colors.accent : colors.mutedForeground} />
+                  <Text style={[styles.prodText, productivity === 'average' && styles.prodTextActive]}>
                     Average
                   </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[
-                    styles.productivityCard,
-                    productivity === 'difficult' && styles.productivityCardActive,
-                  ]}
+                  style={[styles.prodOption, productivity === 'difficult' && styles.prodOptionActive]}
                   onPress={() => setProductivity('difficult')}
                   activeOpacity={0.7}
                 >
-                  <Frown
-                    size={20}
-                    color={productivity === 'difficult' ? colors.accent : colors.mutedForeground}
-                  />
-                  <Text
-                    style={[
-                      styles.productivityLabel,
-                      productivity === 'difficult' && styles.productivityLabelActive,
-                    ]}
-                  >
+                  <Frown size={18} color={productivity === 'difficult' ? '#F59E0B' : colors.mutedForeground} />
+                  <Text style={[styles.prodText, productivity === 'difficult' && styles.prodTextActive]}>
                     Difficult
                   </Text>
                 </TouchableOpacity>
               </View>
-            </View>
+            </Field>
 
-            <Field label="Notes / Reflection (Optional)">
+            <Field label="Notes / Achievements (Optional)">
               <Input
                 value={notes}
                 onChangeText={setNotes}
-                placeholder="Add task details"
+                placeholder="Key concepts covered, questions..."
                 multiline
                 numberOfLines={3}
-                style={{ minHeight: 80, alignItems: 'flex-start' }}
-                textAlignVertical="top"
+                style={{ height: 70, textAlignVertical: 'top' }}
               />
             </Field>
 
-            <View style={styles.actionWrapper}>
-              <Button
-                onPress={handleSave}
-                loading={saving}
-                disabled={saving}
-                style={styles.saveBtn}
-                icon={<Save size={18} color={colors.primaryForeground} style={{ marginRight: 8 }} />}
-              >
-                Log Study Session
-              </Button>
-            </View>
-          </View>
+            <Button
+              onPress={handleSave}
+              loading={saving}
+              style={styles.saveBtn}
+            >
+              <Save size={18} color={colors.primaryForeground} style={{ marginRight: 8 }} />
+              Log Study Session
+            </Button>
+          </Card>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
   );
 }
 
-const createStyles = ({ colors, typography, spacing, radii }) =>
+const createStyles = (theme) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.background,
+      backgroundColor: theme.colors.background,
     },
     scroll: {
-      padding: spacing.lg,
-      paddingBottom: spacing.xxl,
+      padding: theme.spacing.lg,
+      paddingBottom: 40,
     },
-    form: {
-      gap: spacing.lg,
-      marginTop: spacing.md,
+    formCard: {
+      padding: theme.spacing.md,
+      gap: theme.spacing.md,
     },
-    row: {
-      flexDirection: 'row',
-      gap: spacing.md,
-    },
-    halfCol: {
-      flex: 1,
-    },
-    pickerTrigger: {
+    datePickerBtn: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: colors.card,
-      borderColor: colors.cardBorder,
+      backgroundColor: theme.colors.background,
       borderWidth: 1,
-      borderRadius: radii.xl,
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.md,
-      gap: spacing.sm,
+      borderColor: theme.colors.border,
+      borderRadius: theme.radii.md,
+      paddingHorizontal: 12,
+      paddingVertical: 12,
     },
-    pickerTriggerText: {
-      fontFamily: typography.sans.medium,
+    datePickerText: {
       fontSize: 14,
-      color: colors.foreground,
+      color: theme.colors.foreground,
     },
-    section: {
-      gap: spacing.sm,
-    },
-    sectionTitle: {
-      fontFamily: typography.sans.semiBold,
-      fontSize: 14,
-      color: colors.foreground,
-    },
-    productivityGrid: {
+    prodRow: {
       flexDirection: 'row',
-      gap: spacing.sm,
+      gap: theme.spacing.xs,
     },
-    productivityCard: {
+    prodOption: {
       flex: 1,
-      backgroundColor: colors.card,
-      borderRadius: radii.lg,
-      borderWidth: 1,
-      borderColor: colors.cardBorder,
-      paddingVertical: spacing.md,
+      flexDirection: 'row',
       alignItems: 'center',
-      gap: spacing.xs,
+      justifyContent: 'center',
+      paddingVertical: 10,
+      paddingHorizontal: 8,
+      borderRadius: theme.radii.md,
+      backgroundColor: theme.colors.background,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      gap: 6,
     },
-    productivityCardActive: {
-      borderColor: colors.accent,
-      backgroundColor: colors.accent + '10',
+    prodOptionActive: {
+      borderColor: theme.colors.accent,
+      backgroundColor: `${theme.colors.accent}12`,
     },
-    productivityLabel: {
-      fontFamily: typography.sans.medium,
+    prodText: {
       fontSize: 12,
-      color: colors.mutedForeground,
+      fontWeight: '600',
+      color: theme.colors.mutedForeground,
     },
-    productivityLabelActive: {
-      fontFamily: typography.sans.bold,
-      color: colors.foreground,
-    },
-    actionWrapper: {
-      marginTop: spacing.md,
+    prodTextActive: {
+      color: theme.colors.foreground,
     },
     saveBtn: {
-      width: '100%',
-      paddingVertical: spacing.md,
+      marginTop: theme.spacing.sm,
+      height: 50,
     },
   });

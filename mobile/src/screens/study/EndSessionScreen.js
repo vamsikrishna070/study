@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
   View,
   Text,
@@ -7,33 +7,29 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  Switch,
-  ActivityIndicator,
 } from 'react-native';
 import {
   Sparkles,
-  Clock,
-  BookOpen,
   Smile,
   Meh,
   Frown,
-  Save,
-  ChevronRight
+  Save
 } from 'lucide-react-native';
 import { Header } from '../../components/ui/Header';
-import { PageHeading } from '../../components/ui/PageHeading';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Field } from '../../components/ui/Field';
 import { Input } from '../../components/ui/Input';
+import { StudyTopicSelector } from '../../components/study/StudyTopicSelector';
 import { StudySessionContext } from '../../context/StudySessionContext';
 import { createStudySession } from '../../api/studySessions';
+import { getSubjects } from '../../api/subjects';
 import { updateTask } from '../../api/tasks';
 import { useAppDialog } from '../../components/ui/AppDialog';
-import { typography, spacing, radii, useAppTheme, useStyles } from '../../theme/theme';
+import { useAppTheme, useStyles } from '../../theme/theme';
 
 export default function EndSessionScreen({ navigation, route }) {
-  const { colors, typography, spacing, radii } = useAppTheme();
+  const { colors } = useAppTheme();
   const styles = useStyles(createStyles);
   const { discardSession } = useContext(StudySessionContext);
   const { showSuccess, showError } = useAppDialog();
@@ -43,6 +39,17 @@ export default function EndSessionScreen({ navigation, route }) {
   const [reflection, setReflection] = useState('');
   const [markTaskComplete, setMarkTaskComplete] = useState(Boolean(summary.taskId));
   const [saving, setSaving] = useState(false);
+
+  const [availableSubjects, setAvailableSubjects] = useState([]);
+  const [studyType, setStudyType] = useState(summary.studyType || 'syllabus');
+  const [subjects, setSubjects] = useState(summary.subjects || []);
+  const [outsideSyllabus, setOutsideSyllabus] = useState(summary.outsideSyllabus || []);
+
+  useEffect(() => {
+    getSubjects()
+      .then((res) => setAvailableSubjects(res.data || res || []))
+      .catch(() => setAvailableSubjects([]));
+  }, []);
 
   const formatDetailedTime = (sec = 0) => {
     const mins = Math.floor(sec / 60);
@@ -62,10 +69,8 @@ export default function EndSessionScreen({ navigation, route }) {
 
       const rawSubjectId = summary.subjectId || null;
       const validSubjectId = (typeof rawSubjectId === 'string' && rawSubjectId.length === 24) ? rawSubjectId : null;
-
       const rawTaskId = summary.taskId || null;
       const validTaskId = (typeof rawTaskId === 'string' && rawTaskId.length === 24) ? rawTaskId : null;
-
       const rawExamId = summary.examId || null;
       const validExamId = (typeof rawExamId === 'string' && rawExamId.length === 24) ? rawExamId : null;
 
@@ -76,6 +81,7 @@ export default function EndSessionScreen({ navigation, route }) {
         taskId: validTaskId,
         examId: validExamId,
         sessionType: 'timer',
+        studyType,
         status: 'completed',
         startedAt: summary.startedAt || new Date().toISOString(),
         endedAt: summary.endedAt || new Date().toISOString(),
@@ -84,6 +90,8 @@ export default function EndSessionScreen({ navigation, route }) {
         productivity,
         goal: summary.goal || '',
         notes: reflection.trim(),
+        subjects,
+        outsideSyllabus,
       };
 
       await createStudySession(payload);
@@ -97,7 +105,7 @@ export default function EndSessionScreen({ navigation, route }) {
       }
 
       discardSession();
-      showSuccess('Session Saved', 'Great work! Your study session has been logged to history.');
+      showSuccess('Session Saved', 'Great work! Your study session and syllabus progress have been updated.');
       navigation.replace('StudyHistory');
     } catch (err) {
       console.error('[EndSession] Save error:', err);
@@ -122,311 +130,204 @@ export default function EndSessionScreen({ navigation, route }) {
             </View>
             <Text style={styles.title}>Great study block!</Text>
             <Text style={styles.subtitle}>
-              Take a moment to review and reflect on what you accomplished.
+              Review your study duration, select completed topics, and reflect on what you accomplished.
             </Text>
           </View>
 
           <Card style={styles.summaryCard}>
             <View style={styles.statRow}>
-              <View style={styles.statIconBox}>
-                <Clock size={24} color={colors.accent} />
+              <View style={styles.statBox}>
+                <Text style={styles.statLabel}>Time Spent</Text>
+                <Text style={styles.statValue}>{formatDetailedTime(summary.elapsedSeconds || 0)}</Text>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.statLabel}>Total Focus Time</Text>
-                <Text style={styles.statValue}>
-                  {formatDetailedTime(summary.elapsedSeconds || 0)}
-                </Text>
+
+              <View style={styles.divider} />
+
+              <View style={styles.statBox}>
+                <Text style={styles.statLabel}>Focus Goal</Text>
+                <Text style={styles.statValue} numberOfLines={1}>{summary.goal || 'General Study'}</Text>
               </View>
             </View>
 
-            <View style={styles.divider} />
-
-            <View style={styles.detailRow}>
-              <BookOpen size={16} color={colors.mutedForeground} style={{ marginRight: 8 }} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.detailSubject} numberOfLines={1}>
-                  {summary.subjectName || 'General Study'}
-                </Text>
-                {Boolean(summary.topic) && (
-                  <Text style={styles.detailTopic} numberOfLines={1}>
-                    {summary.topic}
+            <Field label="How productive did you feel?">
+              <View style={styles.prodRow}>
+                <TouchableOpacity
+                  style={[styles.prodOption, productivity === 'productive' && styles.prodOptionActive]}
+                  onPress={() => setProductivity('productive')}
+                  activeOpacity={0.7}
+                >
+                  <Smile size={20} color={productivity === 'productive' ? colors.accent : colors.mutedForeground} />
+                  <Text style={[styles.prodText, productivity === 'productive' && styles.prodTextActive]}>
+                    Productive
                   </Text>
-                )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.prodOption, productivity === 'average' && styles.prodOptionActive]}
+                  onPress={() => setProductivity('average')}
+                  activeOpacity={0.7}
+                >
+                  <Meh size={20} color={productivity === 'average' ? colors.accent : colors.mutedForeground} />
+                  <Text style={[styles.prodText, productivity === 'average' && styles.prodTextActive]}>
+                    Average
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.prodOption, productivity === 'difficult' && styles.prodOptionActive]}
+                  onPress={() => setProductivity('difficult')}
+                  activeOpacity={0.7}
+                >
+                  <Frown size={20} color={productivity === 'difficult' ? '#F59E0B' : colors.mutedForeground} />
+                  <Text style={[styles.prodText, productivity === 'difficult' && styles.prodTextActive]}>
+                    Difficult
+                  </Text>
+                </TouchableOpacity>
               </View>
-            </View>
-          </Card>
+            </Field>
 
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>How did the session go?</Text>
-            <View style={styles.productivityGrid}>
-              <TouchableOpacity
-                style={[
-                  styles.productivityBtn,
-                  productivity === 'productive' && { borderColor: colors.accent, backgroundColor: colors.accent + '15' },
-                ]}
-                onPress={() => setProductivity('productive')}
-                activeOpacity={0.7}
-              >
-                <Smile
-                  size={24}
-                  color={productivity === 'productive' ? colors.accent : colors.mutedForeground}
-                />
-                <Text
-                  style={[
-                    styles.productivityText,
-                    productivity === 'productive' && { color: colors.accent, fontWeight: typography.weights.bold },
-                  ]}
-                >
-                  Productive
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.productivityBtn,
-                  productivity === 'average' && { borderColor: colors.primary, backgroundColor: colors.muted },
-                ]}
-                onPress={() => setProductivity('average')}
-                activeOpacity={0.7}
-              >
-                <Meh
-                  size={24}
-                  color={productivity === 'average' ? colors.foreground : colors.mutedForeground}
-                />
-                <Text
-                  style={[
-                    styles.productivityText,
-                    productivity === 'average' && { color: colors.foreground, fontWeight: typography.weights.bold },
-                  ]}
-                >
-                  Average
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.productivityBtn,
-                  productivity === 'difficult' && { borderColor: '#f59e0b', backgroundColor: '#f59e0b15' },
-                ]}
-                onPress={() => setProductivity('difficult')}
-                activeOpacity={0.7}
-              >
-                <Frown
-                  size={24}
-                  color={productivity === 'difficult' ? colors.accent : colors.mutedForeground}
-                />
-                <Text
-                  style={[
-                    styles.productivityLabel,
-                    productivity === 'difficult' && styles.productivityLabelActive,
-                  ]}
-                >
-                  Difficult
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          <Field label="What did you accomplish? (Optional)">
-            <Input
-              value={reflection}
-              onChangeText={setReflection}
-              placeholder="Add session reflection or notes"
-              multiline
-              numberOfLines={3}
-              style={{ minHeight: 80, alignItems: 'flex-start' }}
-              textAlignVertical="top"
+            <StudyTopicSelector
+              studyType={studyType}
+              onStudyTypeChange={setStudyType}
+              availableSubjects={availableSubjects}
+              selectedSubjects={subjects}
+              onSelectedSubjectsChange={setSubjects}
+              outsideSyllabus={outsideSyllabus}
+              onOutsideSyllabusChange={setOutsideSyllabus}
+              showCompletionCheckboxes={true}
             />
-          </Field>
 
-          {Boolean(summary.taskId) && (
-            <View style={styles.taskToggleRow}>
-              <View style={{ flex: 1, marginRight: spacing.md }}>
-                <Text style={styles.taskToggleTitle}>Mark Linked Task as Done</Text>
-                <Text style={styles.taskToggleSubtitle}>Complete task from your study list</Text>
-              </View>
-              <Switch
-                value={markTaskComplete}
-                onValueChange={setMarkTaskComplete}
-                trackColor={{ false: colors.muted, true: colors.accent }}
+            <Field label="Session Reflection / Notes (Optional)">
+              <Input
+                value={reflection}
+                onChangeText={setReflection}
+                placeholder="What did you learn? What needs further review?"
+                multiline
+                numberOfLines={3}
+                style={{ height: 80, textAlignVertical: 'top' }}
               />
-            </View>
-          )}
+            </Field>
 
-          <View style={styles.actionWrapper}>
             <Button
               onPress={handleSave}
               loading={saving}
-              disabled={saving}
               style={styles.saveBtn}
-              icon={<Save size={18} color={colors.primaryForeground} style={{ marginRight: 8 }} />}
             >
-              Save Session
+              <Save size={18} color={colors.primaryForeground} style={{ marginRight: 8 }} />
+              Save Study Log
             </Button>
-          </View>
+          </Card>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
   );
 }
 
-const createStyles = ({ colors, typography, spacing, radii }) =>
+const createStyles = (theme) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.background,
+      backgroundColor: theme.colors.background,
     },
     scroll: {
-      padding: spacing.lg,
-      paddingBottom: spacing.xxl,
-      gap: spacing.xl,
+      padding: theme.spacing.lg,
+      paddingBottom: 40,
     },
     header: {
       alignItems: 'center',
-      marginTop: spacing.sm,
+      marginBottom: theme.spacing.lg,
     },
     badge: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: colors.card,
-      borderColor: colors.accent,
+      backgroundColor: theme.colors.card,
       borderWidth: 1,
-      borderRadius: radii.round,
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.xs,
-      marginBottom: spacing.md,
+      borderColor: theme.colors.border,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: theme.radii.full,
+      marginBottom: theme.spacing.xs,
     },
     badgeText: {
-      fontFamily: typography.mono.bold,
-      fontSize: 11,
-      letterSpacing: 1.5,
-      color: colors.accent,
+      fontSize: 12,
+      fontWeight: '700',
+      color: theme.colors.accent,
     },
     title: {
-      fontFamily: typography.serif.medium,
-      fontSize: 26,
-      color: colors.foreground,
-      textAlign: 'center',
-      marginBottom: spacing.xs,
+      fontSize: 24,
+      fontWeight: '800',
+      color: theme.colors.foreground,
+      marginBottom: 4,
     },
     subtitle: {
-      fontFamily: typography.sans.regular,
       fontSize: 14,
-      color: colors.mutedForeground,
+      color: theme.colors.mutedForeground,
       textAlign: 'center',
-      paddingHorizontal: spacing.lg,
+      paddingHorizontal: theme.spacing.md,
     },
     summaryCard: {
-      padding: spacing.lg,
-      borderRadius: radii.xl,
+      padding: theme.spacing.md,
+      gap: theme.spacing.md,
     },
     statRow: {
       flexDirection: 'row',
+      backgroundColor: theme.colors.background,
+      borderRadius: theme.radii.lg,
+      padding: theme.spacing.md,
       alignItems: 'center',
     },
-    statIconBox: {
-      width: 48,
-      height: 48,
-      borderRadius: radii.lg,
-      backgroundColor: colors.accent + '15',
-      justifyContent: 'center',
+    statBox: {
+      flex: 1,
       alignItems: 'center',
-      marginRight: spacing.md,
-    },
-    statLabel: {
-      fontFamily: typography.mono.regular,
-      fontSize: 11,
-      letterSpacing: 1,
-      textTransform: 'uppercase',
-      color: colors.mutedForeground,
-    },
-    statValue: {
-      fontFamily: typography.sans.bold,
-      fontSize: 22,
-      color: colors.foreground,
-      marginTop: 2,
     },
     divider: {
-      height: 1,
-      backgroundColor: colors.cardBorder,
-      marginVertical: spacing.md,
+      width: 1,
+      height: 30,
+      backgroundColor: theme.colors.border,
     },
-    detailRow: {
+    statLabel: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: theme.colors.mutedForeground,
+      textTransform: 'uppercase',
+      marginBottom: 2,
+    },
+    statValue: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: theme.colors.foreground,
+    },
+    prodRow: {
       flexDirection: 'row',
-      alignItems: 'center',
+      gap: theme.spacing.xs,
     },
-    detailSubject: {
-      fontFamily: typography.sans.semiBold,
-      fontSize: 15,
-      color: colors.foreground,
-    },
-    detailTopic: {
-      fontFamily: typography.sans.regular,
-      fontSize: 13,
-      color: colors.mutedForeground,
-      marginTop: 2,
-    },
-    section: {
-      gap: spacing.sm,
-    },
-    sectionTitle: {
-      fontFamily: typography.sans.semiBold,
-      fontSize: 15,
-      color: colors.foreground,
-    },
-    productivityGrid: {
-      flexDirection: 'row',
-      gap: spacing.sm,
-    },
-    productivityCard: {
+    prodOption: {
       flex: 1,
-      backgroundColor: colors.card,
-      borderRadius: radii.lg,
-      borderWidth: 1,
-      borderColor: colors.cardBorder,
-      paddingVertical: spacing.md,
-      alignItems: 'center',
-      gap: spacing.xs,
-    },
-    productivityCardActive: {
-      borderColor: colors.accent,
-      backgroundColor: colors.accent + '10',
-    },
-    productivityLabel: {
-      fontFamily: typography.sans.medium,
-      fontSize: 12,
-      color: colors.mutedForeground,
-    },
-    productivityLabelActive: {
-      fontFamily: typography.sans.bold,
-      color: colors.foreground,
-    },
-    taskToggleRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
-      backgroundColor: colors.card,
-      padding: spacing.md,
-      borderRadius: radii.xl,
+      justifyContent: 'center',
+      paddingVertical: 10,
+      paddingHorizontal: 8,
+      borderRadius: theme.radii.md,
+      backgroundColor: theme.colors.background,
       borderWidth: 1,
-      borderColor: colors.cardBorder,
+      borderColor: theme.colors.border,
+      gap: 6,
     },
-    taskToggleTitle: {
-      fontFamily: typography.sans.semiBold,
-      fontSize: 14,
-      color: colors.foreground,
+    prodOptionActive: {
+      borderColor: theme.colors.accent,
+      backgroundColor: `${theme.colors.accent}12`,
     },
-    taskToggleSubtitle: {
-      fontFamily: typography.sans.regular,
+    prodText: {
       fontSize: 12,
-      color: colors.mutedForeground,
-      marginTop: 2,
+      fontWeight: '600',
+      color: theme.colors.mutedForeground,
     },
-    actionWrapper: {
-      marginTop: spacing.sm,
+    prodTextActive: {
+      color: theme.colors.foreground,
     },
     saveBtn: {
-      width: '100%',
-      paddingVertical: spacing.md,
+      marginTop: theme.spacing.sm,
+      height: 50,
     },
   });

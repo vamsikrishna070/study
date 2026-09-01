@@ -15,29 +15,31 @@ import {
   PenLine,
   BarChart2,
   BookOpen,
-  Clock,
   Trash2,
   X,
-  Target,
-  Sparkles,
   Smile,
   Meh,
   Frown,
-  CircleCheck,
-  CalendarDays,
+  Check,
+  Globe,
+  Save
 } from 'lucide-react-native';
 import { Header } from '../../components/ui/Header';
 import { PageHeading } from '../../components/ui/PageHeading';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { Field } from '../../components/ui/Field';
+import { Input } from '../../components/ui/Input';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { QueryState } from '../../components/ui/QueryState';
+import { StudyTopicSelector } from '../../components/study/StudyTopicSelector';
 import { useAppDialog } from '../../components/ui/AppDialog';
-import { getStudySessions, deleteStudySession } from '../../api/studySessions';
-import { typography, spacing, radii, useAppTheme, useStyles } from '../../theme/theme';
+import { getStudySessions, deleteStudySession, updateStudySession } from '../../api/studySessions';
+import { getSubjects } from '../../api/subjects';
+import { useAppTheme, useStyles } from '../../theme/theme';
 
 export default function StudyHistoryScreen({ navigation }) {
-  const { colors, typography, spacing, radii } = useAppTheme();
+  const { colors } = useAppTheme();
   const styles = useStyles(createStyles);
   const { showDialog, showSuccess, showError } = useAppDialog();
 
@@ -46,6 +48,17 @@ export default function StudyHistoryScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [selectedSession, setSelectedSession] = useState(null);
+
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editingSession, setEditingSession] = useState(null);
+  const [availableSubjects, setAvailableSubjects] = useState([]);
+  const [editStudyType, setEditStudyType] = useState('syllabus');
+  const [editSubjects, setEditSubjects] = useState([]);
+  const [editOutside, setEditOutside] = useState([]);
+  const [editNotes, setEditNotes] = useState('');
+  const [editDuration, setEditDuration] = useState('45');
+  const [editProductivity, setEditProductivity] = useState('productive');
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const loadSessions = useCallback(async () => {
     try {
@@ -63,6 +76,9 @@ export default function StudyHistoryScreen({ navigation }) {
 
   useEffect(() => {
     loadSessions();
+    getSubjects()
+      .then((res) => setAvailableSubjects(res.data || res || []))
+      .catch(() => setAvailableSubjects([]));
   }, [loadSessions]);
 
   const onRefresh = () => {
@@ -70,11 +86,79 @@ export default function StudyHistoryScreen({ navigation }) {
     loadSessions();
   };
 
+  const handleOpenEdit = (session) => {
+    setEditingSession(session);
+    setEditStudyType(session.studyType || (session.outsideSyllabus?.length ? 'outside_syllabus' : 'syllabus'));
+    setEditSubjects(session.subjects || []);
+    setEditOutside(session.outsideSyllabus || []);
+    setEditNotes(session.notes || '');
+    setEditDuration(String(session.durationMinutes || 45));
+    setEditProductivity(session.productivity || 'productive');
+    setSelectedSession(null);
+    setEditModalVisible(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingSession || savingEdit) return;
+    const durMins = parseInt(editDuration, 10);
+    if (!durMins || durMins <= 0) {
+      showError('Invalid Duration', 'Please enter a valid study duration in minutes.');
+      return;
+    }
+
+    try {
+      setSavingEdit(true);
+      const sessionId = editingSession._id || editingSession.id;
+
+      let primarySubjectName = 'General Study';
+      let primaryTopic = 'General Study';
+
+      if (editStudyType === 'syllabus' && editSubjects.length > 0) {
+        primarySubjectName = editSubjects[0].subjectName || primarySubjectName;
+        if (editSubjects[0].topics && editSubjects[0].topics.length > 0) {
+          primaryTopic = editSubjects[0].topics.map((t) => t.topicName).join(', ');
+        }
+      } else if (editStudyType === 'outside_syllabus' && editOutside.length > 0) {
+        primarySubjectName = editOutside[0].area || 'Outside Syllabus';
+        if (editOutside[0].topics && editOutside[0].topics.length > 0) {
+          primaryTopic = editOutside[0].topics.map((t) => t.name).join(', ');
+        }
+      }
+
+      const payload = {
+        studyType: editStudyType,
+        subjects: editSubjects,
+        outsideSyllabus: editOutside,
+        subjectName: primarySubjectName,
+        topic: primaryTopic,
+        notes: editNotes.trim(),
+        durationMinutes: durMins,
+        productivity: editProductivity,
+      };
+
+      const updated = await updateStudySession(sessionId, payload);
+      const updatedItem = updated.data || updated;
+
+      setSessions((prev) =>
+        prev.map((s) => ((s._id || s.id) === sessionId ? { ...s, ...updatedItem } : s))
+      );
+
+      setEditModalVisible(false);
+      setEditingSession(null);
+      showSuccess('Log Updated', 'Study session and syllabus completion updated.');
+    } catch (err) {
+      console.error('[StudyHistory] Save edit error:', err);
+      showError('Update Failed', 'Failed to update study session. Please try again.');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   const handleDeletePrompt = (session) => {
     showDialog({
       type: 'destructive',
       title: 'Delete Study Session?',
-      message: 'This will remove the session from your history and recalculate your study time.',
+      message: 'This will remove the session from your history and recalculate your syllabus progress.',
       confirmText: 'Delete',
       cancelText: 'Cancel',
       onConfirm: async () => {
@@ -143,7 +227,7 @@ export default function StudyHistoryScreen({ navigation }) {
       case 'average':
         return { label: 'Average', color: colors.mutedForeground, icon: Meh };
       case 'difficult':
-        return { label: 'Difficult', color: '#f59e0b', icon: Frown };
+        return { label: 'Difficult', color: '#F59E0B', icon: Frown };
       default:
         return null;
     }
@@ -228,6 +312,7 @@ export default function StudyHistoryScreen({ navigation }) {
               const subName = session.subject?.name || session.subjectName || 'General Study';
               const subColor = session.subject?.color || colors.accent;
               const prodBadge = getProductivityBadge(session.productivity);
+              const hasMultiSubs = Array.isArray(session.subjects) && session.subjects.length > 1;
 
               return (
                 <Card
@@ -240,7 +325,7 @@ export default function StudyHistoryScreen({ navigation }) {
                     <View style={styles.sessionInfo}>
                       <View style={styles.sessionTitleRow}>
                         <Text style={styles.sessionSubject} numberOfLines={1}>
-                          {subName}
+                          {subName} {hasMultiSubs ? `(+${session.subjects.length - 1} more)` : ''}
                         </Text>
                         <Text style={styles.sessionDuration}>
                           {formatDuration(session.durationMinutes || 0)}
@@ -259,6 +344,13 @@ export default function StudyHistoryScreen({ navigation }) {
                             {session.sessionType === 'manual' ? 'Manual' : 'Timer'}
                           </Text>
                         </View>
+
+                        {session.studyType === 'outside_syllabus' && (
+                          <View style={styles.outsideBadge}>
+                            <Globe size={11} color={colors.accent} style={{ marginRight: 4 }} />
+                            <Text style={styles.outsideBadgeText}>Outside Syllabus</Text>
+                          </View>
+                        )}
 
                         {prodBadge && (
                           <View style={[styles.prodBadge, { borderColor: prodBadge.color + '40' }]}>
@@ -298,71 +390,85 @@ export default function StudyHistoryScreen({ navigation }) {
               <TouchableOpacity
                 style={styles.closeBtn}
                 onPress={() => setSelectedSession(null)}
-                activeOpacity={0.7}
               >
-                <X size={20} color={colors.foreground} />
+                <X size={20} color={colors.mutedForeground} />
               </TouchableOpacity>
             </View>
 
             {selectedSession && (
               <ScrollView style={styles.modalScroll}>
-                <View style={styles.modalDetailItem}>
-                  <Text style={styles.modalLabel}>Subject</Text>
-                  <Text style={styles.modalValue}>
-                    {selectedSession.subject?.name || selectedSession.subjectName || 'General Study'}
+                <View style={styles.detailCard}>
+                  <Text style={styles.detailSubject}>
+                    {selectedSession.subjectName || selectedSession.subject?.name || 'General Study'}
                   </Text>
-                </View>
-
-                {Boolean(selectedSession.topic) && (
-                  <View style={styles.modalDetailItem}>
-                    <Text style={styles.modalLabel}>Topic</Text>
-                    <Text style={styles.modalValue}>{selectedSession.topic}</Text>
-                  </View>
-                )}
-
-                <View style={styles.modalDetailItem}>
-                  <Text style={styles.modalLabel}>Duration</Text>
-                  <Text style={styles.modalValue}>
+                  {Boolean(selectedSession.topic) && (
+                    <Text style={styles.detailTopic}>{selectedSession.topic}</Text>
+                  )}
+                  <Text style={styles.detailDuration}>
                     {formatDuration(selectedSession.durationMinutes || 0)}
                   </Text>
                 </View>
 
-                <View style={styles.modalDetailItem}>
-                  <Text style={styles.modalLabel}>Started At</Text>
-                  <Text style={styles.modalValue}>
-                    {new Date(selectedSession.startedAt).toLocaleString()}
-                  </Text>
-                </View>
+                {Array.isArray(selectedSession.subjects) && selectedSession.subjects.length > 0 && (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.sectionHeader}>Subjects & Topics:</Text>
+                    {selectedSession.subjects.map((sub, sIdx) => (
+                      <View key={`det_sub_${sIdx}`} style={styles.detailSubBlock}>
+                        <Text style={styles.detailSubTitle}>• {sub.subjectName || 'Subject'}</Text>
+                        {(sub.topics || []).map((top, tIdx) => (
+                          <View key={`det_top_${tIdx}`} style={styles.detailTopRow}>
+                            <Check size={12} color={top.completed ? '#10B981' : colors.mutedForeground} style={{ marginRight: 6 }} />
+                            <Text style={[styles.detailTopText, top.completed && { color: '#10B981', fontWeight: '600' }]}>
+                              {top.topicName} {top.completed ? '(Completed)' : ''}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    ))}
+                  </View>
+                )}
 
-                {Boolean(selectedSession.goal) && (
-                  <View style={styles.modalDetailItem}>
-                    <Text style={styles.modalLabel}>Session Goal</Text>
-                    <Text style={styles.modalValue}>{selectedSession.goal}</Text>
+                {Array.isArray(selectedSession.outsideSyllabus) && selectedSession.outsideSyllabus.length > 0 && (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.sectionHeader}>Outside Syllabus Content:</Text>
+                    {selectedSession.outsideSyllabus.map((out, oIdx) => (
+                      <View key={`det_out_${oIdx}`} style={styles.detailSubBlock}>
+                        <Text style={styles.detailSubTitle}>• {out.area || 'General Area'}</Text>
+                        {(out.topics || []).map((top, tIdx) => (
+                          <View key={`det_out_top_${tIdx}`} style={styles.detailTopRow}>
+                            <Check size={12} color={top.completed ? '#10B981' : colors.mutedForeground} style={{ marginRight: 6 }} />
+                            <Text style={[styles.detailTopText, top.completed && { color: '#10B981', fontWeight: '600' }]}>
+                              {top.name} {top.completed ? '(Completed)' : ''}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    ))}
                   </View>
                 )}
 
                 {Boolean(selectedSession.notes) && (
-                  <View style={styles.modalDetailItem}>
-                    <Text style={styles.modalLabel}>Accomplishments & Notes</Text>
-                    <Text style={styles.modalValue}>{selectedSession.notes}</Text>
-                  </View>
-                )}
-
-                {Boolean(selectedSession.task?.title) && (
-                  <View style={styles.modalDetailItem}>
-                    <Text style={styles.modalLabel}>Linked Task</Text>
-                    <Text style={styles.modalValue}>{selectedSession.task.title}</Text>
+                  <View style={styles.detailSection}>
+                    <Text style={styles.sectionHeader}>Notes / Reflection:</Text>
+                    <Text style={styles.notesText}>{selectedSession.notes}</Text>
                   </View>
                 )}
 
                 <View style={styles.modalActions}>
                   <Button
-                    variant="outline"
-                    style={{ borderColor: '#ef4444' }}
-                    onPress={() => handleDeletePrompt(selectedSession)}
-                    icon={<Trash2 size={16} color="#ef4444" style={{ marginRight: 6 }} />}
+                    style={{ flex: 1 }}
+                    onPress={() => handleOpenEdit(selectedSession)}
                   >
-                    <Text style={{ color: '#ef4444' }}>Delete Record</Text>
+                    <PenLine size={16} color={colors.primaryForeground} style={{ marginRight: 6 }} />
+                    Edit Study Log
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    style={{ flex: 1 }}
+                    onPress={() => handleDeletePrompt(selectedSession)}
+                  >
+                    <Trash2 size={16} color={colors.destructiveForeground} style={{ marginRight: 6 }} />
+                    Delete
                   </Button>
                 </View>
               </ScrollView>
@@ -370,75 +476,169 @@ export default function StudyHistoryScreen({ navigation }) {
           </View>
         </View>
       </Modal>
+
+      <Modal
+        visible={editModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setEditModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Edit Study Log</Text>
+              <TouchableOpacity onPress={() => setEditModalVisible(false)}>
+                <X size={20} color={colors.mutedForeground} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={{ paddingVertical: 10 }} keyboardShouldPersistTaps="handled">
+              <StudyTopicSelector
+                studyType={editStudyType}
+                onStudyTypeChange={setEditStudyType}
+                availableSubjects={availableSubjects}
+                selectedSubjects={editSubjects}
+                onSelectedSubjectsChange={setEditSubjects}
+                outsideSyllabus={editOutside}
+                onOutsideSyllabusChange={setEditOutside}
+                showCompletionCheckboxes={true}
+              />
+
+              <Field label="Duration (Minutes)">
+                <Input
+                  value={editDuration}
+                  onChangeText={setEditDuration}
+                  keyboardType="numeric"
+                  placeholder="45"
+                />
+              </Field>
+
+              <Field label="Productivity Rating">
+                <View style={styles.prodRow}>
+                  <TouchableOpacity
+                    style={[styles.prodOption, editProductivity === 'productive' && styles.prodOptionActive]}
+                    onPress={() => setEditProductivity('productive')}
+                    activeOpacity={0.7}
+                  >
+                    <Smile size={18} color={editProductivity === 'productive' ? colors.accent : colors.mutedForeground} />
+                    <Text style={[styles.prodText, editProductivity === 'productive' && styles.prodTextActive]}>
+                      Productive
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.prodOption, editProductivity === 'average' && styles.prodOptionActive]}
+                    onPress={() => setEditProductivity('average')}
+                    activeOpacity={0.7}
+                  >
+                    <Meh size={18} color={editProductivity === 'average' ? colors.accent : colors.mutedForeground} />
+                    <Text style={[styles.prodText, editProductivity === 'average' && styles.prodTextActive]}>
+                      Average
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.prodOption, editProductivity === 'difficult' && styles.prodOptionActive]}
+                    onPress={() => setEditProductivity('difficult')}
+                    activeOpacity={0.7}
+                  >
+                    <Frown size={18} color={editProductivity === 'difficult' ? '#F59E0B' : colors.mutedForeground} />
+                    <Text style={[styles.prodText, editProductivity === 'difficult' && styles.prodTextActive]}>
+                      Difficult
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </Field>
+
+              <Field label="Notes / Reflection">
+                <Input
+                  value={editNotes}
+                  onChangeText={setEditNotes}
+                  placeholder="Notes..."
+                  multiline
+                  numberOfLines={3}
+                  style={{ height: 70, textAlignVertical: 'top' }}
+                />
+              </Field>
+
+              <Button
+                onPress={handleSaveEdit}
+                loading={savingEdit}
+                style={{ marginTop: 14 }}
+              >
+                <Save size={18} color={colors.primaryForeground} style={{ marginRight: 8 }} />
+                Save Log Changes
+              </Button>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
-const createStyles = ({ colors, typography, spacing, radii }) =>
+const createStyles = (theme) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.background,
+      backgroundColor: theme.colors.background,
     },
     scroll: {
-      padding: spacing.lg,
-      paddingBottom: spacing.xxl,
+      padding: theme.spacing.lg,
+      paddingBottom: 40,
     },
     headerActions: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: spacing.xs,
+      gap: theme.spacing.sm,
     },
     headerBtn: {
-      paddingHorizontal: spacing.sm + 4,
+      height: 38,
+      paddingHorizontal: 12,
     },
     chartIconBtn: {
-      width: 40,
-      height: 40,
-      borderRadius: radii.round,
-      backgroundColor: colors.card,
+      width: 38,
+      height: 38,
+      borderRadius: theme.radii.md,
+      backgroundColor: theme.colors.card,
       borderWidth: 1,
-      borderColor: colors.cardBorder,
-      justifyContent: 'center',
+      borderColor: theme.colors.border,
       alignItems: 'center',
-      marginLeft: 4,
+      justifyContent: 'center',
     },
     groupSection: {
-      marginBottom: spacing.xl,
+      marginBottom: theme.spacing.xl,
     },
     groupHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: spacing.sm,
-      paddingHorizontal: 4,
+      marginBottom: theme.spacing.sm,
     },
     groupTitle: {
-      fontFamily: typography.mono.bold,
-      fontSize: 12,
-      letterSpacing: 1,
-      textTransform: 'uppercase',
-      color: colors.accent,
+      fontSize: 14,
+      fontWeight: '700',
+      color: theme.colors.foreground,
     },
     groupSummary: {
-      fontFamily: typography.sans.regular,
       fontSize: 12,
-      color: colors.mutedForeground,
+      color: theme.colors.mutedForeground,
     },
     sessionCard: {
-      marginBottom: spacing.sm,
-      padding: 0,
-      overflow: 'hidden',
+      marginBottom: theme.spacing.sm,
+      padding: theme.spacing.md,
     },
     sessionMainRow: {
       flexDirection: 'row',
+      alignItems: 'stretch',
     },
     colorBar: {
-      width: 5,
+      width: 4,
+      borderRadius: 2,
+      marginRight: theme.spacing.md,
     },
     sessionInfo: {
       flex: 1,
-      padding: spacing.md,
       gap: 4,
     },
     sessionTitleRow: {
@@ -447,55 +647,71 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
       alignItems: 'center',
     },
     sessionSubject: {
-      fontFamily: typography.sans.bold,
       fontSize: 15,
-      color: colors.foreground,
+      fontWeight: '700',
+      color: theme.colors.foreground,
       flex: 1,
-      marginRight: spacing.sm,
+      marginRight: 8,
     },
     sessionDuration: {
-      fontFamily: typography.mono.bold,
-      fontSize: 14,
-      color: colors.accent,
+      fontSize: 13,
+      fontWeight: '600',
+      color: theme.colors.accent,
     },
     sessionTopic: {
-      fontFamily: typography.sans.regular,
       fontSize: 13,
-      color: colors.mutedForeground,
+      color: theme.colors.mutedForeground,
     },
     sessionMetaRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: spacing.sm,
+      flexWrap: 'wrap',
+      gap: 8,
       marginTop: 4,
     },
     typeBadge: {
-      backgroundColor: colors.muted,
-      paddingHorizontal: spacing.xs + 2,
+      backgroundColor: theme.colors.background,
+      paddingHorizontal: 8,
       paddingVertical: 2,
-      borderRadius: radii.sm,
+      borderRadius: theme.radii.sm,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
     },
     typeBadgeText: {
-      fontFamily: typography.mono.regular,
       fontSize: 10,
-      color: colors.mutedForeground,
+      fontWeight: '600',
+      color: theme.colors.mutedForeground,
+    },
+    outsideBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: `${theme.colors.accent}12`,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: theme.radii.sm,
+      borderWidth: 1,
+      borderColor: `${theme.colors.accent}30`,
+    },
+    outsideBadgeText: {
+      fontSize: 10,
+      fontWeight: '600',
+      color: theme.colors.accent,
     },
     prodBadge: {
       flexDirection: 'row',
       alignItems: 'center',
-      borderWidth: 1,
-      paddingHorizontal: spacing.xs + 2,
+      paddingHorizontal: 8,
       paddingVertical: 2,
-      borderRadius: radii.sm,
+      borderRadius: theme.radii.sm,
+      borderWidth: 1,
     },
     prodBadgeText: {
-      fontFamily: typography.sans.medium,
       fontSize: 10,
+      fontWeight: '600',
     },
     timeText: {
-      fontFamily: typography.mono.regular,
       fontSize: 11,
-      color: colors.mutedForeground,
+      color: theme.colors.mutedForeground,
       marginLeft: 'auto',
     },
     modalOverlay: {
@@ -504,47 +720,130 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
       justifyContent: 'flex-end',
     },
     modalCard: {
-      backgroundColor: colors.card,
-      borderTopLeftRadius: radii.xxl,
-      borderTopRightRadius: radii.xxl,
-      maxHeight: '80%',
-      padding: spacing.xl,
+      backgroundColor: theme.colors.background,
+      borderTopLeftRadius: theme.radii.xl,
+      borderTopRightRadius: theme.radii.xl,
+      padding: theme.spacing.lg,
+      maxHeight: '88%',
     },
     modalHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: spacing.lg,
+      marginBottom: theme.spacing.md,
     },
     modalTitle: {
-      fontFamily: typography.serif.medium,
-      fontSize: 20,
-      color: colors.foreground,
+      fontSize: 18,
+      fontWeight: '700',
+      color: theme.colors.foreground,
     },
     closeBtn: {
       padding: 4,
     },
     modalScroll: {
-      gap: spacing.md,
+      paddingVertical: 4,
     },
-    modalDetailItem: {
-      marginBottom: spacing.md,
+    detailCard: {
+      backgroundColor: theme.colors.card,
+      borderRadius: theme.radii.lg,
+      padding: theme.spacing.md,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      marginBottom: theme.spacing.md,
+      alignItems: 'center',
     },
-    modalLabel: {
-      fontFamily: typography.mono.regular,
-      fontSize: 11,
-      textTransform: 'uppercase',
-      letterSpacing: 1,
-      color: colors.mutedForeground,
-      marginBottom: 2,
+    detailSubject: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: theme.colors.foreground,
+      textAlign: 'center',
     },
-    modalValue: {
-      fontFamily: typography.sans.medium,
-      fontSize: 15,
-      color: colors.foreground,
+    detailTopic: {
+      fontSize: 14,
+      color: theme.colors.mutedForeground,
+      textAlign: 'center',
+      marginTop: 4,
+    },
+    detailDuration: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: theme.colors.accent,
+      marginTop: 8,
+    },
+    detailSection: {
+      marginBottom: theme.spacing.md,
+    },
+    sectionHeader: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: theme.colors.mutedForeground,
+      marginBottom: 6,
+    },
+    detailSubBlock: {
+      backgroundColor: theme.colors.card,
+      borderRadius: theme.radii.md,
+      padding: theme.spacing.sm,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      marginBottom: 6,
+    },
+    detailSubTitle: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: theme.colors.foreground,
+      marginBottom: 4,
+    },
+    detailTopRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginLeft: 12,
+      marginVertical: 2,
+    },
+    detailTopText: {
+      fontSize: 12,
+      color: theme.colors.mutedForeground,
+    },
+    notesText: {
+      fontSize: 14,
+      color: theme.colors.foreground,
+      backgroundColor: theme.colors.card,
+      borderRadius: theme.radii.md,
+      padding: theme.spacing.md,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
     },
     modalActions: {
-      marginTop: spacing.lg,
-      marginBottom: spacing.xl,
+      flexDirection: 'row',
+      gap: theme.spacing.md,
+      marginTop: theme.spacing.md,
+    },
+    prodRow: {
+      flexDirection: 'row',
+      gap: theme.spacing.xs,
+    },
+    prodOption: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 10,
+      paddingHorizontal: 8,
+      borderRadius: theme.radii.md,
+      backgroundColor: theme.colors.background,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      gap: 6,
+    },
+    prodOptionActive: {
+      borderColor: theme.colors.accent,
+      backgroundColor: `${theme.colors.accent}12`,
+    },
+    prodText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: theme.colors.mutedForeground,
+    },
+    prodTextActive: {
+      color: theme.colors.foreground,
     },
   });

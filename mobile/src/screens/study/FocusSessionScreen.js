@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useRef } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   BackHandler,
   SafeAreaView,
   StatusBar,
+  Modal,
+  ScrollView,
 } from 'react-native';
 import {
   Pause,
@@ -15,15 +17,18 @@ import {
   X,
   BookOpen,
   Target,
-  Flame,
-  Sparkles
+  Sparkles,
+  Plus
 } from 'lucide-react-native';
 import { StudySessionContext } from '../../context/StudySessionContext';
+import { StudyTopicSelector } from '../../components/study/StudyTopicSelector';
+import { getSubjects } from '../../api/subjects';
 import { useAppDialog } from '../../components/ui/AppDialog';
-import { typography, spacing, radii, useAppTheme, useStyles } from '../../theme/theme';
+import { Button } from '../../components/ui/Button';
+import { useAppTheme, useStyles } from '../../theme/theme';
 
 export default function FocusSessionScreen({ navigation }) {
-  const { colors, typography, spacing, radii, isDark } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
   const styles = useStyles(createStyles);
   const { showDialog } = useAppDialog();
   const isEndingRef = useRef(false);
@@ -35,7 +40,14 @@ export default function FocusSessionScreen({ navigation }) {
     resumeSession,
     endSession,
     discardSession,
+    updateActiveSessionData,
   } = useContext(StudySessionContext);
+
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [availableSubjects, setAvailableSubjects] = useState([]);
+  const [tempStudyType, setTempStudyType] = useState('syllabus');
+  const [tempSubjects, setTempSubjects] = useState([]);
+  const [tempOutside, setTempOutside] = useState([]);
 
   useEffect(() => {
     if (!activeSession) {
@@ -53,6 +65,12 @@ export default function FocusSessionScreen({ navigation }) {
     return () => backHandler.remove();
   }, [activeSession]);
 
+  useEffect(() => {
+    getSubjects()
+      .then((res) => setAvailableSubjects(res.data || res || []))
+      .catch(() => setAvailableSubjects([]));
+  }, []);
+
   const formatTimer = (totalSec) => {
     const hrs = Math.floor(totalSec / 3600);
     const mins = Math.floor((totalSec % 3600) / 60);
@@ -63,6 +81,39 @@ export default function FocusSessionScreen({ navigation }) {
       return `${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
     }
     return `${pad(mins)}:${pad(secs)}`;
+  };
+
+  const handleOpenTopicModal = () => {
+    if (!activeSession) return;
+    setTempStudyType(activeSession.studyType || 'syllabus');
+    setTempSubjects(activeSession.subjects || []);
+    setTempOutside(activeSession.outsideSyllabus || []);
+    setEditModalVisible(true);
+  };
+
+  const handleSaveLiveTopics = () => {
+    let summarySubName = activeSession.subjectName || 'General Study';
+    let summaryTopic = activeSession.topic || '';
+
+    if (tempStudyType === 'syllabus' && tempSubjects.length > 0) {
+      summarySubName = tempSubjects[0].subjectName || summarySubName;
+      const allTopNames = tempSubjects.flatMap(s => (s.topics || []).map(t => t.topicName)).filter(Boolean);
+      if (allTopNames.length > 0) summaryTopic = allTopNames.join(', ');
+    } else if (tempStudyType === 'outside_syllabus' && tempOutside.length > 0) {
+      summarySubName = tempOutside[0].area || 'Outside Syllabus';
+      const allTopNames = tempOutside.flatMap(o => (o.topics || []).map(t => t.name)).filter(Boolean);
+      if (allTopNames.length > 0) summaryTopic = allTopNames.join(', ');
+    }
+
+    updateActiveSessionData({
+      studyType: tempStudyType,
+      subjects: tempSubjects,
+      outsideSyllabus: tempOutside,
+      subjectName: summarySubName,
+      topic: summaryTopic,
+    });
+
+    setEditModalVisible(false);
   };
 
   const handleEnd = () => {
@@ -114,7 +165,6 @@ export default function FocusSessionScreen({ navigation }) {
       </View>
 
       <View style={styles.focusCenter}>
-
         <View style={[styles.statusBadge, isPaused && styles.statusBadgePaused]}>
           <View style={[styles.statusDot, isPaused && styles.statusDotPaused]} />
           <Text style={[styles.statusText, isPaused && styles.statusTextPaused]}>
@@ -148,12 +198,20 @@ export default function FocusSessionScreen({ navigation }) {
               </Text>
             </View>
           )}
+
+          <TouchableOpacity
+            style={styles.addTopicBtn}
+            onPress={handleOpenTopicModal}
+            activeOpacity={0.7}
+          >
+            <Plus size={14} color={colors.accent} style={{ marginRight: 4 }} />
+            <Text style={styles.addTopicBtnText}>Add / Edit Topics</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
       <View style={styles.bottomControls}>
         <View style={styles.controlsRow}>
-
           {isPaused ? (
             <TouchableOpacity
               style={[styles.actionBtn, styles.resumeBtn]}
@@ -184,169 +242,234 @@ export default function FocusSessionScreen({ navigation }) {
           </TouchableOpacity>
         </View>
       </View>
+
+      <Modal
+        visible={editModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setEditModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Add / Edit Live Topics</Text>
+              <TouchableOpacity onPress={() => setEditModalVisible(false)}>
+                <X size={20} color={colors.mutedForeground} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={{ paddingVertical: 10 }} keyboardShouldPersistTaps="handled">
+              <StudyTopicSelector
+                studyType={tempStudyType}
+                onStudyTypeChange={setTempStudyType}
+                availableSubjects={availableSubjects}
+                selectedSubjects={tempSubjects}
+                onSelectedSubjectsChange={setTempSubjects}
+                outsideSyllabus={tempOutside}
+                onOutsideSyllabusChange={setTempOutside}
+                showCompletionCheckboxes={false}
+              />
+            </ScrollView>
+
+            <Button onPress={handleSaveLiveTopics} style={{ marginTop: 10 }}>
+              Update Session Topics
+            </Button>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
 
-const createStyles = ({ colors, typography, spacing, radii }) =>
+const createStyles = (theme) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.background,
+      backgroundColor: theme.colors.background,
     },
     topBar: {
       flexDirection: 'row',
-      alignItems: 'center',
       justifyContent: 'space-between',
-      paddingHorizontal: spacing.lg,
-      paddingVertical: spacing.md,
+      alignItems: 'center',
+      paddingHorizontal: theme.spacing.lg,
+      paddingTop: theme.spacing.md,
     },
     brandRow: {
       flexDirection: 'row',
       alignItems: 'center',
     },
     brandText: {
-      fontFamily: typography.mono.bold,
       fontSize: 12,
-      letterSpacing: 2,
-      color: colors.mutedForeground,
+      fontWeight: '800',
+      letterSpacing: 1.2,
+      color: theme.colors.accent,
     },
     cancelBtn: {
-      width: 36,
-      height: 36,
-      borderRadius: radii.round,
-      backgroundColor: colors.card,
-      borderWidth: 1,
-      borderColor: colors.cardBorder,
-      justifyContent: 'center',
-      alignItems: 'center',
+      padding: 8,
     },
     focusCenter: {
       flex: 1,
       justifyContent: 'center',
       alignItems: 'center',
-      paddingHorizontal: spacing.xl,
+      paddingHorizontal: theme.spacing.lg,
     },
     statusBadge: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: colors.card,
-      borderColor: colors.accent,
+      backgroundColor: theme.colors.card,
       borderWidth: 1,
-      borderRadius: radii.round,
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.xs,
-      marginBottom: spacing.xxl,
+      borderColor: theme.colors.border,
+      paddingHorizontal: 14,
+      paddingVertical: 6,
+      borderRadius: 20,
+      marginBottom: theme.spacing.xl,
     },
     statusBadgePaused: {
-      borderColor: colors.mutedForeground,
+      borderColor: '#F59E0B',
     },
     statusDot: {
       width: 8,
       height: 8,
       borderRadius: 4,
-      backgroundColor: colors.accent,
+      backgroundColor: '#10B981',
       marginRight: 8,
     },
     statusDotPaused: {
-      backgroundColor: colors.mutedForeground,
+      backgroundColor: '#F59E0B',
     },
     statusText: {
-      fontFamily: typography.mono.bold,
       fontSize: 11,
-      letterSpacing: 1.5,
-      color: colors.accent,
+      fontWeight: '700',
+      letterSpacing: 1,
+      color: theme.colors.foreground,
     },
     statusTextPaused: {
-      color: colors.mutedForeground,
+      color: '#F59E0B',
     },
     timerWrapper: {
-      marginVertical: spacing.lg,
-      alignItems: 'center',
+      marginBottom: theme.spacing.xl,
     },
     timerText: {
-      fontFamily: typography.mono.bold,
-      fontSize: 58,
-      letterSpacing: 2,
-      color: colors.foreground,
+      fontSize: 56,
+      fontWeight: '300',
+      fontVariant: ['tabular-nums'],
+      color: theme.colors.foreground,
+      letterSpacing: 1,
     },
     subjectCard: {
       width: '100%',
-      backgroundColor: colors.card,
-      borderRadius: radii.xl,
+      backgroundColor: theme.colors.card,
+      borderRadius: theme.radii.xl,
       borderWidth: 1,
-      borderColor: colors.cardBorder,
-      padding: spacing.lg,
-      marginTop: spacing.xl,
+      borderColor: theme.colors.border,
+      padding: theme.spacing.lg,
       alignItems: 'center',
-      gap: spacing.xs,
+      gap: theme.spacing.xs,
     },
     subjectHeader: {
       flexDirection: 'row',
       alignItems: 'center',
     },
     subjectName: {
-      fontFamily: typography.serif.medium,
-      fontSize: 18,
-      color: colors.foreground,
+      fontSize: 16,
+      fontWeight: '700',
+      color: theme.colors.foreground,
     },
     topicText: {
-      fontFamily: typography.sans.medium,
       fontSize: 14,
-      color: colors.mutedForeground,
+      color: theme.colors.mutedForeground,
       textAlign: 'center',
     },
     goalRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginTop: spacing.xs,
+      marginTop: 4,
     },
     goalText: {
-      fontFamily: typography.sans.regular,
       fontSize: 12,
-      color: colors.mutedForeground,
+      color: theme.colors.mutedForeground,
+      fontStyle: 'italic',
+    },
+    addTopicBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: theme.radii.md,
+      backgroundColor: theme.colors.background,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    addTopicBtnText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: theme.colors.accent,
     },
     bottomControls: {
-      paddingHorizontal: spacing.lg,
-      paddingBottom: spacing.xl,
+      paddingHorizontal: theme.spacing.lg,
+      paddingBottom: theme.spacing.xl,
     },
     controlsRow: {
       flexDirection: 'row',
-      gap: spacing.md,
+      gap: theme.spacing.md,
     },
     actionBtn: {
       flex: 1,
+      height: 56,
+      borderRadius: theme.radii.xl,
       flexDirection: 'row',
-      alignItems: 'center',
       justifyContent: 'center',
-      paddingVertical: spacing.lg,
-      borderRadius: radii.xl,
-      gap: spacing.sm,
+      alignItems: 'center',
+      gap: 8,
     },
     pauseBtn: {
-      backgroundColor: colors.card,
+      backgroundColor: theme.colors.card,
       borderWidth: 1,
-      borderColor: colors.cardBorder,
+      borderColor: theme.colors.border,
     },
     pauseBtnText: {
-      fontFamily: typography.sans.semiBold,
       fontSize: 16,
-      color: colors.foreground,
+      fontWeight: '700',
+      color: theme.colors.foreground,
     },
     resumeBtn: {
-      backgroundColor: colors.accent,
+      backgroundColor: theme.colors.primary,
     },
     resumeBtnText: {
-      fontFamily: typography.sans.bold,
       fontSize: 16,
-      color: colors.primaryForeground,
+      fontWeight: '700',
+      color: theme.colors.primaryForeground,
     },
     endBtn: {
-      backgroundColor: colors.primary,
+      backgroundColor: theme.colors.accent,
     },
     endBtnText: {
-      fontFamily: typography.sans.bold,
       fontSize: 16,
-      color: colors.primaryForeground,
+      fontWeight: '700',
+      color: theme.colors.primaryForeground,
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      justifyContent: 'flex-end',
+    },
+    modalCard: {
+      backgroundColor: theme.colors.background,
+      borderTopLeftRadius: theme.radii.xl,
+      borderTopRightRadius: theme.radii.xl,
+      padding: theme.spacing.lg,
+      maxHeight: '85%',
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: theme.spacing.md,
+    },
+    modalTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: theme.colors.foreground,
     },
   });

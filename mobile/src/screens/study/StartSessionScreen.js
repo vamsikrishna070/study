@@ -7,18 +7,13 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
 } from 'react-native';
 import {
   Play,
-  BookOpen,
   Sparkles,
   RotateCcw,
   BarChart2,
   Target,
-  ListChecks,
-  CalendarDays,
-  PenLine
 } from 'lucide-react-native';
 import { Header } from '../../components/ui/Header';
 import { PageHeading } from '../../components/ui/PageHeading';
@@ -27,15 +22,15 @@ import { Button } from '../../components/ui/Button';
 import { Field } from '../../components/ui/Field';
 import { Input } from '../../components/ui/Input';
 import { SelectPicker } from '../../components/ui/SelectPicker';
+import { StudyTopicSelector } from '../../components/study/StudyTopicSelector';
 import { StudySessionContext } from '../../context/StudySessionContext';
 import { getSubjects } from '../../api/subjects';
-import { getTopics } from '../../api/syllabus';
 import { getTasks } from '../../api/tasks';
 import { getExams } from '../../api/exams';
-import { typography, spacing, radii, useAppTheme, useStyles } from '../../theme/theme';
+import { useAppTheme, useStyles } from '../../theme/theme';
 
 export default function StartSessionScreen({ navigation, route }) {
-  const { colors, typography, spacing, radii } = useAppTheme();
+  const { colors } = useAppTheme();
   const styles = useStyles(createStyles);
   const { activeSession, startSession } = useContext(StudySessionContext);
 
@@ -44,12 +39,12 @@ export default function StartSessionScreen({ navigation, route }) {
   const initialExamId = route.params?.examId || null;
   const initialTopic = route.params?.topic || '';
 
+  const [studyType, setStudyType] = useState('syllabus');
   const [subjects, setSubjects] = useState([]);
-  const [selectedSubjectId, setSelectedSubjectId] = useState(initialSubjectId);
-  const [syllabusTopics, setSyllabusTopics] = useState([]);
-  const [selectedTopic, setSelectedTopic] = useState(initialTopic);
-  const [customTopic, setCustomTopic] = useState('');
-  const [topicMode, setTopicMode] = useState('picker');
+  const [selectedSubjects, setSelectedSubjects] = useState([]);
+  const [outsideSyllabus, setOutsideSyllabus] = useState([
+    { area: '', topics: [] }
+  ]);
   const [tasks, setTasks] = useState([]);
   const [selectedTaskId, setSelectedTaskId] = useState(initialTaskId);
   const [exams, setExams] = useState([]);
@@ -77,68 +72,62 @@ export default function StartSessionScreen({ navigation, route }) {
       setTasks((tasksRes.data || tasksRes || []).filter((t) => !t.completed));
       setExams(examsRes.data || examsRes || []);
 
-      if (!selectedSubjectId && subList.length > 0) {
-        setSelectedSubjectId(subList[0]._id || subList[0].id);
+      if (subList.length > 0 && selectedSubjects.length === 0) {
+        const initSub = initialSubjectId
+          ? subList.find((s) => (s._id || s.id) === initialSubjectId) || subList[0]
+          : subList[0];
+
+        setSelectedSubjects([
+          {
+            subjectId: initSub._id || initSub.id,
+            subjectName: initSub.name,
+            topics: initialTopic ? [{ topicId: null, topicName: initialTopic, completed: false }] : [],
+          },
+        ]);
       }
     } catch (err) {
-      console.error('[StartSession] Error loading form dependencies:', err);
+      console.error('[StartSession] Error loading dependencies:', err);
     } finally {
       setLoading(false);
     }
-  }, [selectedSubjectId]);
+  }, [initialSubjectId, initialTopic]);
 
   useEffect(() => {
     loadFormData();
   }, [loadFormData]);
 
-  useEffect(() => {
-    if (!selectedSubjectId) {
-      setSyllabusTopics([]);
-      return;
+  const handleStart = async () => {
+    let primarySubjectId = null;
+    let primarySubjectName = 'General Study';
+    let primaryTopic = 'General Study';
+
+    if (studyType === 'syllabus' && selectedSubjects.length > 0) {
+      primarySubjectId = selectedSubjects[0].subjectId || null;
+      primarySubjectName = selectedSubjects[0].subjectName || 'General Study';
+      if (selectedSubjects[0].topics && selectedSubjects[0].topics.length > 0) {
+        primaryTopic = selectedSubjects[0].topics.map((t) => t.topicName).join(', ');
+      }
+    } else if (studyType === 'outside_syllabus' && outsideSyllabus.length > 0) {
+      primarySubjectName = outsideSyllabus[0].area || 'Outside Syllabus';
+      if (outsideSyllabus[0].topics && outsideSyllabus[0].topics.length > 0) {
+        primaryTopic = outsideSyllabus[0].topics.map((t) => t.name).join(', ');
+      }
     }
 
-    getTopics(selectedSubjectId)
-      .then((res) => {
-        const list = res.data || res || [];
-        setSyllabusTopics(list);
-        if (list.length > 0 && !initialTopic) {
-          setSelectedTopic(list[0].title || '');
-          setTopicMode('picker');
-        } else if (list.length === 0) {
-          setTopicMode('custom');
-        }
-      })
-      .catch(() => {
-        setSyllabusTopics([]);
-        setTopicMode('custom');
-      });
-  }, [selectedSubjectId, initialTopic]);
-
-  const handleStart = async () => {
-    const chosenSubject = subjects.find((s) => (s._id || s.id) === selectedSubjectId);
-    const finalTopic = topicMode === 'picker' ? selectedTopic : customTopic.trim();
-
     await startSession({
-      subjectId: selectedSubjectId || null,
-      subjectName: chosenSubject?.name || 'General Study',
-      topic: finalTopic || 'General Study',
+      subjectId: primarySubjectId,
+      subjectName: primarySubjectName,
+      topic: primaryTopic,
       taskId: selectedTaskId || null,
       examId: selectedExamId || null,
       goal: goal.trim(),
+      studyType,
+      subjects: selectedSubjects,
+      outsideSyllabus,
     });
 
     navigation.replace('FocusSession');
   };
-
-  const subjectOptions = subjects.map((s) => ({
-    label: `${s.name} (${s.code || 'Sub'})`,
-    value: s._id || s.id,
-  }));
-
-  const topicOptions = syllabusTopics.map((t) => ({
-    label: t.title,
-    value: t.title,
-  }));
 
   const taskOptions = [
     { label: 'None (Unlinked)', value: '' },
@@ -165,20 +154,21 @@ export default function StartSessionScreen({ navigation, route }) {
       >
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <PageHeading
-            eyebrow="Focused Study"
+            eyebrow="Focus Mode"
             title="Start Study Session"
-            detail="Dedicate distraction-free time to your subject, topic, and goals."
+            detail="Configure your session goals, subjects, and topics to begin."
             action={
               <View style={styles.headerActions}>
-                <TouchableOpacity
-                  style={styles.headerBtn}
+                <Button
+                  variant="outline"
                   onPress={() => navigation.navigate('StudyHistory')}
-                  activeOpacity={0.7}
-                >
-                  <RotateCcw size={18} color={colors.foreground} />
-                </TouchableOpacity>
-                <TouchableOpacity
                   style={styles.headerBtn}
+                >
+                  <RotateCcw size={16} color={colors.foreground} style={{ marginRight: 6 }} />
+                  History
+                </Button>
+                <TouchableOpacity
+                  style={styles.chartIconBtn}
                   onPress={() => navigation.navigate('StudyAnalytics')}
                   activeOpacity={0.7}
                 >
@@ -188,193 +178,93 @@ export default function StartSessionScreen({ navigation, route }) {
             }
           />
 
-          {loading ? (
-            <View style={styles.loadingBox}>
-              <ActivityIndicator size="large" color={colors.primary} />
-            </View>
-          ) : (
-            <View style={styles.form}>
+          <Card style={styles.formCard}>
+            <StudyTopicSelector
+              studyType={studyType}
+              onStudyTypeChange={setStudyType}
+              availableSubjects={subjects}
+              selectedSubjects={selectedSubjects}
+              onSelectedSubjectsChange={setSelectedSubjects}
+              outsideSyllabus={outsideSyllabus}
+              onOutsideSyllabusChange={setOutsideSyllabus}
+              showCompletionCheckboxes={false}
+            />
 
-              <Field label="Subject" hint="What subject are you tackling?">
-                <SelectPicker
-                  value={selectedSubjectId}
-                  onValueChange={setSelectedSubjectId}
-                  options={subjectOptions}
-                  placeholder="Select your subject"
-                />
-              </Field>
+            <Field label="Linked Task (Optional)" hint="Link a task to mark completed when session finishes">
+              <SelectPicker
+                value={selectedTaskId}
+                onChange={setSelectedTaskId}
+                options={taskOptions}
+                placeholder="Select a task to focus on..."
+              />
+            </Field>
 
-              <Field label="Topic" hint="Choose a syllabus topic or enter a custom one">
-                {syllabusTopics.length > 0 && (
-                  <View style={styles.topicModeToggle}>
-                    <TouchableOpacity
-                      style={[styles.toggleTab, topicMode === 'picker' && styles.toggleTabActive]}
-                      onPress={() => setTopicMode('picker')}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.toggleTabText, topicMode === 'picker' && styles.toggleTabTextActive]}>
-                        From Syllabus ({syllabusTopics.length})
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.toggleTab, topicMode === 'custom' && styles.toggleTabActive]}
-                      onPress={() => setTopicMode('custom')}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.toggleTabText, topicMode === 'custom' && styles.toggleTabTextActive]}>
-                        Custom Topic
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
+            <Field label="Linked Exam (Optional)" hint="Target an upcoming exam for this study session">
+              <SelectPicker
+                value={selectedExamId}
+                onChange={setSelectedExamId}
+                options={examOptions}
+                placeholder="Select an exam..."
+              />
+            </Field>
 
-                {topicMode === 'picker' && syllabusTopics.length > 0 ? (
-                  <SelectPicker
-                    value={selectedTopic}
-                    onValueChange={setSelectedTopic}
-                    options={topicOptions}
-                    placeholder="Select topic from syllabus"
-                  />
-                ) : (
-                  <Input
-                    value={customTopic}
-                    onChangeText={setCustomTopic}
-                    placeholder="What topic are you studying?"
-                  />
-                )}
-              </Field>
+            <Field label="Session Goal (Optional)" hint="A clear focus outcome for this session">
+              <Input
+                value={goal}
+                onChangeText={setGoal}
+                placeholder="e.g. Solve 10 practice problems, read Chapter 4..."
+              />
+            </Field>
 
-              <Field label="Session Goal (Optional)" hint="A clear focus outcome for this session">
-                <Input
-                  value={goal}
-                  onChangeText={setGoal}
-                  placeholder="Add session goal"
-                />
-              </Field>
-
-              {tasks.length > 0 && (
-                <Field label="Linked Task (Optional)">
-                  <SelectPicker
-                    value={selectedTaskId}
-                    onValueChange={setSelectedTaskId}
-                    options={taskOptions}
-                    placeholder="None (Unlinked)"
-                  />
-                </Field>
-              )}
-
-              {exams.length > 0 && (
-                <Field label="Linked Exam (Optional)">
-                  <SelectPicker
-                    value={selectedExamId}
-                    onValueChange={setSelectedExamId}
-                    options={examOptions}
-                    placeholder="None (Unlinked)"
-                  />
-                </Field>
-              )}
-
-              <View style={styles.actionSection}>
-                <Button
-                  onPress={handleStart}
-                  style={styles.startButton}
-                  icon={<Play size={18} color={colors.primaryForeground} style={{ marginRight: 8 }} />}
-                >
-                  Start Studying
-                </Button>
-
-                <TouchableOpacity
-                  style={styles.manualLogBtn}
-                  onPress={() => navigation.navigate('LogSession')}
-                  activeOpacity={0.7}
-                >
-                  <PenLine size={16} color={colors.accent} style={{ marginRight: 6 }} />
-                  <Text style={styles.manualLogText}>Log Past Session Manually</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
+            <Button
+              onPress={handleStart}
+              style={styles.startBtn}
+            >
+              <Play size={18} color={colors.primaryForeground} style={{ marginRight: 8 }} />
+              Start Focus Timer
+            </Button>
+          </Card>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
   );
 }
 
-const createStyles = ({ colors, typography, spacing, radii }) =>
+const createStyles = (theme) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.background,
+      backgroundColor: theme.colors.background,
     },
     scroll: {
-      padding: spacing.lg,
-      paddingBottom: spacing.xxl,
+      padding: theme.spacing.lg,
+      paddingBottom: 40,
     },
     headerActions: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: spacing.sm,
+      gap: theme.spacing.sm,
     },
     headerBtn: {
-      width: 40,
-      height: 40,
-      borderRadius: radii.round,
-      backgroundColor: colors.card,
+      height: 38,
+      paddingHorizontal: 12,
+    },
+    chartIconBtn: {
+      width: 38,
+      height: 38,
+      borderRadius: theme.radii.md,
+      backgroundColor: theme.colors.card,
       borderWidth: 1,
-      borderColor: colors.cardBorder,
+      borderColor: theme.colors.border,
+      alignItems: 'center',
       justifyContent: 'center',
-      alignItems: 'center',
     },
-    loadingBox: {
-      paddingVertical: spacing.xxl,
-      alignItems: 'center',
+    formCard: {
+      padding: theme.spacing.md,
+      gap: theme.spacing.md,
     },
-    form: {
-      gap: spacing.lg,
-      marginTop: spacing.md,
-    },
-    topicModeToggle: {
-      flexDirection: 'row',
-      backgroundColor: colors.muted,
-      borderRadius: radii.lg,
-      padding: 3,
-      marginBottom: spacing.sm,
-    },
-    toggleTab: {
-      flex: 1,
-      paddingVertical: spacing.xs + 2,
-      alignItems: 'center',
-      borderRadius: radii.md,
-    },
-    toggleTabActive: {
-      backgroundColor: colors.card,
-    },
-    toggleTabText: {
-      fontFamily: typography.sans.medium,
-      fontSize: 12,
-      color: colors.mutedForeground,
-    },
-    toggleTabTextActive: {
-      color: colors.foreground,
-      fontFamily: typography.sans.semiBold,
-    },
-    actionSection: {
-      marginTop: spacing.md,
-      gap: spacing.md,
-      alignItems: 'center',
-    },
-    startButton: {
-      width: '100%',
-      paddingVertical: spacing.md,
-    },
-    manualLogBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: spacing.sm,
-    },
-    manualLogText: {
-      fontFamily: typography.sans.semiBold,
-      fontSize: 14,
-      color: colors.accent,
+    startBtn: {
+      marginTop: theme.spacing.md,
+      height: 52,
     },
   });

@@ -3,9 +3,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MD3LightTheme, MD3DarkTheme } from 'react-native-paper';
 
 export const typography = {
-  sans: { regular: 'Manrope_400Regular', medium: 'Manrope_500Medium', semiBold: 'Manrope_600SemiBold', bold: 'Manrope_700Bold', extraBold: 'Manrope_800ExtraBold' },
-  serif: { medium: 'Newsreader_500Medium', semiBold: 'Newsreader_600SemiBold' },
-  mono: { regular: 'DMMono_400Regular', medium: 'DMMono_500Medium' },
+  sans: { regular: 'Manrope_400Regular', medium: 'Manrope_500Medium', semiBold: 'Manrope_600SemiBold', bold: 'Manrope_700Bold', extraBold: 'Manrope_800ExtraBold', semibold: 'Manrope_600SemiBold' },
+  serif: { regular: 'Newsreader_500Medium', medium: 'Newsreader_500Medium', semiBold: 'Newsreader_600SemiBold', bold: 'Newsreader_600SemiBold' },
+  mono: { regular: 'DMMono_400Regular', medium: 'DMMono_500Medium', semiBold: 'DMMono_500Medium', bold: 'DMMono_500Medium' },
+  regular: 'Manrope_400Regular',
+  medium: 'Manrope_500Medium',
+  semiBold: 'Manrope_600SemiBold',
+  bold: 'Manrope_700Bold',
+  extraBold: 'Manrope_800ExtraBold',
 };
 
 export const spacing = { xs: 4, sm: 8, md: 16, lg: 20, xl: 28, xxl: 36 };
@@ -25,6 +30,11 @@ const darkColors = {
 };
 
 const defaultFonts = {
+  regular: { fontFamily: typography.sans.regular, fontWeight: 'normal' },
+  medium: { fontFamily: typography.sans.medium, fontWeight: '500' },
+  semiBold: { fontFamily: typography.sans.semiBold, fontWeight: '600' },
+  bold: { fontFamily: typography.sans.bold, fontWeight: 'bold' },
+  heavy: { fontFamily: typography.sans.extraBold, fontWeight: '900' },
   bodyMedium: { fontFamily: typography.sans.medium },
   bodyLarge: { fontFamily: typography.sans.regular },
   labelLarge: { fontFamily: typography.sans.bold },

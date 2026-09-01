@@ -18,6 +18,7 @@ export function SelectPicker({
   label,
   value,
   onValueChange,
+  onChange,
   options = [],
   placeholder = 'Select an option',
   disabled = false,
@@ -28,6 +29,8 @@ export function SelectPicker({
   const styles = useStyles(createStyles);
   const [modalVisible, setModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  const changeHandler = onValueChange || onChange;
 
   const normalizedOptions = options.map((opt) =>
     typeof opt === 'object' && opt !== null
@@ -42,7 +45,7 @@ export function SelectPicker({
   );
 
   const handleSelect = (val) => {
-    onValueChange?.(val);
+    changeHandler?.(val);
     setModalVisible(false);
     setSearchQuery('');
   };
