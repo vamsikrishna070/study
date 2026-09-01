@@ -73,7 +73,6 @@ export async function getStatus(req, res) {
 
 export async function syncPortal(req, res) {
   try {
-    console.log(`[PORTAL] Manual sync request for user ${req.user._id}`);
     const data = await reSyncPortalData(req.user._id);
     return res.json({
       success: true,
@@ -129,9 +128,7 @@ export async function disconnectPortal(req, res) {
 export async function getTodayAttendance(req, res) {
   try {
     const userId = req.user._id;
-    console.log(`[PORTAL] GET /api/portal/attendance/today for User ID: ${userId}`);
     const data = await getCurrentAttendance(userId);
-    console.log(`[PORTAL] Attendance loaded: ${data.subjectStats?.length || 0} subject-wise logs, ${data.attendance?.length || 0} today slots, overall: ${data.overallAttendance?.percentage || 0}%`);
     res.json({
       success: true,
       data,
@@ -139,11 +136,7 @@ export async function getTodayAttendance(req, res) {
       lastSyncedAt: data.lastSynced || new Date().toISOString(),
     });
   } catch (error) {
-    console.error('[PortalController] getTodayAttendance ERROR DETAILS:', {
-      message: error.message,
-      stack: error.stack,
-      name: error.name,
-    });
+    console.error('[PortalController] getTodayAttendance failed:', error.message);
     res.status(500).json({
       success: false,
       message: "We couldn't load today's attendance right now. Please try again.",
@@ -163,9 +156,9 @@ export async function markAttendance(req, res) {
       });
     }
 
-    console.log(`[PORTAL] Submitting attendance code for user ${req.user._id}...`);
+    console.log(`[ATTENDANCE] Attendance code submission started`);
     const result = await submitAttendanceCode(req.user._id, attendanceCode.trim());
-    console.log(`[PORTAL] Code submission result: ${result.success ? 'SUCCESS' : result.code}`);
+    console.log(`[ATTENDANCE] Attendance code submission ${result.success ? 'succeeded' : 'failed'}`);
     if (!result.success) {
       const statusCode = result.code === 'PORTAL_SESSION_EXPIRED' ? 401 : 400;
       return res.status(statusCode).json(result);
@@ -177,7 +170,7 @@ export async function markAttendance(req, res) {
       data: result,
     });
   } catch (error) {
-    console.error('[PortalController] markAttendance error:', error.message);
+    console.error('[ATTENDANCE] Attendance code submission failed:', error.message);
     res.status(500).json({
       success: false,
       code: 'PORTAL_UNAVAILABLE',
@@ -190,10 +183,8 @@ export async function markAttendance(req, res) {
 export async function getTimetableData(req, res) {
   try {
     const userId = req.user._id;
-    console.log(`[PORTAL] GET /api/portal/timetable for User ID: ${userId}`);
     const data = await getTimetable(userId);
     const dayCount = Object.keys(data.timetable || {}).length;
-    console.log(`[PORTAL] Timetable loaded: ${dayCount} days schedule`);
     res.json({
       success: true,
       data,

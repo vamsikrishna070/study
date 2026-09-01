@@ -213,7 +213,7 @@ async function solveCaptchaOcr(imageBuffer) {
 }
 
 export async function attemptSrmLogin(username, password) {
-  console.log(`[SRM LOGIN] Login attempt started for SRM username: ${username}`);
+  console.log(`[SRM LOGIN] SRM Portal login started`);
   const MAX_RETRIES = 3;
   let lastErrorReason = null;
 
@@ -279,7 +279,7 @@ export async function attemptSrmLogin(username, password) {
     const isLoginPage = html.includes('txtUserName') || html.includes('txtAuthKey');
     const isSuccess = !isLoginPage && (Boolean(nameMatch) || /HRDSystem|tblSubjectWiseAttendance|Welcome|Logout|profile_pic/i.test(html));
     if (isSuccess) {
-      console.log(`[SRM LOGIN] SRM Portal login succeeded for username: ${username} on attempt ${attempt}`);
+      console.log(`[SRM LOGIN] SRM Portal login succeeded`);
       return finalSessionId;
     }
 
@@ -325,7 +325,7 @@ export async function attemptSrmLogin(username, password) {
 }
 
 export async function connectPortalAccount(userId, srmUsername, srmPassword) {
-  console.log(`[PORTAL CONNECT] Starting portal connection for User ID: ${userId}, SRM Username: ${safeString(srmUsername).toUpperCase()}`);
+  console.log(`[PORTAL CONNECT] Portal connection started`);
   if (!srmUsername || !srmPassword) {
     const err = new Error('Registration Number and Password are required.');
     err.code = 'INVALID_CREDENTIALS';
@@ -344,7 +344,7 @@ export async function connectPortalAccount(userId, srmUsername, srmPassword) {
   if (!account) {
     const oldUserAccount = await SrmPortalAccount.findOne({ userId, srmUsername: { $ne: cleanUsername } });
     if (oldUserAccount) {
-      console.log(`[PORTAL CONNECT] Unlinking old SRM account ${oldUserAccount.srmUsername} for User ID: ${userId}`);
+      console.log(`[PORTAL CONNECT] Unlinking old SRM account`);
       await SrmPortalAccount.deleteOne({ _id: oldUserAccount._id });
       await Subject.deleteMany({ user: userId, isSrmManaged: true });
     }
@@ -359,7 +359,7 @@ export async function connectPortalAccount(userId, srmUsername, srmPassword) {
     });
   } else {
     if (String(account.userId) !== String(userId)) {
-      console.log(`[PORTAL CONNECT] Re-assigning SRM account ${cleanUsername} from User ${account.userId} to User ${userId}`);
+      console.log(`[PORTAL CONNECT] Re-assigning SRM account`);
       account.userId = userId;
     }
     account.encryptedPassword = encryptedPassword;
@@ -401,7 +401,7 @@ export async function connectPortalAccount(userId, srmUsername, srmPassword) {
     console.warn('[PortalService] Initial data scrape partial failure:', scrapeErr.message);
   }
 
-  console.log(`[PORTAL CONNECT] Account connected and saved for User ID: ${userId}, SRM Username: ${cleanUsername}`);
+  console.log(`[PORTAL CONNECT] Portal connection succeeded`);
 
   return {
     success: true,
@@ -942,21 +942,21 @@ export async function triggerBackgroundSync(userId) {
   const usernameKey = account.srmUsername;
 
   if (activeSyncPromises.has(accountKey)) {
-    console.log(`[PORTAL] Background sync already active for account ${accountKey}. Sharing task.`);
+    console.log(`[PORTAL] Background sync already active. Sharing task.`);
     return activeSyncPromises.get(accountKey);
   }
   if (usernameKey && activeSyncPromises.has(usernameKey)) {
-    console.log(`[PORTAL] Background sync already active for username ${usernameKey}. Sharing task.`);
+    console.log(`[PORTAL] Background sync already active. Sharing task.`);
     return activeSyncPromises.get(usernameKey);
   }
 
   const syncTask = (async () => {
     try {
-      console.log(`[PORTAL] Starting background auto-sync for account ${accountKey} (${usernameKey})...`);
+      console.log(`[PORTAL SYNC] Sync started`);
       await reSyncPortalData(userId);
-      console.log(`[PORTAL] Background auto-sync completed for account ${accountKey}.`);
+      console.log(`[PORTAL SYNC] Sync completed successfully`);
     } catch (err) {
-      console.warn(`[PORTAL] Background auto-sync error for account ${accountKey}:`, err.message);
+      console.warn(`[PORTAL SYNC] Sync failed:`, err.message);
     } finally {
       activeSyncPromises.delete(accountKey);
       if (usernameKey) activeSyncPromises.delete(usernameKey);
@@ -1033,31 +1033,29 @@ export async function getPortalAccountData(userId) {
 }
 
 export async function reSyncPortalData(userId) {
-  console.log(`[PORTAL SYNC] Sync start for User ID: ${userId}`);
+  console.log(`[PORTAL SYNC] Sync started`);
   const user = await User.findById(userId);
   const account = await findPortalAccountForUser(user || userId);
 
   if (!account) {
-    console.warn(`[PORTAL SYNC] Sync failed: SrmPortalAccount NOT_CONNECTED for User ID: ${userId}`);
+    console.warn(`[PORTAL SYNC] Sync failed: Account not connected`);
     const err = new Error('SRM Portal account is not connected.');
     err.code = 'NOT_CONNECTED';
     throw err;
   }
 
   try {
-    console.log(`[PORTAL SYNC] Session check start for User ID: ${userId}...`);
     const sessionId = await getActiveSession(account);
-    console.log(`[PORTAL SYNC] Session existence: ${Boolean(sessionId)} for User ID: ${userId}`);
 
     await scrapeAndStoreData(account, sessionId);
     account.connectionStatus = 'connected';
     account.lastSuccessfulSync = new Date();
     await account.save();
 
-    console.log(`[PORTAL SYNC] Sync completed successfully for User ID: ${userId}`);
+    console.log(`[PORTAL SYNC] Sync completed successfully`);
     return await getPortalAccountData(userId);
   } catch (err) {
-    console.warn(`[PORTAL SYNC] Re-sync session refresh/scrape failed for User ID: ${userId}:`, err.message);
+    console.warn(`[PORTAL SYNC] Sync failed:`, err.message);
     if (err.message === 'PORTAL_SESSION_EXPIRED' || err.code === 'INVALID_CREDENTIALS') {
       account.connectionStatus = 'expired';
       await account.save().catch(() => {});
@@ -1072,7 +1070,7 @@ export async function reSyncPortalData(userId) {
 }
 
 export async function disconnectPortalAccount(userId) {
-  console.log(`[PORTAL DISCONNECT] Unlinking SRM portal and clearing caches for user ${userId}...`);
+  console.log(`[PORTAL DISCONNECT] Unlinking SRM portal and clearing caches...`);
   await SrmPortalAccount.deleteMany({ userId });
   await Subject.deleteMany({ user: userId, isSrmManaged: true });
 

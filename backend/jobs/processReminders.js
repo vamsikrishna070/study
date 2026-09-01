@@ -15,7 +15,7 @@ if (env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY) {
 }
 
 async function processReminders() {
-  console.log('Starting standalone reminder processor (Cron Job)...');
+
   await connectDB();
 
   try {
@@ -30,7 +30,9 @@ async function processReminders() {
       ]
     });
 
-    console.log(`Found ${dueReminders.length} due reminder(s).`);
+    if (dueReminders.length > 0) {
+      console.log(`[Reminders] Processed ${dueReminders.length} due reminder(s).`);
+    }
 
     for (const reminder of dueReminders) {
       if (reminder.scheduleType !== 'one-time') {
@@ -108,7 +110,7 @@ async function processReminders() {
   } catch (err) {
     console.error('Error processing reminders:', err);
   } finally {
-    console.log('Reminder processing complete. Exiting...');
+
     await mongoose.disconnect();
     process.exit(0);
   }

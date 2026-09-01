@@ -92,7 +92,7 @@ export async function getActiveSession(account) {
     throw new Error('PORTAL_SESSION_EXPIRED');
   }
 
-  console.log(`[PortalSession] Session expired or invalid. Attempting background re-login for user ${account.userId}...`);
+  console.log(`[PortalSession] Session expired or invalid. Attempting background re-login...`);
   const freshSession = await attemptSrmLogin(account.srmUsername, rawPassword);
   account.encryptedSessionId = encryptPortalSecret(freshSession);
   account.connectionStatus = 'connected';
@@ -250,7 +250,7 @@ export async function submitAttendanceCode(userId, attendanceCode) {
     });
 
     const responseText = await response.text();
-    console.log(`[submitAttendanceCode] Portal raw response for code ${cleanCode}: ${responseText.substring(0, 300)}`);
+
 
     const $ = cheerio.load(responseText);
     const alertText = $('div.alert, .errorMessage, #divmsg, font[color="red"]').text().trim() || responseText;

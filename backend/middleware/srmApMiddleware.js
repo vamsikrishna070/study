@@ -25,7 +25,7 @@ export async function requireSrmApEligible(req, res, next) {
     return next();
   }
 
-  console.warn(`[srmApMiddleware] Access denied (403) for user ID: ${req.user._id}, email: ${req.user.email}, university: "${req.user.university}"`);
+  console.warn(`[srmApMiddleware] Access denied (403) for university: "${req.user.university}"`);
 
   return res.status(403).json({
     success: false,

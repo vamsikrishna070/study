@@ -143,11 +143,10 @@ export const sendEmail = async ({ to, name = '', subject, text, html }) => {
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      console.error('[EmailService] Brevo API request failed:', {
+      console.error('[EmailService] Email delivery failed:', {
         status: response.status,
         statusText: response.statusText,
-        code: data?.code,
-        message: data?.message,
+        error: data.message || 'Unknown API error',
       });
       throw new Error(data?.message || `Unable to send verification email. (HTTP ${response.status})`);
     }
@@ -157,16 +156,16 @@ export const sendEmail = async ({ to, name = '', subject, text, html }) => {
       throw new Error('Brevo accepted the request without returning a message ID.');
     }
 
-    console.log(`[EmailService] Brevo email delivered to ${recipientEmail} (MessageId: ${data.messageId})`);
+    console.log(`[EmailService] Email delivered successfully`);
     return data;
   } catch (error) {
     if (error.name === 'AbortError') {
-      console.error(`[EmailService] Brevo API email request timed out after ${REQUEST_TIMEOUT_MS / 1000}s`);
+      console.error(`[EmailService] Email delivery failed: Timeout`);
       throw new Error('Email service timed out. Please try again shortly.');
     }
 
     if (!error.message.startsWith('Unable to send') && !error.message.startsWith('Email service') && !error.message.startsWith('Brevo')) {
-      console.error(`[EmailService] Unexpected error sending email: ${error.message}`);
+      console.error(`[EmailService] Email delivery failed: ${error.message}`);
     }
 
     throw error;
