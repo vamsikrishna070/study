@@ -47,7 +47,7 @@ export async function parsePdfDocument(buffer, options = {}) {
 
     for (let i = 0; i < assessments.length; i++) {
       const { pageNumber, rawText, assessment } = assessments[i];
-      const shouldOcr = !options.disableOcr && (assessment.needsOcr || hasScannedPages);
+      const shouldOcr = !options.disableOcr && assessment.needsOcr;
 
       if (shouldOcr) {
         console.info(`[PDFParser] Page ${pageNumber} quality is ${assessment.quality} (scanned/hybrid: ${hasScannedPages}). Triggering OCR...`);

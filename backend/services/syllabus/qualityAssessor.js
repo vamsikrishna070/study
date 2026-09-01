@@ -52,26 +52,27 @@ export function assessPageQuality(pageText, pageNumber = 1) {
   const trimmed = pageText.trim();
   const charCount = trimmed.length;
 
+  const alphaMatches = trimmed.match(/[a-zA-Z]/g) || [];
+  const alphaRatio = charCount > 0 ? alphaMatches.length / charCount : 0;
+
+  const replacementMatches = trimmed.match(/[\uFFFD\u0000-\u0008\u000E-\u001F]/g) || [];
+  const garbageRatio = charCount > 0 ? replacementMatches.length / charCount : 0;
+
   if (charCount < 35) {
+    const isCleanText = alphaMatches.length > 0 && garbageRatio < 0.05;
     return {
-      quality: QUALITY_LEVELS.EMPTY,
-      score: 0.1,
+      quality: isCleanText ? QUALITY_LEVELS.PARTIAL : QUALITY_LEVELS.EMPTY,
+      score: isCleanText ? 0.4 : 0.1,
       charCount,
-      alphaRatio: 0,
+      alphaRatio,
       keywordCount: 0,
-      needsOcr: true,
-      reasons: [`Extracted text length is very low (${charCount} characters).`],
+      needsOcr: !isCleanText,
+      reasons: [`Extracted text length is low (${charCount} characters).`],
     };
   }
 
-  const alphaMatches = trimmed.match(/[a-zA-Z]/g) || [];
-  const alphaRatio = alphaMatches.length / charCount;
-
   const words = trimmed.split(/\s+/).filter((w) => w.length >= 3 && /^[a-zA-Z]+$/.test(w));
   const wordCount = words.length;
-
-  const replacementMatches = trimmed.match(/[\uFFFD\u0000-\u0008\u000E-\u001F]/g) || [];
-  const garbageRatio = replacementMatches.length / charCount;
 
   const lowerText = trimmed.toLowerCase();
   const matchedKeywords = SYLLABUS_KEYWORDS.filter((kw) => lowerText.includes(kw));
@@ -80,6 +81,7 @@ export function assessPageQuality(pageText, pageNumber = 1) {
   const isScannedCoverHeader =
     pageNumber === 1 &&
     charCount < 200 &&
+    garbageRatio > 0.05 &&
     !lowerText.includes('code') &&
     !lowerText.includes('unit') &&
     !lowerText.includes('module');

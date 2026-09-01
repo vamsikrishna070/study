@@ -40,7 +40,7 @@ export function extractSyllabusStructure(rawText, options = {}) {
   const normalized = normalizeDocumentText(rawText);
   const lines = normalized.split('\n').map((l) => l.trim()).filter(Boolean);
 
-  const { courseName, courseCode } = extractMetadata(lines);
+  const { courseName, courseCode } = extractMetadata(lines, options);
 
   const { theoryLines, labLines } = segmentDocumentSections(lines);
 
@@ -127,6 +127,7 @@ export async function extractSyllabusFromBuffer(buffer, options = {}) {
   }
 
   const extracted = extractSyllabusStructure(combinedText, {
+    ...options,
     sourceType: fileType,
     totalPages: parseResult.totalPages,
     ocrUsed: parseResult.ocrUsed,

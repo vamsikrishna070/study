@@ -152,6 +152,9 @@ const KNOWN_TOPIC_STARTS = [
 function isNewTableRowStart(line) {
   const l = line.trim();
   if (/^(?:UNIT|MODULE|CHAPTER)\s+(?:[IVXLCDM]+|\d+)\b/i.test(l)) return true;
+  if (/^[A-Z][A-Za-z0-9\s\-/]{2,35}:\s+[A-Za-z]/i.test(l)) return true;
+  if (/^\d+[\.\)\-]\s+[A-Z]/i.test(l)) return true;
+  if (/^(?:Supervised|Unsupervised|Semi-Supervised|Reinforcement|Feature|Dimensionality|Probability|Bayesian|Support|Artificial|Neural|Perceptron|Ensemble|Decision|Locally|Radial)\b/i.test(l)) return true;
   return KNOWN_TOPIC_STARTS.some((re) => re.test(l));
 }
 
@@ -168,7 +171,7 @@ export function reconstructTableLines(rawLines) {
     const line = rawLines[i].trim();
     if (!line || isMetadataHeader(line)) continue;
 
-    if (/^(?:Total\s+contact\s+hours|Course\s+Util(?:ization|itisation)\s+Plan\s*[-–—]?\s*Lab|Learning\s+Assessment)/i.test(line)) {
+    if (/^(?:Course\s+Util(?:ization|itisation)\s+Plan\s*[-–—]?\s*Lab|Learning\s+Assessment)/i.test(line)) {
       if (currentBuffer) {
         reconstructed.push(currentBuffer);
         currentBuffer = '';
@@ -221,7 +224,7 @@ export function extractTheoryUnitsFromTable(theoryLines) {
   let currentUnitName = '';
 
   for (const entry of reconstructed) {
-    const unitMatch = entry.match(/^(?:UNIT|MODULE|CHAPTER)\s+([IVXLCDM]+|\d+)\s*(.*)$/i);
+    const unitMatch = entry.match(/^(?:UNIT|MODULE|CHAPTER)\s+([IVXLCDM]+|\d+)(?:\s+\d+)?\s*(.*)$/i);
     if (unitMatch) {
       const parsedNum = parseUnitNumber(unitMatch[1]);
       if (parsedNum !== null) {

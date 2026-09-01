@@ -128,8 +128,9 @@ const ROMAN_HEADING_REGEX = /^([IVXLCDM]+)\.\s+([A-Z].*)$/i;
 export function extractTheoryUnits(theoryLines) {
   if (isScannedTableSyllabus(theoryLines)) {
     const tableUnits = extractTheoryUnitsFromTable(theoryLines);
-    if (tableUnits.length >= 3 && tableUnits.every((u) => u.topics.length > 0)) {
-      return tableUnits;
+    const validTableUnits = tableUnits.filter((u) => u.topics && u.topics.length > 0);
+    if (validTableUnits.length >= 2) {
+      return validTableUnits;
     }
   }
 
