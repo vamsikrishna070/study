@@ -17,7 +17,6 @@ import {
   CircleCheck,
   Info,
   CircleAlert,
-  CircleQuestionMark,
   X
 } from 'lucide-react-native';
 import { Button } from './Button';
@@ -127,7 +126,7 @@ export function AppDialog({
         iconBgColor = `${colors.primary}18`;
         break;
       default:
-        IconComponent = CircleQuestionMark;
+        IconComponent = Info;
         iconColor = colors.accent;
         iconBgColor = `${colors.accent}18`;
         break;

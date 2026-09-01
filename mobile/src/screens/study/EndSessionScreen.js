@@ -56,15 +56,25 @@ export default function EndSessionScreen({ navigation, route }) {
   };
 
   const handleSave = async () => {
+    if (saving) return;
     try {
       setSaving(true);
 
+      const rawSubjectId = summary.subjectId || null;
+      const validSubjectId = (typeof rawSubjectId === 'string' && rawSubjectId.length === 24) ? rawSubjectId : null;
+
+      const rawTaskId = summary.taskId || null;
+      const validTaskId = (typeof rawTaskId === 'string' && rawTaskId.length === 24) ? rawTaskId : null;
+
+      const rawExamId = summary.examId || null;
+      const validExamId = (typeof rawExamId === 'string' && rawExamId.length === 24) ? rawExamId : null;
+
       const payload = {
-        subjectId: summary.subjectId || null,
+        subjectId: validSubjectId,
         subjectName: summary.subjectName || '',
         topic: summary.topic || '',
-        taskId: summary.taskId || null,
-        examId: summary.examId || null,
+        taskId: validTaskId,
+        examId: validExamId,
         sessionType: 'timer',
         status: 'completed',
         startedAt: summary.startedAt || new Date().toISOString(),
@@ -78,9 +88,9 @@ export default function EndSessionScreen({ navigation, route }) {
 
       await createStudySession(payload);
 
-      if (markTaskComplete && summary.taskId) {
+      if (markTaskComplete && validTaskId) {
         try {
-          await updateTask(summary.taskId, { completed: true });
+          await updateTask(validTaskId, { completed: true });
         } catch (err) {
           console.log('[EndSession] Task auto-complete error:', err);
         }
@@ -91,7 +101,7 @@ export default function EndSessionScreen({ navigation, route }) {
       navigation.replace('StudyHistory');
     } catch (err) {
       console.error('[EndSession] Save error:', err);
-      showError('Save Failed', 'Failed to save your session. Please check your connection.');
+      showError('Save Failed', err?.response?.data?.message || err?.message || 'Failed to save your session. Please check your connection.');
     } finally {
       setSaving(false);
     }

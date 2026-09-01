@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import Exam from "../models/Exam.js";
 import ImportantPoint from "../models/ImportantPoint.js";
 import Note from "../models/Note.js";
@@ -74,7 +75,8 @@ const serialize = (doc) => {
     _id: id(doc),
     attachments,
     subjectId: subjId,
-    subject: subjectName(value.subject, value.customSubject),
+    subject: value.subjectName || subjectName(value.subject, value.customSubject),
+    subjectName: value.subjectName || subjectName(value.subject, value.customSubject),
     subjectCode,
     subjectColor,
     customSubject: value.customSubject || "",
@@ -985,28 +987,47 @@ export async function createStudySession(req, res) {
     notes,
   } = req.body;
 
+  const validSubjectId = (subjectId && mongoose.Types.ObjectId.isValid(subjectId)) ? subjectId : null;
+  const validTaskId = (taskId && mongoose.Types.ObjectId.isValid(taskId)) ? taskId : null;
+  const validExamId = (examId && mongoose.Types.ObjectId.isValid(examId)) ? examId : null;
+
+  const startDate = new Date(startedAt);
+  const existingRecent = await StudySession.findOne({
+    user: req.user._id,
+    startedAt: startDate,
+    createdAt: { $gte: new Date(Date.now() - 10000) }
+  }).populate([
+    { path: 'subject', select: 'name code color' },
+    { path: 'task', select: 'title' },
+    { path: 'exam', select: 'name' },
+  ]);
+
+  if (existingRecent) {
+    return res.status(200).json({ success: true, data: serialize(existingRecent) });
+  }
+
   let computedDuration = Number(durationMinutes) || 0;
   if (!computedDuration && startedAt && endedAt) {
-    const elapsedMs = new Date(endedAt) - new Date(startedAt) - (Number(totalPausedMs) || 0);
+    const elapsedMs = new Date(endedAt) - startDate - (Number(totalPausedMs) || 0);
     computedDuration = Math.max(1, Math.round(elapsedMs / 60000));
   }
 
   let finalSubjectName = customSubjectName || '';
-  if (subjectId && !finalSubjectName) {
-    const sub = await Subject.findOne({ _id: subjectId, user: req.user._id });
+  if (validSubjectId && !finalSubjectName) {
+    const sub = await Subject.findOne({ _id: validSubjectId, user: req.user._id });
     if (sub) finalSubjectName = sub.name;
   }
 
   const item = await StudySession.create({
     user: req.user._id,
-    subject: subjectId || null,
+    subject: validSubjectId,
     subjectName: finalSubjectName,
     topic: (topic || '').trim(),
-    task: taskId || null,
-    exam: examId || null,
+    task: validTaskId,
+    exam: validExamId,
     sessionType,
     status,
-    startedAt: new Date(startedAt),
+    startedAt: startDate,
     endedAt: endedAt ? new Date(endedAt) : (status === 'completed' ? new Date() : null),
     pausedAt: pausedAt ? new Date(pausedAt) : null,
     totalPausedMs: Number(totalPausedMs) || 0,

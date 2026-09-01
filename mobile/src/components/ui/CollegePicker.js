@@ -22,7 +22,7 @@ import {
   ChevronDown,
   ArrowLeft,
   Pencil,
-  CircleQuestionMark
+  Info
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme, useStyles } from '../../theme/theme';
@@ -444,7 +444,7 @@ export function CollegePicker({
                     onPress={() => setIsManualMode(true)}
                     activeOpacity={0.7}
                   >
-                    <CircleQuestionMark size={15} color={colors.primary} style={{ marginRight: 6 }} />
+                    <Info size={15} color={colors.primary} style={{ marginRight: 6 }} />
                     <Text style={styles.unlistedLinkText}>My college isn't listed</Text>
                   </TouchableOpacity>
                 </View>

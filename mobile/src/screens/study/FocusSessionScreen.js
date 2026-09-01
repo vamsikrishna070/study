@@ -1,4 +1,4 @@
-import React, { useContext, useEffect } from 'react';
+import React, { useContext, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -26,6 +26,7 @@ export default function FocusSessionScreen({ navigation }) {
   const { colors, typography, spacing, radii, isDark } = useAppTheme();
   const styles = useStyles(createStyles);
   const { showDialog } = useAppDialog();
+  const isEndingRef = useRef(false);
 
   const {
     activeSession,
@@ -65,9 +66,13 @@ export default function FocusSessionScreen({ navigation }) {
   };
 
   const handleEnd = () => {
+    if (isEndingRef.current) return;
+    isEndingRef.current = true;
     const finalData = endSession();
     if (finalData) {
       navigation.replace('EndSession', { sessionSummary: finalData });
+    } else {
+      isEndingRef.current = false;
     }
   };
 
