@@ -39,7 +39,8 @@ export const confirmSyllabus = async (subjectId, units) => {
 };
 
 export const updateTopicCompletion = async (topicId, completed) => {
-  const response = await client.patch(`/topics/${topicId}`, { completed });
+  const status = completed ? 'completed' : 'not-started';
+  const response = await client.patch(`/topics/${topicId}`, { completed, status });
   return response.data;
 };
 

@@ -113,25 +113,46 @@ const SubjectDetailScreen = ({ route, navigation }) => {
   };
 
   const handleToggleTopic = async (topic) => {
+    const topicId = topic._id || topic.id;
     const isCompleted = topic.status === 'completed' || topic.completed;
     const newStatus = isCompleted ? 'not-started' : 'completed';
+    const newCompleted = !isCompleted;
+
+    console.log(`[SYLLABUS] Completing topic: ${topicId}`);
 
     setTopics((prev) =>
       prev.map((t) =>
-        (t._id || t.id) === (topic._id || topic.id)
-          ? { ...t, status: newStatus, completed: !isCompleted }
+        (t._id || t.id) === topicId
+          ? { ...t, status: newStatus, completed: newCompleted }
           : t
       )
     );
 
     try {
-      await updateTopicCompletion(topic._id || topic.id, !isCompleted);
-      loadData();
-    } catch (err) {
+      const res = await updateTopicCompletion(topicId, newCompleted);
+      const updatedTopic = res?.data || res;
+      console.log(`[SYLLABUS] Completion API response:`, updatedTopic?.status || updatedTopic?.completed);
 
+      if (updatedTopic) {
+        setTopics((prev) =>
+          prev.map((t) =>
+            (t._id || t.id) === topicId
+              ? {
+                  ...t,
+                  ...updatedTopic,
+                  status: updatedTopic.status || newStatus,
+                  completed: updatedTopic.completed ?? newCompleted,
+                }
+              : t
+          )
+        );
+        console.log(`[SYLLABUS] Local state updated:`, newCompleted);
+      }
+    } catch (err) {
+      console.error(`[SYLLABUS] Completion API failed:`, err);
       setTopics((prev) =>
         prev.map((t) =>
-          (t._id || t.id) === (topic._id || topic.id)
+          (t._id || t.id) === topicId
             ? { ...t, status: topic.status, completed: topic.completed }
             : t
         )

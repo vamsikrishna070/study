@@ -61,11 +61,8 @@ const serialize = (doc) => {
     }));
   }
 
-  const taskStatus = value.status === 'in-progress' ? 'in_progress' : (value.status || 'pending');
-
-  const subjectObj = value.subject && typeof value.subject === 'object' ? value.subject : null;
-  const subjectCode = subjectObj?.code || '';
-  const subjectColor = subjectObj?.color || '';
+  const isTopicDone = value.completed === true || value.status === 'completed';
+  const taskStatus = isTopicDone ? 'completed' : (value.status === 'in-progress' ? 'in_progress' : (value.status || 'pending'));
 
   return {
     ...value,
@@ -78,6 +75,7 @@ const serialize = (doc) => {
     subjectColor,
     customSubject: value.customSubject || "",
     status: taskStatus,
+    completed: isTopicDone,
     addedAt: value.createdAt,
     updatedAt: value.updatedAt,
   };
@@ -89,7 +87,11 @@ const required = (body, fields) =>
 export async function updateSubjectProgressHelper(subjectId, userId) {
   if (!subjectId || !userId) return { progress: 0, topicsCompleted: 0, topicsTotal: 0 };
   const total = await Topic.countDocuments({ subject: subjectId, user: userId });
-  const completed = await Topic.countDocuments({ subject: subjectId, user: userId, status: "completed" });
+  const completed = await Topic.countDocuments({
+    subject: subjectId,
+    user: userId,
+    $or: [{ status: "completed" }, { completed: true }]
+  });
   const pct = total === 0 ? 0 : Math.min(100, Math.max(0, Math.round((completed / total) * 100)));
   await Subject.updateOne({ _id: subjectId, user: userId }, { $set: { progress: pct } });
   return { progress: pct, topicsCompleted: completed, topicsTotal: total };
@@ -261,11 +263,28 @@ export async function updateTopic(req, res) {
   const item = await owned(Topic, req.user._id, req.params.id);
   if (!item)
     return res.status(404).json({ success: false, message: "Topic not found" });
-  Object.assign(item, req.body);
+
+  if (typeof req.body.completed === 'boolean') {
+    item.completed = req.body.completed;
+    item.status = req.body.completed ? 'completed' : 'not-started';
+  }
+  if (req.body.status) {
+    item.status = req.body.status;
+    item.completed = req.body.status === 'completed';
+  }
+
+  if (req.body.title !== undefined) item.title = req.body.title;
+  if (req.body.description !== undefined) item.description = req.body.description;
+  if (req.body.importance !== undefined) item.importance = req.body.importance;
+  if (req.body.progress !== undefined) item.progress = req.body.progress;
   if (req.body.subjectId) item.subject = req.body.subjectId;
+
   await item.save();
   await item.populate("subject", "name");
   await updateSubjectProgressHelper(item.subject?._id || item.subject, req.user._id);
+
+  console.log(`[SYLLABUS] Completion API updated topic ${item._id}: status=${item.status}, completed=${item.completed}`);
+
   res.json({ success: true, data: serialize(item) });
 }
 export async function deleteTopic(req, res) {

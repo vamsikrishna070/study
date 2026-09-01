@@ -7,6 +7,7 @@ const topicSchema = new mongoose.Schema({
   title: { type: String, required: true, trim: true },
   description: { type: String, default: '' },
   status: { type: String, enum: ['not-started', 'in-progress', 'completed'], default: 'not-started' },
+  completed: { type: Boolean, default: false },
   progress: { type: Number, min: 0, max: 100, default: 0 },
   importance: { type: String, enum: ['low', 'medium', 'high'], default: 'medium' },
 }, { timestamps: true });
