@@ -127,6 +127,7 @@ const PortalAttendanceScreen = ({ navigation }) => {
             </View>
           );
         })}
+      </View>
       </ScrollView>
     </View>
   );

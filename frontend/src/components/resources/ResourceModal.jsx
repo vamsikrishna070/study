@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { UploadCloud } from 'lucide-react';
+import { UploadCloud, Plus } from 'lucide-react';
 import { getGetResourcesQueryKey, useCreateResource, useGetSubjects, uploadFile } from '../../services/apiHooks.js';
 import { Button, Field, Modal, cx, inputClass } from '../shared.jsx';
 import VoiceRecorder from '../shared/VoiceRecorder.jsx';
@@ -33,9 +33,7 @@ export default function ResourceModal({ onClose }) {
     watched: 'false',
     tags: ''
   });
-  const [fileData, setFileData] = useState(null);
   const [attachments, setAttachments] = useState([]);
-  const [recordingDuration, setRecordingDuration] = useState(0);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -43,35 +41,65 @@ export default function ResourceModal({ onClose }) {
   const isFileType = form.resourceType === 'file';
   const isRecordingType = form.resourceType === 'recording';
 
-  const processFile = async (file) => {
+  const processFiles = async (files) => {
+    if (!files || files.length === 0) return;
+
+    // Prevent accidental duplicate selection
+    const existingKeys = new Set(attachments.map(a => `${a.originalName || a.name}_${a.size}`));
+    const uniqueFiles = files.filter(f => !existingKeys.has(`${f.name}_${f.size}`));
+
+    if (uniqueFiles.length === 0) {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
     setUploading(true);
     try {
-      const data = await uploadFile(file);
-      const newAtt = {
-        publicId: data.publicId,
-        url: data.url,
-        originalName: data.originalName || file.name,
-        name: data.originalName || file.name,
-        mimeType: file.type,
-        size: file.size,
-        type: file.type.startsWith('image/') ? 'image' : file.type.startsWith('audio/') ? 'audio' : 'file',
-      };
-      setAttachments(prev => [...prev, newAtt]);
-      setFileData(newAtt);
-      if (!form.title) {
-        set('title', file.name.replace(/\.[^.]+$/, ''));
+      const uploadPromises = uniqueFiles.map(async (file) => {
+        try {
+          const data = await uploadFile(file);
+          return {
+            publicId: data.publicId,
+            url: data.url,
+            originalName: data.originalName || file.name,
+            name: data.originalName || file.name,
+            mimeType: data.mimeType || file.type,
+            size: file.size,
+            type: file.type.startsWith('image/')
+              ? 'image'
+              : file.type.startsWith('audio/')
+              ? 'audio'
+              : 'file',
+          };
+        } catch (err) {
+          console.error('Upload failed for', file.name, err);
+          return null;
+        }
+      });
+
+      const results = await Promise.all(uploadPromises);
+      const successful = results.filter(Boolean);
+
+      if (successful.length > 0) {
+        setAttachments(prev => [...prev, ...successful]);
+        if (!form.title && uniqueFiles[0]) {
+          set('title', uniqueFiles[0].name.replace(/\.[^.]+$/, ''));
+        }
       }
-    } catch {
-      alert('Upload failed. Please try again.');
+
+      if (successful.length < uniqueFiles.length) {
+        alert(`${uniqueFiles.length - successful.length} file(s) failed to upload. Please try again.`);
+      }
     } finally {
       setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files || []);
     if (files.length > 0) {
-      files.forEach(f => processFile(f));
+      processFiles(files);
     }
   };
 
@@ -80,7 +108,7 @@ export default function ResourceModal({ onClose }) {
     setDragOver(false);
     const files = Array.from(e.dataTransfer.files || []);
     if (files.length > 0) {
-      files.forEach(f => processFile(f));
+      processFiles(files);
     }
   };
 
@@ -99,8 +127,6 @@ export default function ResourceModal({ onClose }) {
         duration,
       };
       setAttachments(prev => [...prev, newAtt]);
-      setFileData(newAtt);
-      setRecordingDuration(duration);
       if (!form.title) set('title', title || 'Voice Recording');
     } catch {
       alert('Upload failed. Please try again.');
@@ -115,7 +141,7 @@ export default function ResourceModal({ onClose }) {
 
   const submit = (e) => {
     e.preventDefault();
-    const finalAttachments = attachments.length > 0 ? attachments : fileData ? [fileData] : [];
+    const finalAttachments = attachments;
     const data = {
       title: form.title.trim(),
       url: isLinkType ? form.url.trim() : (finalAttachments[0]?.url || form.url.trim() || ''),
@@ -145,8 +171,8 @@ export default function ResourceModal({ onClose }) {
     });
   };
 
-  const canSubmit = !create.isPending && !uploading && form.title && (
-    isLinkType ? form.url : attachments.length > 0 || fileData
+  const canSubmit = !create.isPending && !uploading && form.title.trim() && (
+    isLinkType ? form.url.trim() : attachments.length > 0
   );
 
   const urlLabel = form.resourceType === 'youtube' ? 'YouTube URL *' : 'URL *';
@@ -176,9 +202,8 @@ export default function ResourceModal({ onClose }) {
               value={form.resourceType}
               onChange={e => {
                 set('resourceType', e.target.value);
-                setFileData(null);
+                setAttachments([]);
                 set('url', '');
-                setRecordingDuration(0);
               }}
             >
               {RESOURCE_TYPES.map(t => (
@@ -211,18 +236,52 @@ export default function ResourceModal({ onClose }) {
         )}
 
         {isFileType && (
-          <Field label="File *">
-            {fileData ? (
-              <AttachmentCard
-                attachment={{
-                  type: 'file',
-                  originalName: fileData.originalName,
-                  mimeType: fileData.mimeType,
-                  size: fileData.size,
-                  url: fileData.url,
-                }}
-                onRemove={() => setFileData(null)}
-              />
+          <Field label={`Attachments ${attachments.length > 0 ? `(${attachments.length}) *` : '*'}`}>
+            <input
+              type="file"
+              className="hidden"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              multiple
+              accept="application/pdf,image/*,audio/*,video/*,.ppt,.pptx,.doc,.docx,.txt"
+            />
+
+            {attachments.length > 0 ? (
+              <div className="space-y-3">
+                <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                  {attachments.map((att, idx) => (
+                    <AttachmentCard
+                      key={att.publicId || `${att.name}_${idx}`}
+                      attachment={att}
+                      onRemove={() => removeAttachment(idx)}
+                    />
+                  ))}
+                </div>
+
+                <div
+                  onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={cx(
+                    'flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed py-3 px-4 text-center transition-colors',
+                    dragOver ? 'border-accent bg-accent/5' : 'border-border bg-muted/20 hover:border-accent/50 hover:bg-muted/40',
+                    uploading && 'pointer-events-none opacity-50'
+                  )}
+                >
+                  {uploading ? (
+                    <div className="flex items-center gap-2 text-xs font-semibold text-accent">
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+                      <span>Uploading files…</span>
+                    </div>
+                  ) : (
+                    <>
+                      <Plus size={15} className="text-accent" />
+                      <span className="text-xs font-semibold text-foreground">Add more files (drop or browse)</span>
+                    </>
+                  )}
+                </div>
+              </div>
             ) : (
               <div
                 onDragOver={e => { e.preventDefault(); setDragOver(true); }}
@@ -235,17 +294,10 @@ export default function ResourceModal({ onClose }) {
                   uploading && 'pointer-events-none opacity-50'
                 )}
               >
-                <input
-                  type="file"
-                  className="hidden"
-                  ref={fileInputRef}
-                  onChange={handleFileChange}
-                  accept="application/pdf,image/*,audio/*,video/*,.ppt,.pptx,.doc,.docx"
-                />
                 {uploading ? (
                   <div className="flex flex-col items-center gap-2">
                     <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
-                    <p className="text-sm font-semibold text-accent">Uploading file…</p>
+                    <p className="text-sm font-semibold text-accent">Uploading files…</p>
                   </div>
                 ) : (
                   <>
@@ -253,7 +305,7 @@ export default function ResourceModal({ onClose }) {
                       <UploadCloud size={22} />
                     </div>
                     <p className="text-sm font-semibold">Drag & drop or browse files</p>
-                    <p className="mt-1 text-xs text-muted-foreground">PDF • PPT • DOC • Images • Audio • Video</p>
+                    <p className="mt-1 text-xs text-muted-foreground">PDF • PPT • DOC • Images • Audio • Video (Select multiple)</p>
                   </>
                 )}
               </div>
@@ -263,18 +315,16 @@ export default function ResourceModal({ onClose }) {
 
         {isRecordingType && (
           <Field label="Voice Recording *">
-            {fileData ? (
-              <AttachmentCard
-                attachment={{
-                  type: 'recording',
-                  originalName: fileData.originalName,
-                  mimeType: fileData.mimeType,
-                  size: fileData.size,
-                  url: fileData.url,
-                  duration: recordingDuration,
-                }}
-                onRemove={() => { setFileData(null); setRecordingDuration(0); }}
-              />
+            {attachments.length > 0 ? (
+              <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                {attachments.map((att, idx) => (
+                  <AttachmentCard
+                    key={att.publicId || idx}
+                    attachment={att}
+                    onRemove={() => removeAttachment(idx)}
+                  />
+                ))}
+              </div>
             ) : uploading ? (
               <div className="flex items-center justify-center gap-2 rounded-xl border border-border bg-muted/10 p-6">
                 <div className="h-5 w-5 animate-spin rounded-full border-2 border-accent border-t-transparent" />

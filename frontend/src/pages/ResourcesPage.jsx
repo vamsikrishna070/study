@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowUpRight, Library, Plus, FileText, Image as ImageIcon, Video, Music, File, ExternalLink, Download, Share2, Trash2, Check, X } from 'lucide-react';
-import { getGetResourcesQueryKey, useGetResources, useDeleteResource } from '../services/apiHooks.js';
+import { getGetResourcesQueryKey, useGetResources, useDeleteResource, useUpdateResource } from '../services/apiHooks.js';
 import Shell from '../components/Shell.jsx';
 import { Button, EmptyState, LoadingBlock, PageHeading, QueryState, cx, fmtDate } from '../components/shared.jsx';
 import ResourceModal from '../components/resources/ResourceModal.jsx';
@@ -20,6 +20,7 @@ export default function ResourcesPage() {
   const query = useGetResources();
   const resources = query.data;
   const del = useDeleteResource();
+  const update = useUpdateResource();
 
   const [open, setOpen] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
@@ -115,14 +116,15 @@ export default function ResourcesPage() {
                 }]
               : [];
 
-            const handleRemoveAttachment = async (attIdx) => {
+            const handleRemoveAttachment = (attIdx) => {
               const updatedAtts = attList.filter((_, idx) => idx !== attIdx);
-              try {
-                await apiClient.patch(`/resources/${resId}`, { attachments: updatedAtts });
-                qc.invalidateQueries({ queryKey: getGetResourcesQueryKey() });
-              } catch {
-                alert('Failed to remove attachment');
-              }
+              update.mutate({
+                id: resId,
+                data: { attachments: updatedAtts }
+              }, {
+                onSuccess: () => qc.invalidateQueries({ queryKey: getGetResourcesQueryKey() }),
+                onError: () => alert('Failed to remove attachment')
+              });
             };
 
             return (

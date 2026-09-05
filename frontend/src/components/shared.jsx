@@ -42,7 +42,28 @@ export function EmptyState({ icon: Icon, title, detail, action }) {
 }
 
 export function Button({ children, variant = 'primary', onClick, type = 'button', disabled, className = '', testId, ...props }) {
-  return <button type={type} onClick={onClick} disabled={disabled} data-testid={testId} className={cx('focus-ring inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all disabled:cursor-not-allowed disabled:opacity-50', variant === 'primary' && 'bg-primary text-primary-foreground hover:opacity-90', variant === 'quiet' && 'border border-border bg-card text-foreground hover:bg-muted', variant === 'danger' && 'bg-destructive/10 text-destructive hover:bg-destructive/15', className)} {...props}>{children}</button>;
+  const hasCustomPadding = /\b(p|px|py)-/.test(className);
+  const hasCustomRadius = /\brounded-/.test(className);
+  return (
+    <button
+      type={type}
+      onClick={onClick}
+      disabled={disabled}
+      data-testid={testId}
+      className={cx(
+        'focus-ring inline-flex items-center justify-center transition-all disabled:cursor-not-allowed disabled:opacity-50',
+        !hasCustomPadding && 'px-4 py-2.5 text-sm font-bold gap-2',
+        !hasCustomRadius && 'rounded-xl',
+        variant === 'primary' && 'bg-primary text-primary-foreground hover:opacity-90',
+        variant === 'quiet' && 'border border-border bg-card text-foreground hover:bg-muted',
+        variant === 'danger' && 'bg-destructive/10 text-destructive hover:bg-destructive/15',
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </button>
+  );
 }
 
 import { useEffect } from 'react';
