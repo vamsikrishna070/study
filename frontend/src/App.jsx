@@ -56,6 +56,8 @@ function Router() {
     <Route path="/subjects/:id" element={<ProtectedRoute><SubjectDetail /></ProtectedRoute>} />
     <Route path="/syllabus" element={<ProtectedRoute><Syllabus /></ProtectedRoute>} />
     <Route path="/study-session" element={<ProtectedRoute><StudySession /></ProtectedRoute>} />
+    <Route path="/study-session/:id" element={<ProtectedRoute><StudySession /></ProtectedRoute>} />
+    <Route path="/study-sessions/:id" element={<ProtectedRoute><StudySession /></ProtectedRoute>} />
     <Route path="/recordings" element={<ProtectedRoute><Recordings /></ProtectedRoute>} />
     <Route path="/reminders" element={<ProtectedRoute><Reminders /></ProtectedRoute>} />
     <Route path="/calendar" element={<ProtectedRoute><Calendar /></ProtectedRoute>} />

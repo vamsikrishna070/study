@@ -1222,6 +1222,23 @@ export async function getStudySessions(req, res) {
   });
 }
 
+export async function getStudySession(req, res) {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    return res.status(404).json({ success: false, message: "Study Session not found" });
+  }
+
+  const item = await StudySession.findOne({ _id: req.params.id, user: req.user._id })
+    .populate("subject", "name code color")
+    .populate("task", "title")
+    .populate("exam", "name");
+
+  if (!item) {
+    return res.status(404).json({ success: false, message: "Study Session not found" });
+  }
+
+  res.json({ success: true, data: serialize(item) });
+}
+
 async function sanitizeStudySessionSubjects(userId, subjectsInput, primarySubjectId, primarySubjectName, primaryTopic) {
   const sanitized = [];
   const completedTopicIds = [];
@@ -1419,7 +1436,8 @@ export async function createStudySession(req, res) {
     outsideSyllabus,
   } = req.body;
 
-  const validSubjectId = (subjectId && mongoose.Types.ObjectId.isValid(subjectId)) ? subjectId : null;
+  const subInput = subjectId || req.body.subject;
+  const validSubjectId = (subInput && mongoose.Types.ObjectId.isValid(subInput)) ? subInput.toString() : null;
   const validTaskId = (taskId && mongoose.Types.ObjectId.isValid(taskId)) ? taskId : null;
   const validExamId = (examId && mongoose.Types.ObjectId.isValid(examId)) ? examId : null;
 

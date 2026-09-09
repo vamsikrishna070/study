@@ -89,4 +89,6 @@ export const useSearch = (q, options) => query(getSearchQueryKey(q), () => apiCl
 
 export const getGetStudySessionsQueryKey = (params = {}) => ['study-sessions', params];
 export const useGetStudySessions = (params, options) => query(getGetStudySessionsQueryKey(params), () => apiClient.get('/study-sessions', { params }), options);
+export const getGetStudySessionQueryKey = (id) => ['study-sessions', id];
+export const useGetStudySession = (id, options) => query(getGetStudySessionQueryKey(id), () => apiClient.get(`/study-sessions/${id}`), { enabled: !!id, ...options });
 export const useDeleteStudySession = () => mutation(({ id }) => apiClient.delete(`/study-sessions/${id}`));

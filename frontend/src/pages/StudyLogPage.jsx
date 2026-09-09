@@ -206,9 +206,16 @@ export default function StudyLogPage() {
               >
                 <Trash2 size={14} className="mr-1" /> {del.isPending ? 'Deleting…' : 'Delete Record'}
               </Button>
-              <Button variant="quiet" onClick={() => setSelectedSession(null)} className="h-10 text-xs">
-                Close
-              </Button>
+              <div className="flex items-center gap-2">
+                <Link to={`/study-session/${selectedSession._id || selectedSession.id}`}>
+                  <Button variant="outline" className="h-10 text-xs">
+                    View Full Page
+                  </Button>
+                </Link>
+                <Button variant="quiet" onClick={() => setSelectedSession(null)} className="h-10 text-xs">
+                  Close
+                </Button>
+              </div>
             </div>
           }
         >
