@@ -369,11 +369,15 @@ export function ExamSyllabusPicker({
             const isExpanded = expandedSubjects[sId] !== false;
             const isLoading = Boolean(loadingMap[sId]);
 
-            // Filter topics by search query if present
+            // Filter topics by search query if present (matching topic title or unit title)
             if (cleanQuery) {
-              topics = topics.filter((t) =>
-                (t.title || '').toLowerCase().includes(cleanQuery)
-              );
+              topics = topics.filter((t) => {
+                const topicTitle = (t.title || '').toLowerCase();
+                const uId = (t.unit?._id || t.unit?.id || t.unit || '').toString();
+                const unitDoc = units.find((u) => (u._id || u.id || '').toString() === uId);
+                const unitTitle = (unitDoc?.title || '').toLowerCase();
+                return topicTitle.includes(cleanQuery) || unitTitle.includes(cleanQuery);
+              });
             }
 
             const subTopicIds = topics.map((t) => t._id || t.id);

@@ -658,18 +658,33 @@ const ExamsScreen = ({ route, navigation }) => {
               ) : null}
 
               <View style={styles.cardFooter}>
-                <View style={styles.progressBox}>
+                {/* Status & Readiness Row */}
+                <View style={styles.cardStatusRow}>
                   {!item.completed ? (
-                    <Text style={styles.progressText}>
-                      {item.topicsTotal > 0
-                        ? `Exam: ${Math.round(item.progress || 0)}% ready`
-                        : `Subject: ${item.progress || item.subject?.progress || 0}%`}
-                    </Text>
+                    <View style={styles.statusBadgeUpcoming}>
+                      <Clock size={12} color={colors.accent} />
+                      <Text style={styles.statusBadgeTextUpcoming}>
+                        {item.topicsTotal > 0
+                          ? `${Math.round(item.progress || 0)}% Syllabus Ready (${item.topicsCompleted || 0}/${item.topicsTotal})`
+                          : 'Upcoming Exam'}
+                      </Text>
+                    </View>
                   ) : (
-                    <Text style={styles.progressText}>Exam Completed</Text>
+                    <View style={styles.statusBadgeCompletedRow}>
+                      <View style={styles.statusBadgeCompleted}>
+                        <CheckCircle2 size={12} color="#10B981" />
+                        <Text style={styles.statusBadgeTextCompleted}>Exam Completed</Text>
+                      </View>
+                      {item.marksObtained !== undefined && item.marksObtained !== null && (
+                        <Text style={styles.marksBadgeText}>
+                          Score: {item.marksObtained}/{item.maxMarks} ({item.percentage}%)
+                        </Text>
+                      )}
+                    </View>
                   )}
                 </View>
 
+                {/* Responsive Action Buttons Grid */}
                 <View style={styles.cardActions}>
                   <Button
                     size="sm"
@@ -694,6 +709,7 @@ const ExamsScreen = ({ route, navigation }) => {
                       }}
                       style={styles.actionBtn}
                     >
+                      <CheckCircle2 size={13} color="#FFFFFF" style={{ marginRight: 4 }} />
                       Complete
                     </Button>
                   ) : (
@@ -721,6 +737,7 @@ const ExamsScreen = ({ route, navigation }) => {
                         }}
                         style={styles.actionBtn}
                       >
+                        <Plus size={13} color={!(item.marksObtained !== undefined && item.marksObtained !== null) ? '#FFFFFF' : colors.foreground} style={{ marginRight: 4 }} />
                         {!(item.marksObtained !== undefined && item.marksObtained !== null) ? 'Add Marks' : 'Edit Result'}
                       </Button>
                     </>
@@ -1151,21 +1168,76 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
       lineHeight: 16,
     },
     cardFooter: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
       marginTop: spacing.sm,
       paddingTop: spacing.sm,
       borderTopWidth: 1,
       borderTopColor: colors.cardBorder,
+      gap: spacing.sm,
     },
-    progressBox: {},
-    progressText: {
-      fontFamily: typography.mono.regular,
-      fontSize: 10,
-      color: colors.mutedForeground,
+    cardStatusRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
     },
-    deleteBtn: { minHeight: 30, paddingVertical: 2, paddingHorizontal: 10 },
+    statusBadgeUpcoming: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: `${colors.accent}12`,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: radii.sm,
+    },
+    statusBadgeTextUpcoming: {
+      fontFamily: typography.mono.medium,
+      fontSize: 11,
+      color: colors.accent,
+      fontWeight: '600',
+    },
+    statusBadgeCompletedRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      flex: 1,
+    },
+    statusBadgeCompleted: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      backgroundColor: 'rgba(16, 185, 129, 0.12)',
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: radii.sm,
+    },
+    statusBadgeTextCompleted: {
+      fontFamily: typography.sans.bold,
+      fontSize: 11,
+      color: '#10B981',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    marksBadgeText: {
+      fontFamily: typography.mono.bold,
+      fontSize: 11,
+      color: colors.foreground,
+    },
+    cardActions: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'flex-end',
+      alignItems: 'center',
+      gap: 6,
+    },
+    actionBtn: {
+      minHeight: 32,
+      paddingVertical: 4,
+      paddingHorizontal: 9,
+    },
+    deleteBtn: {
+      minHeight: 32,
+      paddingVertical: 4,
+      paddingHorizontal: 9,
+    },
     modalContainer: { flex: 1, justifyContent: 'flex-end' },
     modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(24,32,49,0.48)' },
     modalContent: {
