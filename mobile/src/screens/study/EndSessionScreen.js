@@ -146,7 +146,11 @@ export default function EndSessionScreen({ navigation, route }) {
       showSuccess('Session Saved', 'Great work! Your study session and syllabus progress have been updated.');
 
       if (createdId) {
-        navigation.replace('StudySessionDetail', { sessionId: createdId, session: createdSession });
+        if (typeof navigation.replace === 'function') {
+          navigation.replace('StudySessionDetail', { sessionId: createdId, session: createdSession });
+        } else {
+          navigation.navigate('StudySessionDetail', { sessionId: createdId, session: createdSession });
+        }
       } else if (navigation.canGoBack()) {
         navigation.goBack();
       } else {

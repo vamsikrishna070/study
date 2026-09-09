@@ -211,7 +211,7 @@ const OnboardingScreen = ({ navigation }) => {
   );
 };
 
-const createStyles = (colors, typography, spacing, radii) => StyleSheet.create({
+const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.create({
   container: {
     flexGrow: 1,
     justifyContent: 'center',

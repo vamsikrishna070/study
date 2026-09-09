@@ -467,7 +467,7 @@ export default function StudySessionDetailScreen({ route, navigation }) {
         {/* Action Buttons */}
         <View style={styles.actionButtons}>
           <Button
-            variant="default"
+            variant="primary"
             onPress={handleOpenEdit}
             style={styles.actionBtn}
           >
@@ -476,11 +476,11 @@ export default function StudySessionDetailScreen({ route, navigation }) {
           </Button>
 
           <Button
-            variant="destructive"
+            variant="danger"
             onPress={handleDelete}
             style={styles.actionBtn}
           >
-            <Trash2 size={16} color={colors.destructiveForeground} style={{ marginRight: 8 }} />
+            <Trash2 size={16} color={colors.destructive} style={{ marginRight: 8 }} />
             Delete Session
           </Button>
         </View>
@@ -615,7 +615,7 @@ export default function StudySessionDetailScreen({ route, navigation }) {
   );
 }
 
-const createStyles = (colors, typography) =>
+const createStyles = ({ colors, typography, spacing, radii }) =>
   StyleSheet.create({
     container: {
       flex: 1,
