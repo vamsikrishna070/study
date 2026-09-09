@@ -130,7 +130,9 @@ export default function EndSessionScreen({ navigation, route }) {
         outsideSyllabus,
       };
 
-      await createStudySession(payload);
+      const res = await createStudySession(payload);
+      const createdSession = res?.data || res;
+      const createdId = createdSession?._id || createdSession?.id || res?._id || res?.id;
 
       if (markTaskComplete && validTaskId) {
         try {
@@ -142,7 +144,10 @@ export default function EndSessionScreen({ navigation, route }) {
 
       discardSession();
       showSuccess('Session Saved', 'Great work! Your study session and syllabus progress have been updated.');
-      if (navigation.canGoBack()) {
+
+      if (createdId) {
+        navigation.replace('StudySessionDetail', { sessionId: createdId, session: createdSession });
+      } else if (navigation.canGoBack()) {
         navigation.goBack();
       } else {
         navigation.navigate('StudyHistory');

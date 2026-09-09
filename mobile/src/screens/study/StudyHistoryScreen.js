@@ -38,7 +38,7 @@ import { getStudySessions, deleteStudySession, updateStudySession } from '../../
 import { getSubjects } from '../../api/subjects';
 import { useAppTheme, useStyles } from '../../theme/theme';
 
-export default function StudyHistoryScreen({ navigation }) {
+export default function StudyHistoryScreen({ navigation, route }) {
   const { colors } = useAppTheme();
   const styles = useStyles(createStyles);
   const { showDialog, showSuccess, showError } = useAppDialog();
@@ -80,6 +80,12 @@ export default function StudyHistoryScreen({ navigation }) {
       .then((res) => setAvailableSubjects(res.data || res || []))
       .catch(() => setAvailableSubjects([]));
   }, [loadSessions]);
+
+  useEffect(() => {
+    if (route?.params?.sessionId) {
+      navigation.navigate('StudySessionDetail', { sessionId: route.params.sessionId });
+    }
+  }, [route?.params?.sessionId, navigation]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -319,7 +325,7 @@ export default function StudyHistoryScreen({ navigation }) {
                 <Card
                   key={session._id || session.id || Math.random()}
                   style={styles.sessionCard}
-                  onPress={() => setSelectedSession(session)}
+                  onPress={() => navigation.navigate('StudySessionDetail', { sessionId: session._id || session.id, session })}
                 >
                   <View style={styles.sessionMainRow}>
                     <View style={[styles.colorBar, { backgroundColor: subColor }]} />

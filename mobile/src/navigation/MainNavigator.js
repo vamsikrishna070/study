@@ -28,6 +28,7 @@ import EndSessionScreen from '../screens/study/EndSessionScreen';
 import LogSessionScreen from '../screens/study/LogSessionScreen';
 import StudyHistoryScreen from '../screens/study/StudyHistoryScreen';
 import StudyAnalyticsScreen from '../screens/study/StudyAnalyticsScreen';
+import StudySessionDetailScreen from '../screens/study/StudySessionDetailScreen';
 
 import PortalDashboardScreen from '../screens/portal/PortalDashboardScreen';
 import AttendanceScreen from '../screens/attendance/AttendanceScreen';
@@ -156,7 +157,9 @@ const MainNavigator = () => {
       <Stack.Screen name="FocusSession" component={FocusSessionScreen} />
       <Stack.Screen name="EndSession" component={EndSessionScreen} />
       <Stack.Screen name="LogSession" component={LogSessionScreen} />
+      <Stack.Screen name="StudyHistory" component={StudyHistoryScreen} />
       <Stack.Screen name="StudyAnalytics" component={StudyAnalyticsScreen} />
+      <Stack.Screen name="StudySessionDetail" component={StudySessionDetailScreen} />
     </Stack.Navigator>
   );
 };

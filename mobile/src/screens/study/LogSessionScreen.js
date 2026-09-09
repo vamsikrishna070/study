@@ -74,6 +74,8 @@ export default function LogSessionScreen({ navigation }) {
   };
 
   const handleSave = async () => {
+    if (saving) return;
+
     const mins = parseInt(durationMinutes, 10);
     if (!mins || mins <= 0) {
       showError('Invalid Duration', 'Please enter a valid study duration in minutes.');
@@ -116,9 +118,15 @@ export default function LogSessionScreen({ navigation }) {
         outsideSyllabus,
       };
 
-      await createStudySession(payload);
+      const res = await createStudySession(payload);
+      const createdSession = res?.data || res;
+      const createdId = createdSession?._id || createdSession?.id || res?._id || res?.id;
+
       showSuccess('Session Logged', 'Your manual study session and syllabus progress have been updated.');
-      if (navigation.canGoBack()) {
+
+      if (createdId) {
+        navigation.replace('StudySessionDetail', { sessionId: createdId, session: createdSession });
+      } else if (navigation.canGoBack()) {
         navigation.goBack();
       } else {
         navigation.navigate('StudyHistory');

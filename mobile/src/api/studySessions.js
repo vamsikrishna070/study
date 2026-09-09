@@ -5,6 +5,11 @@ export async function getStudySessions(params = {}) {
   return response.data || { success: false, data: [], pagination: {} };
 }
 
+export async function getStudySession(id) {
+  const response = await apiClient.get(`/study-sessions/${id}`);
+  return response.data?.data || response.data;
+}
+
 export async function getStudyStats() {
   const response = await apiClient.get('/study-sessions/stats');
   return response.data?.data || null;
