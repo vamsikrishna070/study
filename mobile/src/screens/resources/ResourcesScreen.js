@@ -14,6 +14,7 @@ import {
   Alert,
   Image,
   Linking,
+  TextInput,
 } from 'react-native';
 import {
   Library,
@@ -586,7 +587,7 @@ const ResourcesScreen = ({ route, navigation }) => {
           const resId = item._id || item.id;
           const isLink = item.resourceType === 'link' || item.resourceType === 'youtube';
           const attList = isLink ? [] : (item.attachments && item.attachments.length > 0)
-            ? item.attachments
+            ? item.attachments.filter(Boolean)
             : (item.fileData?.url || item.url)
             ? [{
                 id: item.fileData?.publicId || 'legacy',
@@ -642,9 +643,9 @@ const ResourcesScreen = ({ route, navigation }) => {
               <Text style={styles.cardTitle}>{item.title}</Text>
 
               <View style={styles.metaRow}>
-                {!!(item.subjectCode ? `${item.subjectCode} - ${item.subject}` : (item.subject?.name || item.subject)) && (
+                {!!(item.subjectCode ? `${item.subjectCode} - ${typeof item.subject === 'object' ? item.subject?.name : item.subject}` : (item.subject?.name || (typeof item.subject === 'string' ? item.subject : ''))) && (
                   <Text style={styles.subjectChip}>
-                    {item.subjectCode ? `${item.subjectCode} - ${item.subject}` : (item.subject?.name || item.subject)}
+                    {item.subjectCode ? `${item.subjectCode} - ${typeof item.subject === 'object' ? item.subject?.name : item.subject}` : (item.subject?.name || (typeof item.subject === 'string' ? item.subject : ''))}
                   </Text>
                 )}
                 {item.rating > 0 && (
