@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowUpRight, Library, Plus, FileText, Image as ImageIcon, Video, Music, File, ExternalLink, Download, Share2, Trash2, Check, X } from 'lucide-react';
+import { ArrowUpRight, Library, Plus, FileText, Image as ImageIcon, Video, Music, File, ExternalLink, Download, Share2, Trash2, Check, X, Search } from 'lucide-react';
 import { getGetResourcesQueryKey, useGetResources, useDeleteResource, useUpdateResource } from '../services/apiHooks.js';
 import Shell from '../components/Shell.jsx';
 import { Button, EmptyState, LoadingBlock, PageHeading, QueryState, cx, fmtDate } from '../components/shared.jsx';
@@ -24,6 +24,7 @@ export default function ResourcesPage() {
 
   const [open, setOpen] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const remove = (r) => {
     if (confirm(`Delete "${r.title}"?`)) {
@@ -70,6 +71,29 @@ export default function ResourcesPage() {
     }
   };
 
+  const filteredResources = (resources || []).filter((r) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    const title = (r.title || '').toLowerCase();
+    const sub = (r.customSubject || r.subject?.name || r.subject || '').toLowerCase();
+    const topic = (r.topic || '').toLowerCase();
+    const type = (r.resourceType || '').toLowerCase();
+    const tags = Array.isArray(r.tags) ? r.tags.join(' ').toLowerCase() : '';
+    const attNames = Array.isArray(r.attachments)
+      ? r.attachments.map(a => `${a.originalName || ''} ${a.name || ''} ${a.filename || ''}`).join(' ').toLowerCase()
+      : '';
+    const fileDataName = (r.fileData?.originalName || '').toLowerCase();
+    return (
+      title.includes(q) ||
+      sub.includes(q) ||
+      topic.includes(q) ||
+      type.includes(q) ||
+      tags.includes(q) ||
+      attNames.includes(q) ||
+      fileDataName.includes(q)
+    );
+  });
+
   return (
     <Shell>
       <PageHeading
@@ -82,6 +106,38 @@ export default function ResourcesPage() {
           </Button>
         }
       />
+
+      {/* Search Bar */}
+      {Boolean(resources?.length) && (
+        <div className="mb-6 flex items-center gap-3">
+          <div className="relative flex-1 max-w-md">
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search resources by title, attachment, subject, tags..."
+              className="w-full rounded-xl border border-input bg-card pl-10 pr-9 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              data-testid="input-search-resources"
+            />
+            {searchQuery.trim() && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                title="Clear search"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+          {searchQuery.trim() && (
+            <span className="font-mono text-xs text-muted-foreground">
+              {filteredResources.length} result{filteredResources.length === 1 ? '' : 's'}
+            </span>
+          )}
+        </div>
+      )}
 
       {query.isLoading ? (
         <LoadingBlock lines={5} />
@@ -98,9 +154,20 @@ export default function ResourcesPage() {
             </Button>
           }
         />
+      ) : !filteredResources.length ? (
+        <EmptyState
+          icon={Search}
+          title="No resources found"
+          detail={`No resources match "${searchQuery}". Try a different keyword.`}
+          action={
+            <Button variant="quiet" onClick={() => setSearchQuery('')} testId="button-clear-search">
+              Clear search
+            </Button>
+          }
+        />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {resources.map((r) => {
+          {filteredResources.map((r) => {
             const resId = r.id || r._id;
             const subjectLabel = r.customSubject || r.subject?.name || r.subject || 'General';
             const attList = (r.attachments && r.attachments.length > 0)

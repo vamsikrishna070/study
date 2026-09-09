@@ -27,6 +27,7 @@ import {
   ChevronUp,
   CheckCircle2,
   PenLine,
+  RotateCcw,
 } from 'lucide-react-native';
 import { getUserFriendlyError } from '../../utils/errorUtils';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -69,7 +70,7 @@ const ExamsScreen = ({ route, navigation }) => {
   const styles = useStyles(createStyles);
   const insets = useSafeAreaInsets();
   const { logout } = useContext(AuthContext);
-  const { showError, showDeleteConfirm } = useAppDialog();
+  const { showDialog, showError, showDeleteConfirm } = useAppDialog();
 
   const paramSubjectId = route?.params?.subjectId || null;
   const paramOpenCreate = route?.params?.openCreate || false;
@@ -127,7 +128,20 @@ const ExamsScreen = ({ route, navigation }) => {
   const handleOpenEdit = (exam) => {
     setEditingExamId(exam._id || exam.id);
     setName(exam.name || '');
-    setSubjectId(exam.subject?._id || exam.subject || '');
+
+    const rawSub = exam.subject?._id || exam.subject?.id || exam.subject || exam.subjectId;
+    let matchedSubId = '';
+    if (rawSub) {
+      const rawStr = typeof rawSub === 'object' ? (rawSub._id || rawSub.id) : String(rawSub);
+      const found = subjects.find(
+        (s) => (s._id || s.id) === rawStr || (s.name && s.name.toLowerCase() === rawStr.toLowerCase())
+      );
+      matchedSubId = found ? (found._id || found.id) : (subjects.length > 0 ? (subjects[0]._id || subjects[0].id) : '');
+    } else if (subjects.length > 0) {
+      matchedSubId = subjects[0]._id || subjects[0].id;
+    }
+    setSubjectId(matchedSubId);
+
     setType(exam.type || 'End semester');
     setDate(exam.date ? new Date(exam.date) : new Date());
     setTime(exam.time || '');
@@ -140,6 +154,27 @@ const ExamsScreen = ({ route, navigation }) => {
     );
     setSyllabusStructure(exam.syllabus || []);
     setModalVisible(true);
+  };
+
+  const handleMarkNotDone = (exam) => {
+    const examId = exam._id || exam.id;
+    showDialog({
+      type: 'confirm',
+      title: 'Mark as Not Done?',
+      message: `Move "${exam.name}" back to your upcoming exams list?`,
+      confirmText: 'Mark as Not Done',
+      onConfirm: async () => {
+        try {
+          const res = await updateExam(examId, { completed: false });
+          const updated = res.data || res;
+          setExams((prev) =>
+            prev.map((e) => ((e._id || e.id) === examId ? { ...e, ...updated, completed: false } : e))
+          );
+        } catch (e) {
+          showError('Error', 'Failed to update exam status.');
+        }
+      },
+    });
   };
 
   const toggleExamTopics = (id) => {
@@ -653,22 +688,33 @@ const ExamsScreen = ({ route, navigation }) => {
                       Complete
                     </Button>
                   ) : (
-                    <Button
-                      size="sm"
-                      variant={!(item.marksObtained !== undefined && item.marksObtained !== null) ? 'primary' : 'outline'}
-                      onPress={() => {
-                        setSelectedExam(item);
-                        setPerfRating(item.performance || 'Good');
-                        setPerfReflection(item.reflection || '');
-                        setMarksPending(item.marksObtained === undefined || item.marksObtained === null);
-                        setMarksObtained(item.marksObtained !== undefined && item.marksObtained !== null ? String(item.marksObtained) : '');
-                        setMaxMarks(item.maxMarks !== undefined && item.maxMarks !== null ? String(item.maxMarks) : '');
-                        setPerfModalVisible(true);
-                      }}
-                      style={styles.actionBtn}
-                    >
-                      {!(item.marksObtained !== undefined && item.marksObtained !== null) ? 'Add Marks' : 'Edit Result'}
-                    </Button>
+                    <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onPress={() => handleMarkNotDone(item)}
+                        style={styles.actionBtn}
+                      >
+                        <RotateCcw size={12} color={colors.foreground} style={{ marginRight: 4 }} />
+                        Not Done
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={!(item.marksObtained !== undefined && item.marksObtained !== null) ? 'primary' : 'outline'}
+                        onPress={() => {
+                          setSelectedExam(item);
+                          setPerfRating(item.performance || 'Good');
+                          setPerfReflection(item.reflection || '');
+                          setMarksPending(item.marksObtained === undefined || item.marksObtained === null);
+                          setMarksObtained(item.marksObtained !== undefined && item.marksObtained !== null ? String(item.marksObtained) : '');
+                          setMaxMarks(item.maxMarks !== undefined && item.maxMarks !== null ? String(item.maxMarks) : '');
+                          setPerfModalVisible(true);
+                        }}
+                        style={styles.actionBtn}
+                      >
+                        {!(item.marksObtained !== undefined && item.marksObtained !== null) ? 'Add Marks' : 'Edit Result'}
+                      </Button>
+                    </>
                   )}
                   <Button
                     variant="danger"

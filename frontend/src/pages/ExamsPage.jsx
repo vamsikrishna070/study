@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { CalendarDays, Plus, BookOpen, ChevronDown, ChevronRight, CheckCircle2, Clock, PenLine } from 'lucide-react';
+import { CalendarDays, Plus, BookOpen, ChevronDown, ChevronRight, CheckCircle2, Clock, PenLine, RotateCcw } from 'lucide-react';
 import { getGetDashboardQueryKey, getGetExamsQueryKey, useCreateExam, useGetExams, useGetSubjects, useUpdateExam, useDeleteExam } from '../services/apiHooks.js';
 import Shell from '../components/Shell.jsx';
 import { Button, EmptyState, Field, LoadingBlock, Modal, PageHeading, QueryState, fmtFullDate, inputClass } from '../components/shared.jsx';
@@ -13,9 +13,17 @@ function ExamForm({ onClose, subjects, initialExam = null }) {
   const create = useCreateExam();
   const update = useUpdateExam();
 
+  const initialSubjectId = (() => {
+    const raw = initialExam?.subjectId || initialExam?.subject?._id || initialExam?.subject;
+    if (!raw) return subjects[0]?.id || subjects[0]?._id || '';
+    const rawStr = typeof raw === 'object' ? (raw._id || raw.id) : String(raw);
+    const found = subjects.find(s => (s.id || s._id) === rawStr || (s.name && s.name.toLowerCase() === rawStr.toLowerCase()));
+    return found ? (found.id || found._id) : (subjects[0]?.id || subjects[0]?._id || '');
+  })();
+
   const [form, setForm] = useState({
     name: initialExam?.name || '',
-    subjectId: initialExam?.subjectId || initialExam?.subject?._id || subjects[0]?.id || subjects[0]?._id || '',
+    subjectId: initialSubjectId,
     date: initialExam?.date ? new Date(initialExam.date).toISOString().slice(0, 10) : today(),
     time: initialExam?.time || '',
     venue: initialExam?.venue || '',
@@ -383,9 +391,24 @@ export default function ExamsPage() {
 
   const qc = useQueryClient();
   const del = useDeleteExam();
+  const update = useUpdateExam();
 
   const toggleExamTopics = (id) => {
     setExpandedExamTopics(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleMarkNotDone = (exam) => {
+    if (confirm(`Mark "${exam.name}" as not done? This will return the exam to your upcoming exams list.`)) {
+      update.mutate({
+        id: exam.id || exam._id,
+        data: { completed: false }
+      }, {
+        onSuccess: () => {
+          qc.invalidateQueries({ queryKey: getGetExamsQueryKey() });
+          qc.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+        }
+      });
+    }
   };
 
   const remove = (exam) => {
@@ -581,6 +604,15 @@ export default function ExamsPage() {
                         </Button>
                       ) : (
                         <>
+                          <Button
+                            variant="quiet"
+                            onClick={() => handleMarkNotDone(e)}
+                            className="h-8 px-2.5 text-[11px] gap-1"
+                            testId={`btn-not-done-${e.id}`}
+                          >
+                            <RotateCcw size={12} />
+                            Mark as Not Done
+                          </Button>
                           {!(e.marksObtained !== undefined && e.marksObtained !== null) ? (
                             <Button onClick={() => setPerformanceExam(e)} className="h-8 px-3 text-[11px]" testId={`btn-add-marks-${e.id}`}>
                               Add Marks

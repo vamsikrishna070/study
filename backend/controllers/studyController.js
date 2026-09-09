@@ -596,12 +596,33 @@ export async function getExams(req, res) {
     data,
   });
 }
+const escapeRegex = (str = '') => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+async function resolveUserSubjectId(userId, subjectInput, validTopicIds = []) {
+  if (subjectInput && mongoose.Types.ObjectId.isValid(subjectInput)) {
+    const found = await Subject.findOne({ _id: subjectInput, user: userId });
+    if (found) return found._id;
+  }
+  if (typeof subjectInput === 'string' && subjectInput.trim()) {
+    const nameRegex = new RegExp(`^${escapeRegex(subjectInput.trim())}$`, 'i');
+    const found = await Subject.findOne({ name: nameRegex, user: userId });
+    if (found) return found._id;
+  }
+  if (Array.isArray(validTopicIds) && validTopicIds.length > 0) {
+    const firstTopic = await Topic.findOne({ _id: { $in: validTopicIds }, user: userId }).populate('subject');
+    if (firstTopic && firstTopic.subject) {
+      return firstTopic.subject._id || firstTopic.subject;
+    }
+  }
+  return null;
+}
+
 export async function createExam(req, res) {
   const { name, date, subjectId, topics, syllabus } = req.body;
-  if (!name || !date || (!subjectId && (!topics || topics.length === 0))) {
+  if (!name || !date) {
     return res.status(400).json({
       success: false,
-      message: "Name, date, and subject or syllabus topics are required",
+      message: "Name and date are required",
     });
   }
 
@@ -651,20 +672,40 @@ export async function createExam(req, res) {
     }
   }
 
-  let finalSubjectId = subjectId && mongoose.Types.ObjectId.isValid(subjectId) ? subjectId : null;
   let topicDocs = [];
   if (validTopicIds.length > 0) {
     topicDocs = await Topic.find({ _id: { $in: validTopicIds }, user: req.user._id })
       .populate('subject', 'name code color')
       .populate('unit', 'title order');
     validTopicIds = topicDocs.map(t => t._id.toString());
-    if (!finalSubjectId && topicDocs.length > 0 && topicDocs[0].subject) {
-      finalSubjectId = topicDocs[0].subject._id || topicDocs[0].subject;
-    }
+  }
+
+  const finalSubjectId = await resolveUserSubjectId(
+    req.user._id,
+    subjectId || req.body.subject,
+    validTopicIds
+  );
+
+  if (!finalSubjectId && validTopicIds.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: "Please select a valid subject or syllabus topics for this exam",
+    });
   }
 
   const item = await Exam.create({
-    ...req.body,
+    name: req.body.name,
+    type: req.body.type || 'End semester',
+    date: req.body.date,
+    time: req.body.time || '',
+    venue: req.body.venue || '',
+    notes: req.body.notes || '',
+    completed: req.body.completed || false,
+    performance: req.body.performance || '',
+    reflection: req.body.reflection || '',
+    marksObtained: req.body.marksObtained,
+    maxMarks: req.body.maxMarks,
+    percentage: req.body.percentage,
     subject: finalSubjectId,
     topics: validTopicIds,
     syllabus: validSyllabus,
@@ -710,8 +751,9 @@ export async function updateExam(req, res) {
     req.body.maxMarks = maxMarksVal;
   }
 
+  let validTopicIds = item.topics ? item.topics.map(t => t.toString()) : [];
   if (req.body.topics !== undefined) {
-    let validTopicIds = [];
+    validTopicIds = [];
     if (Array.isArray(req.body.topics) && req.body.topics.length > 0) {
       for (const tid of req.body.topics) {
         const idStr = typeof tid === 'object' && tid !== null ? (tid._id || tid.id || tid.topicId) : tid;
@@ -722,6 +764,7 @@ export async function updateExam(req, res) {
     }
     const topicDocs = await Topic.find({ _id: { $in: validTopicIds }, user: req.user._id });
     item.topics = topicDocs.map(t => t._id);
+    validTopicIds = topicDocs.map(t => t._id.toString());
   }
 
   if (req.body.syllabus !== undefined && Array.isArray(req.body.syllabus)) {
@@ -732,8 +775,39 @@ export async function updateExam(req, res) {
     }));
   }
 
-  Object.assign(item, req.body);
-  if (req.body.subjectId) item.subject = req.body.subjectId;
+  if (req.body.subjectId !== undefined || req.body.subject !== undefined) {
+    const rawSubjectInput = req.body.subjectId !== undefined ? req.body.subjectId : req.body.subject;
+    const resolvedSubjectId = await resolveUserSubjectId(
+      req.user._id,
+      rawSubjectInput,
+      validTopicIds
+    );
+    if (rawSubjectInput && !resolvedSubjectId && validTopicIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid subject. Please select a valid subject.",
+      });
+    }
+    if (resolvedSubjectId) {
+      item.subject = resolvedSubjectId;
+    }
+  }
+
+  if (req.body.name !== undefined) item.name = req.body.name;
+  if (req.body.type !== undefined) item.type = req.body.type;
+  if (req.body.date !== undefined) item.date = req.body.date;
+  if (req.body.time !== undefined) item.time = req.body.time;
+  if (req.body.venue !== undefined) item.venue = req.body.venue;
+  if (req.body.notes !== undefined) item.notes = req.body.notes;
+  if (req.body.completed !== undefined) item.completed = Boolean(req.body.completed);
+  if (req.body.performance !== undefined) item.performance = req.body.performance;
+  if (req.body.reflection !== undefined) item.reflection = req.body.reflection;
+  if (req.body.marksObtained !== undefined) item.marksObtained = req.body.marksObtained;
+  if (req.body.maxMarks !== undefined) item.maxMarks = req.body.maxMarks;
+  if (req.body.percentage !== undefined) item.percentage = req.body.percentage;
+  if (req.body.resultDate !== undefined) item.resultDate = req.body.resultDate;
+  if (req.body.remarks !== undefined) item.remarks = req.body.remarks;
+
   await item.save();
   await item.populate("subject", "name progress");
 
@@ -768,7 +842,31 @@ export async function getResources(req, res) {
   const filter = { user: req.user._id };
   if (req.query.subjectId) filter.subject = req.query.subjectId;
   const items = await populateItems(Resource, filter);
-  res.json({ success: true, data: items.map(serialize) });
+  const search = String(req.query.search || "").trim().toLowerCase();
+  let data = items.map(serialize);
+  if (search) {
+    data = data.filter((item) => {
+      const title = String(item.title || "").toLowerCase();
+      const subject = String(item.subject?.name || item.customSubject || item.subject || "").toLowerCase();
+      const topic = String(item.topic || "").toLowerCase();
+      const type = String(item.type || item.resourceType || "").toLowerCase();
+      const tags = Array.isArray(item.tags) ? item.tags.join(" ").toLowerCase() : "";
+      const attachmentNames = Array.isArray(item.attachments)
+        ? item.attachments.map(a => `${a.originalName || ''} ${a.filename || ''} ${a.name || ''}`).join(" ").toLowerCase()
+        : "";
+      const fileDataName = String(item.fileData?.originalName || "").toLowerCase();
+      return (
+        title.includes(search) ||
+        subject.includes(search) ||
+        topic.includes(search) ||
+        type.includes(search) ||
+        tags.includes(search) ||
+        attachmentNames.includes(search) ||
+        fileDataName.includes(search)
+      );
+    });
+  }
+  res.json({ success: true, data });
 }
 export async function createResource(req, res) {
   if (!req.body.title)

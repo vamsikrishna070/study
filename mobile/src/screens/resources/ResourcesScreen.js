@@ -30,6 +30,7 @@ import {
   Play,
   Pause,
   RotateCcw,
+  Search,
 } from 'lucide-react-native';
 import { viewDocument } from '../../utils/documentViewer';
 import { getAttachmentKind, getKindLabel, getOpenLabel, openAttachment } from '../../utils/attachmentHelper';
@@ -197,6 +198,7 @@ const ResourcesScreen = ({ route, navigation }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const [modalVisible, setModalVisible] = useState(paramOpenCreate);
   const [editingId, setEditingId] = useState(null);
@@ -482,11 +484,34 @@ const ResourcesScreen = ({ route, navigation }) => {
   const isFileType = resourceType === 'file';
   const isRecordingType = resourceType === 'recording';
 
+  const filteredData = data.filter((item) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    const title = (item.title || '').toLowerCase();
+    const sub = (item.subject?.name || item.customSubject || item.subject || '').toLowerCase();
+    const topic = (item.topic || '').toLowerCase();
+    const type = (item.resourceType || '').toLowerCase();
+    const tags = Array.isArray(item.tags) ? item.tags.join(' ').toLowerCase() : '';
+    const attNames = Array.isArray(item.attachments)
+      ? item.attachments.map((a) => `${a.originalName || ''} ${a.name || ''} ${a.filename || ''}`).join(' ').toLowerCase()
+      : '';
+    const fileDataName = (item.fileData?.originalName || '').toLowerCase();
+    return (
+      title.includes(q) ||
+      sub.includes(q) ||
+      topic.includes(q) ||
+      type.includes(q) ||
+      tags.includes(q) ||
+      attNames.includes(q) ||
+      fileDataName.includes(q)
+    );
+  });
+
   return (
     <View style={styles.container}>
       <Header />
       <FlatList
-        data={data}
+        data={filteredData}
         keyExtractor={(item, idx) => item._id || item.id || idx.toString()}
         contentContainerStyle={styles.listContent}
         refreshControl={
@@ -506,21 +531,55 @@ const ResourcesScreen = ({ route, navigation }) => {
               }
             />
             <QueryState error={error} onRetry={loadData} label="Resources" />
+
+            {data.length > 0 && (
+              <View style={styles.searchBarContainer}>
+                <Search size={16} color={colors.mutedForeground} style={{ marginRight: 8 }} />
+                <TextInput
+                  style={styles.searchTextInput}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  placeholder="Search resources by title, file, subject..."
+                  placeholderTextColor={colors.mutedForeground}
+                />
+                {Boolean(searchQuery.trim()) && (
+                  <TouchableOpacity
+                    onPress={() => setSearchQuery('')}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <X size={16} color={colors.mutedForeground} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
           </>
         }
         ListEmptyComponent={
           !error && !loading ? (
-            <EmptyState
-              title="Your library is empty"
-              detail="Save videos, articles, docs, and problem sets as you find them."
-              icon={Library}
-              action={
-                <Button onPress={() => setModalVisible(true)}>
-                  <Plus size={16} color={colors.primaryForeground} style={{ marginRight: 6 }} />
-                  Save first resource
-                </Button>
-              }
-            />
+            data.length > 0 && filteredData.length === 0 ? (
+              <EmptyState
+                title="No resources found"
+                detail={`No resources match "${searchQuery}". Try a different keyword.`}
+                icon={Search}
+                action={
+                  <Button variant="outline" onPress={() => setSearchQuery('')}>
+                    Clear search
+                  </Button>
+                }
+              />
+            ) : (
+              <EmptyState
+                title="Your library is empty"
+                detail="Save videos, articles, docs, and problem sets as you find them."
+                icon={Library}
+                action={
+                  <Button onPress={() => setModalVisible(true)}>
+                    <Plus size={16} color={colors.primaryForeground} style={{ marginRight: 6 }} />
+                    Save first resource
+                  </Button>
+                }
+              />
+            )
           ) : null
         }
         renderItem={({ item }) => {
@@ -1132,6 +1191,24 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
       backgroundColor: `${colors.muted}33`,
     },
     modalBtn: { minWidth: 100 },
+    searchBarContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.card,
+      borderRadius: radii.xl,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      paddingHorizontal: spacing.md,
+      paddingVertical: Platform.OS === 'ios' ? 10 : 6,
+      marginBottom: spacing.md,
+    },
+    searchTextInput: {
+      flex: 1,
+      fontFamily: typography.sans.regular,
+      fontSize: 14,
+      color: colors.foreground,
+      paddingVertical: 0,
+    },
   });
 
 export default ResourcesScreen;
