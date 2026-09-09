@@ -28,6 +28,7 @@ import {
   CheckCircle2,
   PenLine,
   RotateCcw,
+  Sparkles,
 } from 'lucide-react-native';
 import { getUserFriendlyError } from '../../utils/errorUtils';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -94,6 +95,7 @@ const ExamsScreen = ({ route, navigation }) => {
   const [selectedTopicIds, setSelectedTopicIds] = useState([]);
   const [syllabusStructure, setSyllabusStructure] = useState([]);
   const [expandedExamTopics, setExpandedExamTopics] = useState({});
+  const [syllabusModalVisible, setSyllabusModalVisible] = useState(false);
 
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
@@ -118,6 +120,7 @@ const ExamsScreen = ({ route, navigation }) => {
     setSelectedTopicIds([]);
     setSyllabusStructure([]);
     setEditingExamId(null);
+    setSyllabusModalVisible(false);
   };
 
   const handleOpenCreate = () => {
@@ -147,12 +150,18 @@ const ExamsScreen = ({ route, navigation }) => {
     setTime(exam.time || '');
     setVenue(exam.venue || '');
     setNotes(exam.notes || '');
-    setSelectedTopicIds(
-      Array.isArray(exam.topics)
-        ? exam.topics.map((t) => (typeof t === 'object' && t !== null ? (t._id || t.id) : t))
-        : []
-    );
+
+    let topicIds = [];
+    if (Array.isArray(exam.topics) && exam.topics.length > 0) {
+      topicIds = exam.topics.map((t) => (typeof t === 'object' && t !== null ? (t._id || t.id) : t));
+    } else if (Array.isArray(exam.syllabus) && exam.syllabus.length > 0) {
+      topicIds = exam.syllabus
+        .map((s) => (typeof s.topicId === 'object' && s.topicId !== null ? (s.topicId._id || s.topicId.id) : s.topicId))
+        .filter(Boolean);
+    }
+    setSelectedTopicIds(topicIds);
     setSyllabusStructure(exam.syllabus || []);
+    setSyllabusModalVisible(false);
     setModalVisible(true);
   };
 
@@ -760,22 +769,64 @@ const ExamsScreen = ({ route, navigation }) => {
                 />
               </Field>
 
-              {/* Syllabus Picker for Selected Subject */}
-              {!!subjectId && (
-                <View style={{ marginBottom: spacing.md }}>
-                  <Text style={[styles.fieldLabel, { color: colors.foreground, marginBottom: spacing.xs }]}>
-                    Exam Syllabus (Topics to be tested)
+              {/* Exam Syllabus (Topics to be tested) Section */}
+              <View style={styles.syllabusSectionContainer}>
+                <View style={styles.syllabusSectionHeaderRow}>
+                  <Text style={[styles.fieldLabel, { color: colors.foreground }]}>
+                    EXAM SYLLABUS (TOPICS TO BE TESTED)
                   </Text>
-                  <ExamSyllabusPicker
-                    subjectId={subjectId}
-                    selectedTopicIds={selectedTopicIds}
-                    onSelectionChange={(topicIds, tree) => {
-                      setSelectedTopicIds(topicIds);
-                      setSyllabusStructure(tree);
-                    }}
-                  />
+                  <Text style={styles.syllabusScopeBadge}>
+                    {selectedTopicIds.length} topic{selectedTopicIds.length === 1 ? '' : 's'} included
+                  </Text>
                 </View>
-              )}
+
+                {/* Scope Action Card */}
+                <TouchableOpacity
+                  style={[
+                    styles.syllabusTriggerCard,
+                    selectedTopicIds.length > 0 && styles.syllabusTriggerCardActive,
+                  ]}
+                  onPress={() => setSyllabusModalVisible(true)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.syllabusTriggerTop}>
+                    <View style={styles.syllabusIconBox}>
+                      <BookOpen size={18} color={colors.accent} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.syllabusTriggerTitle}>Exam Syllabus Scope</Text>
+                      <Text style={styles.syllabusTriggerSubtitle}>
+                        {selectedTopicIds.length > 0
+                          ? `${selectedTopicIds.length} topic${selectedTopicIds.length === 1 ? '' : 's'} selected for exam preparation tracking.`
+                          : 'Select units and topics below to include in this exam\'s progress tracking.'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.syllabusActionButtonRow}>
+                    <TouchableOpacity
+                      style={[
+                        styles.syllabusActionButton,
+                        selectedTopicIds.length > 0 ? styles.syllabusEditBtn : styles.syllabusAddBtn,
+                      ]}
+                      onPress={() => setSyllabusModalVisible(true)}
+                      activeOpacity={0.8}
+                    >
+                      {selectedTopicIds.length > 0 ? (
+                        <>
+                          <PenLine size={13} color={colors.accent} style={{ marginRight: 6 }} />
+                          <Text style={styles.syllabusEditBtnText}>Edit Syllabus</Text>
+                        </>
+                      ) : (
+                        <>
+                          <Plus size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
+                          <Text style={styles.syllabusAddBtnText}>Add Syllabus</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </TouchableOpacity>
+              </View>
 
               <Field label="Exam Type">
                 <SelectPicker
@@ -870,6 +921,19 @@ const ExamsScreen = ({ route, navigation }) => {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Dedicated Exam Syllabus Picker Modal */}
+      <ExamSyllabusPicker
+        visible={syllabusModalVisible}
+        onClose={() => setSyllabusModalVisible(false)}
+        onSave={(newTopicIds, tree) => {
+          setSelectedTopicIds(newTopicIds);
+          setSyllabusStructure(tree);
+        }}
+        selectedTopicIds={selectedTopicIds}
+        subjects={subjects}
+        primarySubjectId={subjectId}
+      />
 
       <Modal visible={perfModalVisible} animationType="slide" transparent onRequestClose={() => setPerfModalVisible(false)}>
         <KeyboardAvoidingView
@@ -1332,6 +1396,89 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
       fontFamily: typography.mono.bold,
       fontSize: 10,
       textTransform: 'uppercase',
+    },
+    syllabusSectionContainer: {
+      marginBottom: spacing.md,
+      gap: 6,
+    },
+    syllabusSectionHeaderRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    syllabusScopeBadge: {
+      fontFamily: typography.mono.bold,
+      fontSize: 11,
+      color: colors.accent,
+    },
+    syllabusTriggerCard: {
+      backgroundColor: colors.card,
+      borderRadius: radii.lg,
+      padding: spacing.md,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      gap: spacing.sm,
+    },
+    syllabusTriggerCardActive: {
+      borderColor: `${colors.accent}40`,
+      backgroundColor: `${colors.accent}08`,
+    },
+    syllabusTriggerTop: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    syllabusIconBox: {
+      width: 36,
+      height: 36,
+      borderRadius: radii.md,
+      backgroundColor: `${colors.accent}15`,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: `${colors.accent}30`,
+    },
+    syllabusTriggerTitle: {
+      fontFamily: typography.sans.bold,
+      fontSize: 13,
+      color: colors.foreground,
+    },
+    syllabusTriggerSubtitle: {
+      fontFamily: typography.sans.regular,
+      fontSize: 11,
+      color: colors.mutedForeground,
+      marginTop: 2,
+      lineHeight: 15,
+    },
+    syllabusActionButtonRow: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      marginTop: 2,
+    },
+    syllabusActionButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+      borderRadius: radii.md,
+    },
+    syllabusAddBtn: {
+      backgroundColor: colors.accent,
+    },
+    syllabusAddBtnText: {
+      fontFamily: typography.sans.bold,
+      fontSize: 12,
+      color: colors.primaryForeground,
+    },
+    syllabusEditBtn: {
+      backgroundColor: `${colors.accent}15`,
+      borderWidth: 1,
+      borderColor: `${colors.accent}40`,
+    },
+    syllabusEditBtnText: {
+      fontFamily: typography.sans.bold,
+      fontSize: 12,
+      color: colors.accent,
     },
   });
 
