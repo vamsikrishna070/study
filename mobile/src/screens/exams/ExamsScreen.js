@@ -29,6 +29,7 @@ import {
   PenLine,
   RotateCcw,
   Sparkles,
+  Trash2,
 } from 'lucide-react-native';
 import { getUserFriendlyError } from '../../utils/errorUtils';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -684,71 +685,101 @@ const ExamsScreen = ({ route, navigation }) => {
                   )}
                 </View>
 
-                {/* Responsive Action Buttons Grid */}
-                <View style={styles.cardActions}>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onPress={() => handleOpenEdit(item)}
-                    style={styles.actionBtn}
-                  >
-                    <PenLine size={13} color={colors.foreground} style={{ marginRight: 4 }} />
-                    Edit
-                  </Button>
+                {/* Responsive 2-Column Action Buttons Grid */}
+                <View style={styles.cardActionsStack}>
                   {!item.completed ? (
-                    <Button
-                      size="sm"
-                      onPress={() => {
-                        setSelectedExam(item);
-                        setPerfRating(item.performance || 'Good');
-                        setPerfReflection(item.reflection || '');
-                        setMarksPending(item.marksObtained === undefined || item.marksObtained === null);
-                        setMarksObtained(item.marksObtained !== undefined && item.marksObtained !== null ? String(item.marksObtained) : '');
-                        setMaxMarks(item.maxMarks !== undefined && item.maxMarks !== null ? String(item.maxMarks) : '');
-                        setPerfModalVisible(true);
-                      }}
-                      style={styles.actionBtn}
-                    >
-                      <CheckCircle2 size={13} color="#FFFFFF" style={{ marginRight: 4 }} />
-                      Complete
-                    </Button>
+                    <>
+                      <View style={styles.cardActionsRow}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onPress={() => handleOpenEdit(item)}
+                          style={styles.actionBtnGrid}
+                        >
+                          <PenLine size={13} color={colors.foreground} style={{ marginRight: 5 }} />
+                          Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          onPress={() => {
+                            setSelectedExam(item);
+                            setPerfRating(item.performance || 'Good');
+                            setPerfReflection(item.reflection || '');
+                            setMarksPending(item.marksObtained === undefined || item.marksObtained === null);
+                            setMarksObtained(item.marksObtained !== undefined && item.marksObtained !== null ? String(item.marksObtained) : '');
+                            setMaxMarks(item.maxMarks !== undefined && item.maxMarks !== null ? String(item.maxMarks) : '');
+                            setPerfModalVisible(true);
+                          }}
+                          style={styles.actionBtnGrid}
+                        >
+                          <CheckCircle2 size={13} color="#FFFFFF" style={{ marginRight: 5 }} />
+                          Complete
+                        </Button>
+                      </View>
+                      <View style={styles.cardActionsRow}>
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          onPress={() => handleDelete(examId)}
+                          style={styles.actionBtnGrid}
+                        >
+                          <Trash2 size={13} color={colors.destructive} style={{ marginRight: 5 }} />
+                          Delete
+                        </Button>
+                      </View>
+                    </>
                   ) : (
                     <>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onPress={() => handleMarkNotDone(item)}
-                        style={styles.actionBtn}
-                      >
-                        <RotateCcw size={12} color={colors.foreground} style={{ marginRight: 4 }} />
-                        Not Done
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={!(item.marksObtained !== undefined && item.marksObtained !== null) ? 'primary' : 'outline'}
-                        onPress={() => {
-                          setSelectedExam(item);
-                          setPerfRating(item.performance || 'Good');
-                          setPerfReflection(item.reflection || '');
-                          setMarksPending(item.marksObtained === undefined || item.marksObtained === null);
-                          setMarksObtained(item.marksObtained !== undefined && item.marksObtained !== null ? String(item.marksObtained) : '');
-                          setMaxMarks(item.maxMarks !== undefined && item.maxMarks !== null ? String(item.maxMarks) : '');
-                          setPerfModalVisible(true);
-                        }}
-                        style={styles.actionBtn}
-                      >
-                        <Plus size={13} color={!(item.marksObtained !== undefined && item.marksObtained !== null) ? '#FFFFFF' : colors.foreground} style={{ marginRight: 4 }} />
-                        {!(item.marksObtained !== undefined && item.marksObtained !== null) ? 'Add Marks' : 'Edit Result'}
-                      </Button>
+                      <View style={styles.cardActionsRow}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onPress={() => handleOpenEdit(item)}
+                          style={styles.actionBtnGrid}
+                        >
+                          <PenLine size={13} color={colors.foreground} style={{ marginRight: 5 }} />
+                          Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onPress={() => handleMarkNotDone(item)}
+                          style={styles.actionBtnGrid}
+                        >
+                          <RotateCcw size={12} color={colors.foreground} style={{ marginRight: 5 }} />
+                          Not Done
+                        </Button>
+                      </View>
+                      <View style={styles.cardActionsRow}>
+                        <Button
+                          size="sm"
+                          variant={!(item.marksObtained !== undefined && item.marksObtained !== null) ? 'primary' : 'outline'}
+                          onPress={() => {
+                            setSelectedExam(item);
+                            setPerfRating(item.performance || 'Good');
+                            setPerfReflection(item.reflection || '');
+                            setMarksPending(item.marksObtained === undefined || item.marksObtained === null);
+                            setMarksObtained(item.marksObtained !== undefined && item.marksObtained !== null ? String(item.marksObtained) : '');
+                            setMaxMarks(item.maxMarks !== undefined && item.maxMarks !== null ? String(item.maxMarks) : '');
+                            setPerfModalVisible(true);
+                          }}
+                          style={styles.actionBtnGrid}
+                        >
+                          <Plus size={13} color={!(item.marksObtained !== undefined && item.marksObtained !== null) ? '#FFFFFF' : colors.foreground} style={{ marginRight: 5 }} />
+                          {!(item.marksObtained !== undefined && item.marksObtained !== null) ? 'Add Marks' : 'Edit Result'}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          onPress={() => handleDelete(examId)}
+                          style={styles.actionBtnGrid}
+                        >
+                          <Trash2 size={13} color={colors.destructive} style={{ marginRight: 5 }} />
+                          Delete
+                        </Button>
+                      </View>
                     </>
                   )}
-                  <Button
-                    variant="danger"
-                    onPress={() => handleDelete(examId)}
-                    style={styles.deleteBtn}
-                  >
-                    Delete
-                  </Button>
                 </View>
               </View>
             </View>
@@ -1221,22 +1252,20 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
       fontSize: 11,
       color: colors.foreground,
     },
-    cardActions: {
+    cardActionsStack: {
+      gap: 8,
+      width: '100%',
+    },
+    cardActionsRow: {
       flexDirection: 'row',
-      flexWrap: 'wrap',
-      justifyContent: 'flex-end',
-      alignItems: 'center',
-      gap: 6,
+      gap: 8,
+      width: '100%',
     },
-    actionBtn: {
-      minHeight: 32,
-      paddingVertical: 4,
-      paddingHorizontal: 9,
-    },
-    deleteBtn: {
-      minHeight: 32,
-      paddingVertical: 4,
-      paddingHorizontal: 9,
+    actionBtnGrid: {
+      flex: 1,
+      minHeight: 36,
+      paddingVertical: 6,
+      paddingHorizontal: 8,
     },
     modalContainer: { flex: 1, justifyContent: 'flex-end' },
     modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(24,32,49,0.48)' },
