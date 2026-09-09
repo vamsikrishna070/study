@@ -375,40 +375,135 @@ export function StudyTopicSelector({
                         <View style={styles.unitContent}>
                           {unitGroup.topics.length > 0 ? (
                             <View style={styles.topicList}>
-                              {unitGroup.topics.map((tItem) => {
-                                const tId = tItem._id || tItem.id;
-                                const selectedObj = selectedTopicList.find((st) =>
-                                  (st.topicId && st.topicId === tId) || (st.topicName && st.topicName === tItem.title)
+                              {(() => {
+                                const pendingTopics = unitGroup.topics.filter(
+                                  (t) => !t.completed && t.status !== 'completed'
                                 );
-                                const isSelected = Boolean(selectedObj);
-                                const isCompleted = selectedObj?.completed;
+                                const completedTopics = unitGroup.topics.filter(
+                                  (t) => t.completed || t.status === 'completed'
+                                );
 
                                 return (
-                                  <TouchableOpacity
-                                    key={tId || tItem.title}
-                                    style={[
-                                      styles.topicRow,
-                                      isSelected && styles.selectedTopicRow,
-                                    ]}
-                                    onPress={() => handleToggleSyllabusTopic(subIdx, tItem)}
-                                    activeOpacity={0.7}
-                                  >
-                                    <View style={[
-                                      styles.checkbox,
-                                      isSelected && styles.checkedBox,
-                                      showCompletionCheckboxes && isCompleted && styles.completedCheckedBox
-                                    ]}>
-                                      {isSelected && <Check size={10} color="#FFFFFF" />}
-                                    </View>
-                                    <Text style={[
-                                      styles.topicText,
-                                      isSelected && styles.selectedTopicText,
-                                    ]}>
-                                      {tItem.title}
-                                    </Text>
-                                  </TouchableOpacity>
+                                  <>
+                                    {/* TO STUDY SECTION */}
+                                    {pendingTopics.length > 0 && (
+                                      <View style={{ marginBottom: completedTopics.length > 0 ? 6 : 0 }}>
+                                        <Text style={styles.topicSectionHeader}>
+                                          To Study ({pendingTopics.length})
+                                        </Text>
+                                        {pendingTopics.map((tItem) => {
+                                          const tId = tItem._id || tItem.id;
+                                          const selectedObj = selectedTopicList.find(
+                                            (st) =>
+                                              (st.topicId && st.topicId === tId) ||
+                                              (st.topicName && st.topicName === tItem.title)
+                                          );
+                                          const isSelected = Boolean(selectedObj);
+                                          const isCompleted = selectedObj?.completed;
+
+                                          return (
+                                            <TouchableOpacity
+                                              key={tId || tItem.title}
+                                              style={[
+                                                styles.topicRow,
+                                                isSelected && styles.selectedTopicRow,
+                                              ]}
+                                              onPress={() => handleToggleSyllabusTopic(subIdx, tItem)}
+                                              activeOpacity={0.7}
+                                            >
+                                              <View
+                                                style={[
+                                                  styles.checkbox,
+                                                  isSelected && styles.checkedBox,
+                                                  showCompletionCheckboxes && isCompleted && styles.completedCheckedBox,
+                                                ]}
+                                              >
+                                                {isSelected && <Check size={10} color="#FFFFFF" />}
+                                              </View>
+                                              <Text
+                                                style={[
+                                                  styles.topicText,
+                                                  isSelected && styles.selectedTopicText,
+                                                ]}
+                                                numberOfLines={2}
+                                              >
+                                                {tItem.title}
+                                              </Text>
+                                            </TouchableOpacity>
+                                          );
+                                        })}
+                                      </View>
+                                    )}
+
+                                    {/* COMPLETED / REVISION SECTION */}
+                                    {completedTopics.length > 0 && (
+                                      <View style={{ marginTop: pendingTopics.length > 0 ? 4 : 0 }}>
+                                        <Text style={styles.topicSectionHeaderCompleted}>
+                                          Completed / Revision ({completedTopics.length})
+                                        </Text>
+                                        {completedTopics.map((tItem) => {
+                                          const tId = tItem._id || tItem.id;
+                                          const selectedObj = selectedTopicList.find(
+                                            (st) =>
+                                              (st.topicId && st.topicId === tId) ||
+                                              (st.topicName && st.topicName === tItem.title)
+                                          );
+                                          const isSelected = Boolean(selectedObj);
+
+                                          return (
+                                            <View
+                                              key={tId || tItem.title}
+                                              style={[
+                                                styles.completedTopicRow,
+                                                isSelected && styles.selectedTopicRow,
+                                              ]}
+                                            >
+                                              <View style={styles.completedTopicLeft}>
+                                                <View style={styles.doneBadge}>
+                                                  <Check size={9} color="#10b981" />
+                                                  <Text style={styles.doneBadgeText}>Done</Text>
+                                                </View>
+                                                <Text
+                                                  style={[
+                                                    styles.topicTextCompleted,
+                                                    isSelected && styles.selectedTopicText,
+                                                  ]}
+                                                  numberOfLines={2}
+                                                >
+                                                  {tItem.title}
+                                                </Text>
+                                              </View>
+
+                                              <TouchableOpacity
+                                                style={[
+                                                  styles.reviseBtn,
+                                                  isSelected && styles.reviseBtnSelected,
+                                                ]}
+                                                onPress={() => {
+                                                  handleToggleSyllabusTopic(subIdx, tItem);
+                                                  if (!isSelected && onStudyTypeChange) {
+                                                    onStudyTypeChange('revision');
+                                                  }
+                                                }}
+                                                activeOpacity={0.7}
+                                              >
+                                                <Text
+                                                  style={[
+                                                    styles.reviseBtnText,
+                                                    isSelected && styles.reviseBtnTextSelected,
+                                                  ]}
+                                                >
+                                                  {isSelected ? 'Revising ✓' : 'Revise Again'}
+                                                </Text>
+                                              </TouchableOpacity>
+                                            </View>
+                                          );
+                                        })}
+                                      </View>
+                                    )}
+                                  </>
                                 );
-                              })}
+                              })()}
                             </View>
                           ) : (
                             <Text style={styles.emptyTopicText}>No topics listed in this unit.</Text>
@@ -771,5 +866,80 @@ const createStyles = (theme) =>
       fontFamily: theme.typography.sans.medium,
       fontSize: 13,
       color: theme.colors.accent,
+    },
+    topicSectionHeader: {
+      fontFamily: theme.typography.mono.bold,
+      fontSize: 9,
+      textTransform: 'uppercase',
+      letterSpacing: 0.8,
+      color: theme.colors.mutedForeground,
+      marginBottom: 4,
+      marginTop: 2,
+    },
+    topicSectionHeaderCompleted: {
+      fontFamily: theme.typography.mono.bold,
+      fontSize: 9,
+      textTransform: 'uppercase',
+      letterSpacing: 0.8,
+      color: '#10b981',
+      marginBottom: 4,
+      marginTop: 4,
+    },
+    completedTopicRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 6,
+      paddingHorizontal: 8,
+      borderRadius: theme.radii.sm,
+      backgroundColor: `${theme.colors.muted}40`,
+      marginVertical: 2,
+    },
+    completedTopicLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+      marginRight: 8,
+    },
+    doneBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 2,
+      backgroundColor: '#10b981' + '15',
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: theme.radii.sm,
+      marginRight: 8,
+    },
+    doneBadgeText: {
+      fontFamily: theme.typography.mono.bold,
+      fontSize: 9,
+      color: '#10b981',
+      textTransform: 'uppercase',
+    },
+    topicTextCompleted: {
+      fontFamily: theme.typography.sans.regular,
+      fontSize: 13,
+      color: theme.colors.mutedForeground,
+      flex: 1,
+    },
+    reviseBtn: {
+      backgroundColor: `${theme.colors.accent}15`,
+      borderWidth: 1,
+      borderColor: theme.colors.accent,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: theme.radii.sm,
+    },
+    reviseBtnSelected: {
+      backgroundColor: theme.colors.accent,
+    },
+    reviseBtnText: {
+      fontFamily: theme.typography.sans.semiBold,
+      fontSize: 11,
+      color: theme.colors.accent,
+    },
+    reviseBtnTextSelected: {
+      color: theme.colors.primaryForeground,
     },
   });

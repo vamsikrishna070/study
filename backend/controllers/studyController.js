@@ -535,24 +535,75 @@ export async function deleteTask(req, res) {
 export async function getExams(req, res) {
   const items = await populateItems(Exam, { user: req.user._id });
   const today = dayStart();
-  res.json({
-    success: true,
-    data: items.map((item) => ({
-      ...serialize(item),
+
+  const allTopicIds = [];
+  items.forEach((item) => {
+    if (Array.isArray(item.topics) && item.topics.length > 0) {
+      item.topics.forEach((tid) => {
+        if (tid) allTopicIds.push(tid);
+      });
+    }
+  });
+
+  const topicDocs = allTopicIds.length > 0
+    ? await Topic.find({ _id: { $in: allTopicIds }, user: req.user._id })
+        .populate('subject', 'name code color')
+        .populate('unit', 'title order')
+    : [];
+
+  const topicMap = {};
+  topicDocs.forEach((t) => {
+    topicMap[t._id.toString()] = t;
+  });
+
+  const data = items.map((item) => {
+    const serialized = serialize(item);
+    let topicsCompleted = 0;
+    let topicsTotal = 0;
+    let progress = 0;
+    let examTopics = [];
+
+    if (Array.isArray(item.topics) && item.topics.length > 0) {
+      examTopics = item.topics
+        .map((tid) => topicMap[tid?.toString()])
+        .filter(Boolean)
+        .map(serialize);
+
+      topicsTotal = examTopics.length;
+      topicsCompleted = examTopics.filter(
+        (t) => t.completed === true || t.status === 'completed'
+      ).length;
+      progress = topicsTotal === 0 ? 0 : Math.round((topicsCompleted / topicsTotal) * 100);
+    } else {
+      progress = item.subject?.progress || 0;
+      topicsCompleted = item.subject?.topicsCompleted || 0;
+      topicsTotal = item.subject?.topicsTotal || 0;
+    }
+
+    return {
+      ...serialized,
       date: item.date,
       daysLeft: Math.ceil((new Date(item.date) - today) / 86400000),
-      progress: item.subject?.progress || 0,
-    })),
+      progress,
+      topicsCompleted,
+      topicsTotal,
+      topics: examTopics,
+    };
+  });
+
+  res.json({
+    success: true,
+    data,
   });
 }
 export async function createExam(req, res) {
-  if (!required(req.body, ["name", "date", "subjectId"]))
-    return res
-      .status(400)
-      .json({
-        success: false,
-        message: "Name, date, and subject are required",
-      });
+  const { name, date, subjectId, topics, syllabus } = req.body;
+  if (!name || !date || (!subjectId && (!topics || topics.length === 0))) {
+    return res.status(400).json({
+      success: false,
+      message: "Name, date, and subject or syllabus topics are required",
+    });
+  }
 
   if (req.body.marksObtained === '' || req.body.marksObtained === null || req.body.maxMarks === '' || req.body.maxMarks === null) {
     req.body.marksObtained = null;
@@ -575,13 +626,63 @@ export async function createExam(req, res) {
     req.body.maxMarks = maxMarksVal;
   }
 
+  let validTopicIds = [];
+  if (Array.isArray(topics) && topics.length > 0) {
+    for (const tid of topics) {
+      const idStr = typeof tid === 'object' && tid !== null ? (tid._id || tid.id || tid.topicId) : tid;
+      if (idStr && mongoose.Types.ObjectId.isValid(idStr)) {
+        validTopicIds.push(idStr.toString());
+      }
+    }
+  }
+
+  let validSyllabus = [];
+  if (Array.isArray(syllabus)) {
+    for (const s of syllabus) {
+      const topId = s.topicId && mongoose.Types.ObjectId.isValid(s.topicId) ? s.topicId : null;
+      if (topId && !validTopicIds.includes(topId.toString())) {
+        validTopicIds.push(topId.toString());
+      }
+      validSyllabus.push({
+        subjectId: s.subjectId && mongoose.Types.ObjectId.isValid(s.subjectId) ? s.subjectId : null,
+        unitId: s.unitId && mongoose.Types.ObjectId.isValid(s.unitId) ? s.unitId : null,
+        topicId: topId,
+      });
+    }
+  }
+
+  let finalSubjectId = subjectId && mongoose.Types.ObjectId.isValid(subjectId) ? subjectId : null;
+  let topicDocs = [];
+  if (validTopicIds.length > 0) {
+    topicDocs = await Topic.find({ _id: { $in: validTopicIds }, user: req.user._id })
+      .populate('subject', 'name code color')
+      .populate('unit', 'title order');
+    validTopicIds = topicDocs.map(t => t._id.toString());
+    if (!finalSubjectId && topicDocs.length > 0 && topicDocs[0].subject) {
+      finalSubjectId = topicDocs[0].subject._id || topicDocs[0].subject;
+    }
+  }
+
   const item = await Exam.create({
     ...req.body,
-    subject: req.body.subjectId,
+    subject: finalSubjectId,
+    topics: validTopicIds,
+    syllabus: validSyllabus,
     user: req.user._id,
   });
   await item.populate("subject", "name progress");
-  res.status(201).json({ success: true, data: serialize(item) });
+
+  const topicsTotal = topicDocs.length;
+  const topicsCompleted = topicDocs.filter(t => t.completed === true || t.status === 'completed').length;
+  const progress = topicsTotal === 0 ? (item.subject?.progress || 0) : Math.round((topicsCompleted / topicsTotal) * 100);
+
+  const serialized = serialize(item);
+  serialized.topics = topicDocs.map(serialize);
+  serialized.topicsCompleted = topicsCompleted;
+  serialized.topicsTotal = topicsTotal;
+  serialized.progress = progress;
+
+  res.status(201).json({ success: true, data: serialized });
 }
 export async function updateExam(req, res) {
   const item = await owned(Exam, req.user._id, req.params.id);
@@ -609,11 +710,51 @@ export async function updateExam(req, res) {
     req.body.maxMarks = maxMarksVal;
   }
 
+  if (req.body.topics !== undefined) {
+    let validTopicIds = [];
+    if (Array.isArray(req.body.topics) && req.body.topics.length > 0) {
+      for (const tid of req.body.topics) {
+        const idStr = typeof tid === 'object' && tid !== null ? (tid._id || tid.id || tid.topicId) : tid;
+        if (idStr && mongoose.Types.ObjectId.isValid(idStr)) {
+          validTopicIds.push(idStr.toString());
+        }
+      }
+    }
+    const topicDocs = await Topic.find({ _id: { $in: validTopicIds }, user: req.user._id });
+    item.topics = topicDocs.map(t => t._id);
+  }
+
+  if (req.body.syllabus !== undefined && Array.isArray(req.body.syllabus)) {
+    item.syllabus = req.body.syllabus.map(s => ({
+      subjectId: s.subjectId && mongoose.Types.ObjectId.isValid(s.subjectId) ? s.subjectId : null,
+      unitId: s.unitId && mongoose.Types.ObjectId.isValid(s.unitId) ? s.unitId : null,
+      topicId: s.topicId && mongoose.Types.ObjectId.isValid(s.topicId) ? s.topicId : null,
+    }));
+  }
+
   Object.assign(item, req.body);
   if (req.body.subjectId) item.subject = req.body.subjectId;
   await item.save();
   await item.populate("subject", "name progress");
-  res.json({ success: true, data: serialize(item) });
+
+  let topicDocs = [];
+  if (Array.isArray(item.topics) && item.topics.length > 0) {
+    topicDocs = await Topic.find({ _id: { $in: item.topics }, user: req.user._id })
+      .populate('subject', 'name code color')
+      .populate('unit', 'title order');
+  }
+
+  const topicsTotal = topicDocs.length;
+  const topicsCompleted = topicDocs.filter(t => t.completed === true || t.status === 'completed').length;
+  const progress = topicsTotal === 0 ? (item.subject?.progress || 0) : Math.round((topicsCompleted / topicsTotal) * 100);
+
+  const serialized = serialize(item);
+  serialized.topics = topicDocs.map(serialize);
+  serialized.topicsCompleted = topicsCompleted;
+  serialized.topicsTotal = topicsTotal;
+  serialized.progress = progress;
+
+  res.json({ success: true, data: serialized });
 }
 export async function deleteExam(req, res) {
   const item = await owned(Exam, req.user._id, req.params.id);
@@ -1258,7 +1399,7 @@ export async function createStudySession(req, res) {
     outsideSyllabus: sanitizedOutside,
   });
 
-  if (status === 'completed') {
+  if (status === 'completed' && (studyType || item?.studyType) !== 'revision') {
     await syncStudySessionSyllabus(req.user._id);
   }
 
@@ -1278,7 +1419,7 @@ export async function updateStudySession(req, res) {
   }
 
   const previousCompletedTopicIds = [];
-  if (Array.isArray(item.subjects)) {
+  if (item.studyType !== 'revision' && Array.isArray(item.subjects)) {
     item.subjects.forEach((sub) => {
       if (Array.isArray(sub.topics)) {
         sub.topics.forEach((t) => {
@@ -1348,7 +1489,9 @@ export async function updateStudySession(req, res) {
   }
 
   await item.save();
-  await syncStudySessionSyllabus(req.user._id, previousCompletedTopicIds);
+  if (item.studyType !== 'revision') {
+    await syncStudySessionSyllabus(req.user._id, previousCompletedTopicIds);
+  }
 
   await item.populate([
     { path: 'subject', select: 'name code color' },
@@ -1367,7 +1510,7 @@ export async function deleteStudySession(req, res) {
       .json({ success: false, message: "Study Session not found" });
 
   const previousCompletedTopicIds = [];
-  if (Array.isArray(item.subjects)) {
+  if (item.studyType !== 'revision' && Array.isArray(item.subjects)) {
     item.subjects.forEach((sub) => {
       if (Array.isArray(sub.topics)) {
         sub.topics.forEach((t) => {
@@ -1380,7 +1523,9 @@ export async function deleteStudySession(req, res) {
   }
 
   await item.deleteOne();
-  await syncStudySessionSyllabus(req.user._id, previousCompletedTopicIds);
+  if (previousCompletedTopicIds.length > 0) {
+    await syncStudySessionSyllabus(req.user._id, previousCompletedTopicIds);
+  }
 
   res.status(204).end();
 }

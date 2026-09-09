@@ -22,6 +22,11 @@ import {
   Clock,
   MapPin,
   FileText,
+  BookOpen,
+  ChevronDown,
+  ChevronUp,
+  CheckCircle2,
+  PenLine,
 } from 'lucide-react-native';
 import { getUserFriendlyError } from '../../utils/errorUtils';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -37,6 +42,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Field } from '../../components/ui/Field';
 import { SelectPicker } from '../../components/ui/SelectPicker';
+import { ExamSyllabusPicker } from '../../components/exams/ExamSyllabusPicker';
 import { useAppDialog } from '../../components/ui/AppDialog';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme, useStyles } from '../../theme/theme';
@@ -76,6 +82,7 @@ const ExamsScreen = ({ route, navigation }) => {
   const [activeTab, setActiveTab] = useState('upcoming');
 
   const [modalVisible, setModalVisible] = useState(paramOpenCreate);
+  const [editingExamId, setEditingExamId] = useState(null);
   const [name, setName] = useState('');
   const [subjectId, setSubjectId] = useState(paramSubjectId || '');
   const [type, setType] = useState('End semester');
@@ -83,6 +90,9 @@ const ExamsScreen = ({ route, navigation }) => {
   const [time, setTime] = useState('');
   const [venue, setVenue] = useState('');
   const [notes, setNotes] = useState('');
+  const [selectedTopicIds, setSelectedTopicIds] = useState([]);
+  const [syllabusStructure, setSyllabusStructure] = useState([]);
+  const [expandedExamTopics, setExpandedExamTopics] = useState({});
 
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
@@ -95,6 +105,46 @@ const ExamsScreen = ({ route, navigation }) => {
   const [marksPending, setMarksPending] = useState(true);
   const [marksObtained, setMarksObtained] = useState('');
   const [maxMarks, setMaxMarks] = useState('');
+
+  const resetForm = () => {
+    setName('');
+    setSubjectId(paramSubjectId || (subjects.length > 0 ? (subjects[0]._id || subjects[0].id) : ''));
+    setType('End semester');
+    setDate(new Date());
+    setTime('');
+    setVenue('');
+    setNotes('');
+    setSelectedTopicIds([]);
+    setSyllabusStructure([]);
+    setEditingExamId(null);
+  };
+
+  const handleOpenCreate = () => {
+    resetForm();
+    setModalVisible(true);
+  };
+
+  const handleOpenEdit = (exam) => {
+    setEditingExamId(exam._id || exam.id);
+    setName(exam.name || '');
+    setSubjectId(exam.subject?._id || exam.subject || '');
+    setType(exam.type || 'End semester');
+    setDate(exam.date ? new Date(exam.date) : new Date());
+    setTime(exam.time || '');
+    setVenue(exam.venue || '');
+    setNotes(exam.notes || '');
+    setSelectedTopicIds(
+      Array.isArray(exam.topics)
+        ? exam.topics.map((t) => (typeof t === 'object' && t !== null ? (t._id || t.id) : t))
+        : []
+    );
+    setSyllabusStructure(exam.syllabus || []);
+    setModalVisible(true);
+  };
+
+  const toggleExamTopics = (id) => {
+    setExpandedExamTopics((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
 
   const loadData = async () => {
     try {
@@ -134,7 +184,10 @@ const ExamsScreen = ({ route, navigation }) => {
   }, [paramSubjectId]);
 
   useEffect(() => {
-    if (paramOpenCreate) setModalVisible(true);
+    if (paramOpenCreate) {
+      resetForm();
+      setModalVisible(true);
+    }
   }, [paramOpenCreate]);
 
   const onRefresh = useCallback(() => {
@@ -142,13 +195,13 @@ const ExamsScreen = ({ route, navigation }) => {
     loadData();
   }, [paramSubjectId]);
 
-  const handleCreate = async () => {
+  const handleSave = async () => {
     if (!name.trim()) {
       showError('Validation Error', 'Exam title/name is required.');
       return;
     }
-    if (!subjectId) {
-      showError('Validation Error', 'Please select a subject for this exam.');
+    if (!subjectId && selectedTopicIds.length === 0) {
+      showError('Validation Error', 'Please select a subject or syllabus topics for this exam.');
       return;
     }
 
@@ -156,30 +209,35 @@ const ExamsScreen = ({ route, navigation }) => {
     try {
       const payload = {
         name: name.trim(),
-        subjectId,
+        subjectId: subjectId || undefined,
         type,
         date: date.toISOString(),
         time: time.trim(),
         venue: venue.trim(),
         notes: notes.trim(),
+        topics: selectedTopicIds,
+        syllabus: syllabusStructure,
       };
 
-      const res = await createExam(payload);
-      setModalVisible(false);
-      setName('');
-      setType('End semester');
-      setTime('');
-      setVenue('');
-      setNotes('');
-      setDate(new Date());
-
-      if (res.data) {
-        setExams((prev) => [res.data, ...prev]);
+      if (editingExamId) {
+        const res = await updateExam(editingExamId, payload);
+        const updated = res.data || res;
+        setExams((prev) =>
+          prev.map((e) => ((e._id || e.id) === editingExamId ? { ...e, ...updated } : e))
+        );
       } else {
-        await loadData();
+        const res = await createExam(payload);
+        if (res.data) {
+          setExams((prev) => [res.data, ...prev]);
+        } else {
+          await loadData();
+        }
       }
+
+      setModalVisible(false);
+      resetForm();
     } catch (e) {
-      showError('Error', e?.response?.data?.message || 'Failed to schedule exam.');
+      showError('Error', e?.response?.data?.message || 'Failed to save exam.');
     } finally {
       setSubmitting(false);
     }
@@ -491,11 +549,77 @@ const ExamsScreen = ({ route, navigation }) => {
                 </View>
               )}
 
+              {/* Syllabus Progress & Breakdown */}
+              {item.topicsTotal > 0 ? (
+                <View style={styles.syllabusProgressBox}>
+                  <View style={styles.syllabusProgressHeader}>
+                    <Text style={styles.syllabusProgressLabel}>
+                      Syllabus Preparation ({item.topicsCompleted || 0}/{item.topicsTotal} topics)
+                    </Text>
+                    <Text style={styles.syllabusProgressPercent}>
+                      {Math.round(item.progress || 0)}%
+                    </Text>
+                  </View>
+                  <View style={styles.progressBarTrack}>
+                    <View
+                      style={[
+                        styles.progressBarFill,
+                        { width: `${Math.min(100, Math.max(0, item.progress || 0))}%` },
+                      ]}
+                    />
+                  </View>
+                  {Array.isArray(item.topics) && item.topics.length > 0 && (
+                    <TouchableOpacity
+                      style={styles.topicToggleBtn}
+                      onPress={() => toggleExamTopics(examId)}
+                      activeOpacity={0.7}
+                    >
+                      <BookOpen size={13} color={colors.accent} />
+                      <Text style={styles.topicToggleText}>
+                        {expandedExamTopics[examId] ? 'Hide topics' : 'View syllabus topics'}
+                      </Text>
+                      {expandedExamTopics[examId] ? (
+                        <ChevronUp size={14} color={colors.accent} />
+                      ) : (
+                        <ChevronDown size={14} color={colors.accent} />
+                      )}
+                    </TouchableOpacity>
+                  )}
+                  {expandedExamTopics[examId] && Array.isArray(item.topics) && (
+                    <View style={styles.topicsList}>
+                      {item.topics.map((t, tIdx) => {
+                        const isDone = typeof t === 'object' ? (t.completed || t.status === 'completed') : false;
+                        const title = typeof t === 'object' ? (t.title || t.name) : `Topic ${tIdx + 1}`;
+                        return (
+                          <View key={t._id || t.id || tIdx} style={styles.topicItemRow}>
+                            <CheckCircle2
+                              size={14}
+                              color={isDone ? '#10b981' : colors.mutedForeground}
+                            />
+                            <Text
+                              style={[
+                                styles.topicItemText,
+                                isDone && styles.topicItemTextCompleted,
+                              ]}
+                              numberOfLines={1}
+                            >
+                              {title}
+                            </Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  )}
+                </View>
+              ) : null}
+
               <View style={styles.cardFooter}>
                 <View style={styles.progressBox}>
                   {!item.completed ? (
                     <Text style={styles.progressText}>
-                      Subject Progress: {item.progress || item.subject?.progress || 0}%
+                      {item.topicsTotal > 0
+                        ? `Exam: ${Math.round(item.progress || 0)}% ready`
+                        : `Subject: ${item.progress || item.subject?.progress || 0}%`}
                     </Text>
                   ) : (
                     <Text style={styles.progressText}>Exam Completed</Text>
@@ -503,6 +627,15 @@ const ExamsScreen = ({ route, navigation }) => {
                 </View>
 
                 <View style={styles.cardActions}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onPress={() => handleOpenEdit(item)}
+                    style={styles.actionBtn}
+                  >
+                    <PenLine size={13} color={colors.foreground} style={{ marginRight: 4 }} />
+                    Edit
+                  </Button>
                   {!item.completed ? (
                     <Button
                       size="sm"
@@ -559,7 +692,9 @@ const ExamsScreen = ({ route, navigation }) => {
           <View style={styles.modalBackdrop} />
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Schedule Exam</Text>
+              <Text style={styles.modalTitle}>
+                {editingExamId ? 'Edit Exam & Syllabus' : 'Schedule Exam'}
+              </Text>
               <Button variant="quiet" style={styles.closeBtn} onPress={() => setModalVisible(false)}>
                 <X size={20} color={colors.foreground} />
               </Button>
@@ -567,7 +702,7 @@ const ExamsScreen = ({ route, navigation }) => {
 
             <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled">
               <Field label="Exam Name / Title">
-                <Input value={name} onChangeText={setName} placeholder="Enter exam name" />
+                <Input value={name} onChangeText={setName} placeholder="e.g. Midterm Test / End Sem" />
               </Field>
 
               <Field label="Subject">
@@ -578,6 +713,23 @@ const ExamsScreen = ({ route, navigation }) => {
                   placeholder="Select your subject"
                 />
               </Field>
+
+              {/* Syllabus Picker for Selected Subject */}
+              {!!subjectId && (
+                <View style={{ marginBottom: spacing.md }}>
+                  <Text style={[styles.fieldLabel, { color: colors.foreground, marginBottom: spacing.xs }]}>
+                    Exam Syllabus (Topics to be tested)
+                  </Text>
+                  <ExamSyllabusPicker
+                    subjectId={subjectId}
+                    selectedTopicIds={selectedTopicIds}
+                    onSelectionChange={(topicIds, tree) => {
+                      setSelectedTopicIds(topicIds);
+                      setSyllabusStructure(tree);
+                    }}
+                  />
+                </View>
+              )}
 
               <Field label="Exam Type">
                 <SelectPicker
@@ -635,7 +787,7 @@ const ExamsScreen = ({ route, navigation }) => {
                 <Input
                   value={venue}
                   onChangeText={setVenue}
-                  placeholder="Enter exam venue"
+                  placeholder="e.g. Hall A, Room 302"
                 />
               </Field>
 
@@ -662,11 +814,11 @@ const ExamsScreen = ({ route, navigation }) => {
               </Button>
               <Button
                 style={styles.modalBtn}
-                onPress={handleCreate}
+                onPress={handleSave}
                 loading={submitting}
-                disabled={!name.trim() || !subjectId || submitting}
+                disabled={!name.trim() || (!subjectId && selectedTopicIds.length === 0) || submitting}
               >
-                Schedule Exam
+                {editingExamId ? 'Save Changes' : 'Schedule Exam'}
               </Button>
             </View>
           </View>
@@ -1060,6 +1212,80 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
     tabButtonTextActive: {
       color: colors.accent,
       fontFamily: typography.sans.bold,
+    },
+    syllabusProgressBox: {
+      backgroundColor: colors.background,
+      borderRadius: radii.lg,
+      padding: spacing.sm,
+      marginVertical: spacing.xs,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+    },
+    syllabusProgressHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 6,
+    },
+    syllabusProgressLabel: {
+      fontFamily: typography.sans.semibold,
+      fontSize: 12,
+      color: colors.foreground,
+    },
+    syllabusProgressPercent: {
+      fontFamily: typography.mono.bold,
+      fontSize: 12,
+      color: colors.accent,
+    },
+    progressBarTrack: {
+      height: 6,
+      backgroundColor: colors.muted,
+      borderRadius: 3,
+      overflow: 'hidden',
+    },
+    progressBarFill: {
+      height: '100%',
+      backgroundColor: '#10b981',
+      borderRadius: 3,
+    },
+    topicToggleBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginTop: 8,
+      paddingVertical: 2,
+    },
+    topicToggleText: {
+      fontFamily: typography.sans.medium,
+      fontSize: 12,
+      color: colors.accent,
+    },
+    topicsList: {
+      marginTop: 6,
+      paddingTop: 6,
+      borderTopWidth: 1,
+      borderTopColor: colors.cardBorder,
+      gap: 6,
+    },
+    topicItemRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    topicItemText: {
+      fontFamily: typography.sans.regular,
+      fontSize: 12,
+      color: colors.foreground,
+      flex: 1,
+    },
+    topicItemTextCompleted: {
+      color: colors.mutedForeground,
+      textDecorationLine: 'line-through',
+    },
+    fieldLabel: {
+      fontFamily: typography.mono.bold,
+      fontSize: 10,
+      textTransform: 'uppercase',
     },
   });
 

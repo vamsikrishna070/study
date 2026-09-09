@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 const examSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-  subject: { type: mongoose.Schema.Types.ObjectId, ref: 'Subject', required: true },
+  subject: { type: mongoose.Schema.Types.ObjectId, ref: 'Subject', default: null },
   name: { type: String, required: true, trim: true },
   type: { type: String, trim: true, default: 'End semester' },
   date: { type: Date, required: true },
@@ -17,6 +17,12 @@ const examSchema = new mongoose.Schema({
   percentage: { type: Number },
   resultDate: { type: Date },
   remarks: { type: String, trim: true, default: '' },
+  topics: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Topic' }],
+  syllabus: [{
+    subjectId: { type: mongoose.Schema.Types.ObjectId, ref: 'Subject' },
+    unitId: { type: mongoose.Schema.Types.ObjectId, ref: 'Unit' },
+    topicId: { type: mongoose.Schema.Types.ObjectId, ref: 'Topic' },
+  }],
 }, { timestamps: true });
 
 export default mongoose.model('Exam', examSchema);
