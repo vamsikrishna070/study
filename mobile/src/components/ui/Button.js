@@ -6,6 +6,7 @@ export function Button({
   children,
   variant = 'primary',
   size = 'md',
+  fullWidth = false,
   onPress,
   disabled,
   loading,
@@ -17,20 +18,38 @@ export function Button({
 
   const getVariantStyles = () => {
     switch (variant) {
-      case 'quiet':
+      case 'secondary':
         return {
-          button: { backgroundColor: 'transparent' },
-          text: { color: colors.foreground },
+          button: {
+            backgroundColor: `${colors.primary}18`,
+            borderColor: `${colors.primary}35`,
+            borderWidth: 1,
+          },
+          text: { color: colors.primary },
         };
       case 'outline':
         return {
-          button: { backgroundColor: colors.card, borderColor: colors.cardBorder, borderWidth: 1 },
+          button: {
+            backgroundColor: 'transparent',
+            borderColor: colors.cardBorder,
+            borderWidth: 1,
+          },
           text: { color: colors.foreground },
         };
       case 'danger':
         return {
-          button: { backgroundColor: `${colors.destructive}1A`, borderColor: `${colors.destructive}33`, borderWidth: 1 },
+          button: {
+            backgroundColor: `${colors.destructive}1A`,
+            borderColor: `${colors.destructive}33`,
+            borderWidth: 1,
+          },
           text: { color: colors.destructive },
+        };
+      case 'ghost':
+      case 'quiet':
+        return {
+          button: { backgroundColor: 'transparent' },
+          text: { color: colors.foreground },
         };
       case 'primary':
       default:
@@ -45,19 +64,37 @@ export function Button({
     switch (size) {
       case 'sm':
         return {
-          button: { paddingVertical: 6, paddingHorizontal: 10, minHeight: 34, borderRadius: radii.md },
-          text: { fontSize: 12 },
+          button: {
+            height: 36,
+            minHeight: 36,
+            paddingVertical: 6,
+            paddingHorizontal: spacing.md,
+            borderRadius: radii.lg,
+          },
+          text: { fontSize: 12, fontFamily: typography.sans.semiBold },
         };
       case 'lg':
         return {
-          button: { paddingVertical: 14, paddingHorizontal: spacing.lg, minHeight: 52, borderRadius: radii.xl },
-          text: { fontSize: 15 },
+          button: {
+            height: 52,
+            minHeight: 52,
+            paddingVertical: 14,
+            paddingHorizontal: spacing.xl,
+            borderRadius: radii.xl,
+          },
+          text: { fontSize: 15, fontFamily: typography.sans.bold },
         };
       case 'md':
       default:
         return {
-          button: { paddingVertical: 12, paddingHorizontal: spacing.md, minHeight: 48, borderRadius: radii.xl },
-          text: { fontSize: 14 },
+          button: {
+            height: 48,
+            minHeight: 48,
+            paddingVertical: 12,
+            paddingHorizontal: spacing.lg,
+            borderRadius: radii.xl,
+          },
+          text: { fontSize: 14, fontFamily: typography.sans.bold },
         };
     }
   };
@@ -71,6 +108,7 @@ export function Button({
         styles.baseButton,
         sStyles.button,
         vStyles.button,
+        fullWidth && styles.fullWidth,
         (disabled || loading) && styles.disabled,
         style,
       ]}
@@ -84,7 +122,11 @@ export function Button({
         <View style={styles.contentContainer}>
           {React.Children.map(children, (child) => {
             if (typeof child === 'string' || typeof child === 'number') {
-              return <Text style={[styles.baseText, sStyles.text, vStyles.text, textStyle]}>{child}</Text>;
+              return (
+                <Text style={[styles.baseText, sStyles.text, vStyles.text, textStyle]}>
+                  {child}
+                </Text>
+              );
             }
             return child;
           })}
@@ -101,16 +143,20 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
+    fullWidth: {
+      width: '100%',
+    },
     contentContainer: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
+      gap: 8,
     },
     baseText: {
-      fontFamily: typography.sans.bold,
       textAlign: 'center',
     },
     disabled: {
       opacity: 0.5,
     },
   });
+

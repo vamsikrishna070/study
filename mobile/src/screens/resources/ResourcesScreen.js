@@ -32,6 +32,11 @@ import {
   Pause,
   RotateCcw,
   Search,
+  Check,
+  Edit3,
+  Eye,
+  Paperclip,
+  Trash2,
 } from 'lucide-react-native';
 import { viewDocument } from '../../utils/documentViewer';
 import { getAttachmentKind, getKindLabel, getOpenLabel, openAttachment } from '../../utils/attachmentHelper';
@@ -525,8 +530,8 @@ const ResourcesScreen = ({ route, navigation }) => {
               title="Resources"
               detail="Keep the best explanations close, not scattered across twenty tabs."
               action={
-                <Button size="sm" onPress={() => setModalVisible(true)}>
-                  <Plus size={16} color={colors.primaryForeground} style={{ marginRight: 6 }} />
+                <Button onPress={() => setModalVisible(true)}>
+                  <Plus size={18} color={colors.primaryForeground} />
                   Save resource
                 </Button>
               }
@@ -575,7 +580,7 @@ const ResourcesScreen = ({ route, navigation }) => {
                 icon={Library}
                 action={
                   <Button onPress={() => setModalVisible(true)}>
-                    <Plus size={16} color={colors.primaryForeground} style={{ marginRight: 6 }} />
+                    <Plus size={18} color={colors.primaryForeground} />
                     Save first resource
                   </Button>
                 }
@@ -604,6 +609,7 @@ const ResourcesScreen = ({ route, navigation }) => {
             showDeleteConfirm({
               title: 'Delete File?',
               message: `Are you sure you want to delete:\n\n"${attToDelete.name || attToDelete.originalName || 'Attachment'}"`,
+              confirmText: 'Delete',
               onConfirm: async () => {
                 const updatedAtts = attList.filter((_, idx) => idx !== attIdx);
                 try {
@@ -619,9 +625,14 @@ const ResourcesScreen = ({ route, navigation }) => {
             });
           };
 
+          const subjectDisplayName = item.subjectCode
+            ? `${item.subjectCode} - ${typeof item.subject === 'object' ? item.subject?.name : item.subject}`
+            : (item.subject?.name || (typeof item.subject === 'string' ? item.subject : ''));
+
           return (
             <View style={styles.card}>
-              <View style={styles.cardHeader}>
+              {/* Header: Type Icon, Dominant Title, Status Badge */}
+              <View style={styles.cardHeaderRow}>
                 <View style={styles.iconBox}>
                   <ResourceIcon
                     type={item.resourceType}
@@ -629,44 +640,70 @@ const ResourcesScreen = ({ route, navigation }) => {
                     color={colors.primary}
                   />
                 </View>
+
+                <View style={styles.cardTitleCol}>
+                  <Text style={styles.cardTitle} numberOfLines={2}>
+                    {item.title}
+                  </Text>
+                  <View style={styles.metaRow}>
+                    {Boolean(subjectDisplayName) && (
+                      <Text style={styles.metaSubject} numberOfLines={1}>
+                        {subjectDisplayName}
+                      </Text>
+                    )}
+                    {Boolean(item.topic) && (
+                      <>
+                        {Boolean(subjectDisplayName) && <Text style={styles.metaDot}>•</Text>}
+                        <Text style={styles.metaTopic} numberOfLines={1}>
+                          {item.topic}
+                        </Text>
+                      </>
+                    )}
+                    {item.rating > 0 && (
+                      <>
+                        {(Boolean(subjectDisplayName) || Boolean(item.topic)) && (
+                          <Text style={styles.metaDot}>•</Text>
+                        )}
+                        <View style={styles.ratingBox}>
+                          <Star size={11} color="#eab308" fill="#eab308" />
+                          <Text style={styles.ratingText}>{item.rating}/5</Text>
+                        </View>
+                      </>
+                    )}
+                  </View>
+                </View>
+
                 <TouchableOpacity
-                  style={[styles.badge, item.watched ? styles.badgeWatched : null]}
+                  style={[styles.statusBadge, item.watched ? styles.statusBadgeWatched : styles.statusBadgePending]}
                   onPress={() => handleToggleWatched(item)}
                   activeOpacity={0.7}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                 >
-                  <Text style={[styles.badgeText, item.watched ? styles.badgeTextWatched : null]}>
-                    {item.watched ? 'completed' : 'to explore'}
+                  {item.watched ? (
+                    <Check size={10} color={colors.accent} style={{ marginRight: 3 }} />
+                  ) : null}
+                  <Text style={[styles.statusBadgeText, item.watched ? styles.statusBadgeTextWatched : styles.statusBadgeTextPending]}>
+                    {item.watched ? 'Completed' : 'To explore'}
                   </Text>
                 </TouchableOpacity>
               </View>
 
-              <Text style={styles.cardTitle}>{item.title}</Text>
-
-              <View style={styles.metaRow}>
-                {!!(item.subjectCode ? `${item.subjectCode} - ${typeof item.subject === 'object' ? item.subject?.name : item.subject}` : (item.subject?.name || (typeof item.subject === 'string' ? item.subject : ''))) && (
-                  <Text style={styles.subjectChip}>
-                    {item.subjectCode ? `${item.subjectCode} - ${typeof item.subject === 'object' ? item.subject?.name : item.subject}` : (item.subject?.name || (typeof item.subject === 'string' ? item.subject : ''))}
-                  </Text>
-                )}
-                {item.rating > 0 && (
-                  <View style={styles.ratingBox}>
-                    <Star size={13} color="#eab308" fill="#eab308" />
-                    <Text style={styles.ratingText}>{item.rating}/5</Text>
-                  </View>
-                )}
-              </View>
-
-              {!!item.description && (
-                <Text style={styles.cardPreview} numberOfLines={2}>
+              {/* Description preview if present */}
+              {Boolean(item.description) && (
+                <Text style={styles.cardDescription} numberOfLines={2}>
                   {item.description}
                 </Text>
               )}
 
+              {/* Attachments Section (Single subtle container for multiple items) */}
               {attList.length > 0 && (
-                <View style={{ marginTop: 10, gap: 8 }}>
-                  <Text style={{ fontFamily: typography.mono.bold, fontSize: 10, color: colors.mutedForeground, letterSpacing: 0.8 }}>
-                    ATTACHMENTS ({attList.length})
-                  </Text>
+                <View style={styles.attachmentsContainer}>
+                  <View style={styles.attachmentsHeaderBar}>
+                    <Paperclip size={12} color={colors.mutedForeground} style={{ marginRight: 5 }} />
+                    <Text style={styles.attachmentsHeaderText}>
+                      ATTACHMENTS ({attList.length})
+                    </Text>
+                  </View>
                   {attList.map((att, attIdx) => {
                     const attUrl = att.url;
                     const kind = getAttachmentKind(att);
@@ -699,127 +736,114 @@ const ResourcesScreen = ({ route, navigation }) => {
                     return (
                       <View
                         key={att.id || att._id || attIdx}
-                        style={{
-                          backgroundColor: colors.background,
-                          borderRadius: radii.md,
-                          padding: 12,
-                          borderWidth: 1,
-                          borderColor: colors.cardBorder,
-                        }}
+                        style={[
+                          styles.attachmentItemRow,
+                          attIdx > 0 && styles.attachmentItemBorderTop,
+                        ]}
                       >
-
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                          <View style={{
-                            width: 34, height: 34, borderRadius: radii.sm,
-                            backgroundColor: `${iconColor}18`,
-                            alignItems: 'center', justifyContent: 'center', marginRight: 10,
-                          }}>
-                            <KindIcon size={18} color={iconColor} />
+                        <View style={styles.attachmentMainRow}>
+                          <View style={[styles.attachmentIconBox, { backgroundColor: `${iconColor}14` }]}>
+                            <KindIcon size={16} color={iconColor} />
                           </View>
-                          <View style={{ flex: 1 }}>
-                            <Text style={{ fontFamily: typography.sans.medium, fontSize: 13, color: colors.foreground }} numberOfLines={1}>
+                          <View style={styles.attachmentInfoCol}>
+                            <Text style={styles.attachmentName} numberOfLines={1} ellipsizeMode="middle">
                               {att.name || att.originalName || 'Attachment'}
                             </Text>
-                            <Text style={{ fontFamily: typography.mono.regular, fontSize: 11, color: colors.mutedForeground, marginTop: 1 }}>
+                            <Text style={styles.attachmentMeta}>
                               {kindLabel}{sizeText ? ` • ${sizeText}` : ''}
                             </Text>
+                          </View>
+
+                          {/* Action controls */}
+                          <View style={styles.attachmentActionsCol}>
+                            {!isAudioKind && attUrl && (
+                              <TouchableOpacity
+                                onPress={handleOpen}
+                                activeOpacity={0.7}
+                                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                                style={styles.attachmentViewBtn}
+                              >
+                                <ExternalLink size={12} color={colors.accent} style={{ marginRight: 4 }} />
+                                <Text style={styles.attachmentViewBtnText}>{openLabel}</Text>
+                              </TouchableOpacity>
+                            )}
+                            <TouchableOpacity
+                              onPress={() => handleRemoveSingleAttachment(attIdx)}
+                              activeOpacity={0.7}
+                              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                              style={styles.attachmentDeleteBtn}
+                            >
+                              <Trash2 size={13} color={colors.destructive} />
+                            </TouchableOpacity>
                           </View>
                         </View>
 
                         {isImageKind && attUrl && (
                           <Image
                             source={{ uri: attUrl }}
-                            style={{ height: 100, borderRadius: radii.sm, marginTop: 8 }}
+                            style={styles.attachmentImageThumb}
                             resizeMode="cover"
                           />
                         )}
 
                         {isAudioKind && attUrl && (
-                          <ResourceAudioBar url={attUrl} title={att.name || item.title} />
+                          <View style={{ marginTop: 6 }}>
+                            <ResourceAudioBar url={attUrl} title={att.name || item.title} />
+                          </View>
                         )}
-
-                        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginTop: 10, gap: 10 }}>
-                          {!isAudioKind && attUrl && (
-                            <TouchableOpacity
-                              onPress={handleOpen}
-                              activeOpacity={0.7}
-                              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                              style={{
-                                flexDirection: 'row', alignItems: 'center',
-                                paddingVertical: 6, paddingHorizontal: 14,
-                                backgroundColor: `${colors.accent}15`,
-                                borderRadius: radii.sm, borderWidth: 1, borderColor: `${colors.accent}30`,
-                              }}
-                            >
-                              <ExternalLink size={14} color={colors.accent} style={{ marginRight: 5 }} />
-                              <Text style={{ fontFamily: typography.sans.semiBold, fontSize: 12, color: colors.accent }}>{openLabel}</Text>
-                            </TouchableOpacity>
-                          )}
-                          <TouchableOpacity
-                            onPress={() => handleRemoveSingleAttachment(attIdx)}
-                            activeOpacity={0.7}
-                            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                            style={{
-                              flexDirection: 'row', alignItems: 'center',
-                              paddingVertical: 6, paddingHorizontal: 14,
-                              backgroundColor: `${colors.destructive}12`,
-                              borderRadius: radii.sm, borderWidth: 1, borderColor: `${colors.destructive}25`,
-                            }}
-                          >
-                            <X size={14} color={colors.destructive} style={{ marginRight: 5 }} />
-                            <Text style={{ fontFamily: typography.sans.semiBold, fontSize: 12, color: colors.destructive }}>Delete</Text>
-                          </TouchableOpacity>
-                        </View>
                       </View>
                     );
                   })}
                 </View>
               )}
 
+              {/* Web / YouTube Link Box (Single subtle container) */}
               {isLink && (item.url || item.fileData?.url) && (
-                <View style={{ marginTop: 10, padding: 12, backgroundColor: colors.muted + '20', borderRadius: radii.md, borderWidth: 1, borderColor: colors.cardBorder }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                    <ExternalLink size={16} color={colors.accent} style={{ marginRight: 6 }} />
-                    <Text style={{ fontFamily: typography.sans.semiBold, fontSize: 14, color: colors.foreground }}>Link</Text>
+                <View style={styles.linkContainer}>
+                  <View style={styles.linkInfoCol}>
+                    <ExternalLink size={15} color={colors.accent} style={{ marginRight: 8 }} />
+                    <Text style={styles.linkUrlText} numberOfLines={1} ellipsizeMode="middle">
+                      {item.url || item.fileData?.url}
+                    </Text>
                   </View>
-                  <Text style={{ fontFamily: typography.sans.regular, fontSize: 13, color: colors.primary, marginBottom: 8 }} numberOfLines={2}>
-                    {item.url || item.fileData?.url}
-                  </Text>
                   <TouchableOpacity
-                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, backgroundColor: colors.accent + '15', borderRadius: radii.sm }}
+                    style={styles.linkActionBtn}
                     onPress={() => Linking.openURL(item.url || item.fileData?.url).catch(() => viewDocument(item.url || item.fileData?.url, item.title))}
+                    activeOpacity={0.7}
                   >
-                    <Text style={{ fontFamily: typography.sans.medium, fontSize: 13, color: colors.accent }}>Open Link</Text>
+                    <Text style={styles.linkActionBtnText}>Open Link</Text>
                   </TouchableOpacity>
                 </View>
               )}
 
-              {item.tags?.length > 0 && (
-                <View style={styles.tagsRow}>
-                  {item.tags.map((tag, i) => (
-                    <Text key={i} style={styles.tagText}>
-                      #{tag}
-                    </Text>
+              {/* Card Footer: Tags on Left, Resource Actions (Edit / Delete) on Right */}
+              <View style={styles.cardFooter}>
+                <View style={styles.tagsContainer}>
+                  {(item.tags || []).map((tag, i) => (
+                    <View key={i} style={styles.tagPill}>
+                      <Text style={styles.tagText}>#{tag}</Text>
+                    </View>
                   ))}
                 </View>
-              )}
 
-              <View style={styles.cardFooter}>
-                <View style={{ flexDirection: 'row', gap: 12, marginLeft: 'auto' }}>
-                  <Button
-                    variant="quiet"
+                <View style={styles.cardFooterActions}>
+                  <TouchableOpacity
                     onPress={() => handleEdit(item)}
-                    style={[styles.deleteBtn, { backgroundColor: 'transparent' }]}
+                    style={styles.cardEditBtn}
+                    activeOpacity={0.7}
                   >
-                    Edit
-                  </Button>
-                  <Button
-                    variant="danger"
+                    <Edit3 size={13} color={colors.foreground} style={{ marginRight: 4 }} />
+                    <Text style={styles.cardEditBtnText}>Edit</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
                     onPress={() => handleDelete(resId)}
-                    style={styles.deleteBtn}
+                    style={styles.cardDeleteBtn}
+                    activeOpacity={0.7}
                   >
-                    Delete Resource
-                  </Button>
+                    <Trash2 size={13} color={colors.destructive} style={{ marginRight: 4 }} />
+                    <Text style={styles.cardDeleteBtnText}>Delete</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
             </View>
@@ -966,7 +990,7 @@ const ResourcesScreen = ({ route, navigation }) => {
                 { paddingBottom: Math.max(insets.bottom, spacing.md) },
               ]}
             >
-              <Button variant="quiet" style={styles.modalBtn} onPress={closeAndResetModal}>
+              <Button variant="ghost" style={styles.modalBtn} onPress={closeAndResetModal}>
                 Cancel
               </Button>
               <Button
@@ -975,6 +999,7 @@ const ResourcesScreen = ({ route, navigation }) => {
                 loading={submitting}
                 disabled={!title.trim() || submitting || uploadingFile}
               >
+                <Check size={18} color={colors.primaryForeground} />
                 Save Resource
               </Button>
             </View>
@@ -1000,96 +1025,216 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
       borderRadius: radii.xl,
       borderWidth: 1,
       borderColor: colors.cardBorder,
-      padding: spacing.lg,
+      padding: spacing.md,
       marginBottom: spacing.md,
     },
-    cardHeader: {
+    cardHeaderRow: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: spacing.xs,
+      alignItems: 'flex-start',
+      gap: spacing.sm,
+      marginBottom: 6,
     },
     iconBox: {
       width: 38,
       height: 38,
       borderRadius: radii.md,
-      backgroundColor: colors.muted + '80',
+      backgroundColor: colors.muted + '60',
       alignItems: 'center',
       justifyContent: 'center',
+      marginTop: 2,
     },
-    badge: {
-      backgroundColor: colors.muted,
-      paddingHorizontal: 8,
-      paddingVertical: 3,
-      borderRadius: radii.round,
-    },
-    badgeWatched: {
-      backgroundColor: colors.accent + '20',
-    },
-    badgeText: {
-      fontFamily: typography.mono.regular,
-      fontSize: 10,
-      textTransform: 'uppercase',
-      color: colors.mutedForeground,
-    },
-    badgeTextWatched: {
-      color: colors.accent,
-      fontFamily: typography.mono.bold,
+    cardTitleCol: {
+      flex: 1,
+      justifyContent: 'center',
     },
     cardTitle: {
       fontFamily: typography.serif.medium,
-      fontSize: 20,
+      fontSize: 17,
+      lineHeight: 22,
       color: colors.foreground,
-      marginTop: spacing.xs,
-      marginBottom: 2,
     },
     metaRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: spacing.sm,
-      marginVertical: 4,
+      flexWrap: 'wrap',
+      gap: 5,
+      marginTop: 3,
     },
-    subjectChip: {
+    metaSubject: {
       fontFamily: typography.sans.medium,
       fontSize: 11,
       color: colors.primary,
-      backgroundColor: `${colors.primary}1A`,
-      paddingHorizontal: 8,
-      paddingVertical: 2,
-      borderRadius: radii.sm,
+    },
+    metaTopic: {
+      fontFamily: typography.sans.regular,
+      fontSize: 11,
+      color: colors.mutedForeground,
+    },
+    metaDot: {
+      fontSize: 10,
+      color: colors.mutedForeground,
     },
     ratingBox: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 3,
+      gap: 2,
     },
     ratingText: {
       fontFamily: typography.mono.medium,
-      fontSize: 11,
+      fontSize: 10,
       color: colors.foreground,
     },
-    cardPreview: {
+    statusBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: radii.round,
+      alignSelf: 'flex-start',
+    },
+    statusBadgeWatched: {
+      backgroundColor: `${colors.accent}18`,
+    },
+    statusBadgePending: {
+      backgroundColor: `${colors.muted}60`,
+    },
+    statusBadgeText: {
+      fontFamily: typography.mono.bold,
+      fontSize: 10,
+      textTransform: 'uppercase',
+    },
+    statusBadgeTextWatched: {
+      color: colors.accent,
+    },
+    statusBadgeTextPending: {
+      color: colors.mutedForeground,
+    },
+    cardDescription: {
       fontFamily: typography.sans.regular,
       fontSize: 13,
       color: colors.mutedForeground,
       lineHeight: 18,
-      marginTop: spacing.xs,
-      marginBottom: spacing.sm,
+      marginTop: 6,
+      marginBottom: 2,
     },
-    cardImagePreview: {
-      height: 120,
-      width: '100%',
+    attachmentsContainer: {
+      backgroundColor: colors.background,
       borderRadius: radii.lg,
-      marginVertical: spacing.xs,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      marginTop: 10,
+      overflow: 'hidden',
     },
-    tagsRow: {
+    attachmentsHeaderBar: {
       flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: 6,
-      marginVertical: spacing.xs,
+      alignItems: 'center',
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      backgroundColor: `${colors.muted}30`,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.cardBorder,
     },
-    tagText: {
+    attachmentsHeaderText: {
+      fontFamily: typography.mono.bold,
+      fontSize: 10,
+      color: colors.mutedForeground,
+      letterSpacing: 0.8,
+    },
+    attachmentItemRow: {
+      padding: 10,
+    },
+    attachmentItemBorderTop: {
+      borderTopWidth: 1,
+      borderTopColor: colors.cardBorder,
+    },
+    attachmentMainRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    attachmentIconBox: {
+      width: 32,
+      height: 32,
+      borderRadius: radii.sm,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    attachmentInfoCol: {
+      flex: 1,
+    },
+    attachmentName: {
+      fontFamily: typography.sans.medium,
+      fontSize: 13,
+      color: colors.foreground,
+    },
+    attachmentMeta: {
       fontFamily: typography.mono.regular,
+      fontSize: 11,
+      color: colors.mutedForeground,
+      marginTop: 1,
+    },
+    attachmentActionsCol: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    attachmentViewBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 4,
+      paddingHorizontal: 8,
+      borderRadius: radii.sm,
+      backgroundColor: `${colors.accent}15`,
+      borderWidth: 1,
+      borderColor: `${colors.accent}30`,
+    },
+    attachmentViewBtnText: {
+      fontFamily: typography.sans.bold,
+      fontSize: 11,
+      color: colors.accent,
+    },
+    attachmentDeleteBtn: {
+      padding: 5,
+    },
+    attachmentImageThumb: {
+      height: 90,
+      borderRadius: radii.sm,
+      marginTop: 8,
+    },
+    linkContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: colors.background,
+      borderRadius: radii.lg,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      padding: 10,
+      marginTop: 10,
+      gap: 10,
+    },
+    linkInfoCol: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+      overflow: 'hidden',
+    },
+    linkUrlText: {
+      fontFamily: typography.sans.regular,
+      fontSize: 12,
+      color: colors.foreground,
+      flex: 1,
+    },
+    linkActionBtn: {
+      paddingVertical: 5,
+      paddingHorizontal: 10,
+      backgroundColor: `${colors.accent}15`,
+      borderRadius: radii.sm,
+      borderWidth: 1,
+      borderColor: `${colors.accent}30`,
+    },
+    linkActionBtnText: {
+      fontFamily: typography.sans.bold,
       fontSize: 11,
       color: colors.accent,
     },
@@ -1097,23 +1242,61 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginTop: spacing.sm,
-      paddingTop: spacing.sm,
+      marginTop: 12,
+      paddingTop: 10,
       borderTopWidth: 1,
       borderTopColor: colors.cardBorder,
     },
-    openBtn: {
+    tagsContainer: {
       flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      paddingVertical: 4,
+      flexWrap: 'wrap',
+      gap: 5,
+      flex: 1,
     },
-    openBtnText: {
-      fontFamily: typography.sans.semiBold,
-      fontSize: 13,
+    tagPill: {
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: radii.sm,
+      backgroundColor: `${colors.accent}10`,
+    },
+    tagText: {
+      fontFamily: typography.mono.regular,
+      fontSize: 10,
       color: colors.accent,
     },
-    deleteBtn: { minHeight: 30, paddingVertical: 2, paddingHorizontal: 10 },
+    cardFooterActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    cardEditBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 5,
+      paddingHorizontal: 10,
+      borderRadius: radii.sm,
+      backgroundColor: `${colors.muted}40`,
+    },
+    cardEditBtnText: {
+      fontFamily: typography.sans.bold,
+      fontSize: 12,
+      color: colors.foreground,
+    },
+    cardDeleteBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 5,
+      paddingHorizontal: 10,
+      borderRadius: radii.sm,
+      backgroundColor: `${colors.destructive}12`,
+      borderWidth: 1,
+      borderColor: `${colors.destructive}25`,
+    },
+    cardDeleteBtnText: {
+      fontFamily: typography.sans.bold,
+      fontSize: 12,
+      color: colors.destructive,
+    },
     modalContainer: { flex: 1, justifyContent: 'flex-end' },
     modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(24,32,49,0.48)' },
     modalContent: {

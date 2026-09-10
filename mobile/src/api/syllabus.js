@@ -38,6 +38,12 @@ export const confirmSyllabus = async (subjectId, units) => {
   return response.data;
 };
 
+export const updateSyllabus = async (subjectId, units) => {
+  const response = await client.put(`/subjects/${subjectId}/syllabus`, { units });
+  return response.data;
+};
+
+
 export const updateTopicCompletion = async (topicId, completed) => {
   const status = completed ? 'completed' : 'not-started';
   const response = await client.patch(`/topics/${topicId}`, { completed, status });

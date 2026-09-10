@@ -205,3 +205,109 @@ export async function confirmSyllabus(req, res) {
     res.status(500).json({ success: false, message: 'Failed to save syllabus' });
   }
 }
+
+export async function updateSyllabusStructure(req, res) {
+  try {
+    const subject = await Subject.findOne({
+      _id: req.params.id,
+      user: req.user._id,
+    });
+    if (!subject) {
+      return res.status(404).json({ success: false, message: 'Subject not found' });
+    }
+
+    const { units } = req.body;
+    if (!units || !Array.isArray(units)) {
+      return res
+        .status(400)
+        .json({ success: false, message: 'Units array is required' });
+    }
+
+    const currentUnits = await Unit.find({ subject: subject._id, user: req.user._id });
+    const currentTopics = await Topic.find({ subject: subject._id, user: req.user._id });
+
+    const processedUnitIds = new Set();
+    const processedTopicIds = new Set();
+
+    let unitOrder = 0;
+    for (const u of units) {
+      unitOrder++;
+      const unitTitle = u.title || u.name || u.unitName || `Unit ${unitOrder}`;
+      let unitDoc = null;
+
+      const incomingUnitId = u._id || u.id;
+      if (incomingUnitId) {
+        unitDoc = currentUnits.find((cu) => cu._id.toString() === incomingUnitId.toString());
+      }
+
+      if (unitDoc) {
+        unitDoc.title = unitTitle;
+        unitDoc.order = unitOrder;
+        await unitDoc.save();
+      } else {
+        unitDoc = await Unit.create({
+          user: req.user._id,
+          subject: subject._id,
+          title: unitTitle,
+          order: unitOrder,
+        });
+      }
+      processedUnitIds.add(unitDoc._id.toString());
+
+      if (u.topics && Array.isArray(u.topics)) {
+        let topicOrder = 0;
+        for (const t of u.topics) {
+          topicOrder++;
+          const topicTitle = t.title || t.name || `Topic ${topicOrder}`;
+          let topicDoc = null;
+
+          const incomingTopicId = t._id || t.id;
+          if (incomingTopicId) {
+            topicDoc = currentTopics.find((ct) => ct._id.toString() === incomingTopicId.toString());
+          }
+
+          if (topicDoc) {
+            topicDoc.title = topicTitle;
+            topicDoc.order = topicOrder;
+            topicDoc.unit = unitDoc._id;
+            await topicDoc.save();
+          } else {
+            topicDoc = await Topic.create({
+              user: req.user._id,
+              subject: subject._id,
+              unit: unitDoc._id,
+              title: topicTitle,
+              status: 'not-started',
+              completed: false,
+              importance: t.importance || 'medium',
+              order: topicOrder,
+            });
+          }
+          processedTopicIds.add(topicDoc._id.toString());
+        }
+      }
+    }
+
+    const topicsToRemove = currentTopics.filter((ct) => !processedTopicIds.has(ct._id.toString()));
+    if (topicsToRemove.length > 0) {
+      await Topic.deleteMany({ _id: { $in: topicsToRemove.map((t) => t._id) }, user: req.user._id });
+    }
+
+    const unitsToRemove = currentUnits.filter((cu) => !processedUnitIds.has(cu._id.toString()));
+    if (unitsToRemove.length > 0) {
+      await Unit.deleteMany({ _id: { $in: unitsToRemove.map((u) => u._id) }, user: req.user._id });
+    }
+
+    const progressData = await updateSubjectProgressHelper(subject._id, req.user._id);
+
+    res.json({
+      success: true,
+      message: 'Syllabus successfully updated',
+      data: progressData,
+    });
+  } catch (error) {
+    console.error('[SyllabusUpdate] Error:', error);
+    res.status(500).json({ success: false, message: 'Failed to update syllabus' });
+  }
+}
+

@@ -19,6 +19,7 @@ import {
   Sparkles,
   Layers,
   CloudUpload,
+  Edit3,
 } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import {
@@ -35,6 +36,7 @@ import { QueryState } from '../../components/ui/QueryState';
 import { Button } from '../../components/ui/Button';
 import { SelectPicker } from '../../components/ui/SelectPicker';
 import { SyllabusReviewModal } from '../../components/subjects/SyllabusReviewModal';
+import { SyllabusEditorModal } from '../../components/subjects/SyllabusEditorModal';
 import { DocumentPreviewCard } from '../../components/ui/DocumentPreviewCard';
 import { pickAndUploadDocument } from '../../utils/fileUploader';
 import { useAppDialog } from '../../components/ui/AppDialog';
@@ -58,6 +60,7 @@ const SyllabusScreen = ({ route, navigation }) => {
   const [expandedUnits, setExpandedUnits] = useState({});
 
   const [reviewVisible, setReviewVisible] = useState(false);
+  const [editorVisible, setEditorVisible] = useState(false);
   const [parsedUnits, setParsedUnits] = useState([]);
   const [extracting, setExtracting] = useState(false);
   const [uploadingPdf, setUploadingPdf] = useState(false);
@@ -339,12 +342,10 @@ const SyllabusScreen = ({ route, navigation }) => {
             subjectId ? (
               <Button
                 onPress={handleUploadAndExtract}
-                variant="outline"
-                size="sm"
                 loading={extracting || uploadingPdf}
                 disabled={extracting || uploadingPdf}
               >
-                <Sparkles size={16} color={subjectColor} style={{ marginRight: 6 }} />
+                <Upload size={18} color={colors.primaryForeground} />
                 {extracting ? 'Extracting...' : uploadingPdf ? 'Uploading...' : 'Upload PDF'}
               </Button>
             ) : null
@@ -393,6 +394,7 @@ const SyllabusScreen = ({ route, navigation }) => {
                 onReplace={handleUploadAndExtract}
                 onRemove={handleRemoveSyllabus}
                 onExtract={units.length === 0 ? handleExtractExisting : null}
+                onEditSyllabus={() => setEditorVisible(true)}
                 accentColor={subjectColor}
               />
             ) : (
@@ -454,6 +456,20 @@ const SyllabusScreen = ({ route, navigation }) => {
               </View>
             ) : (
               <View style={styles.unitsSection}>
+                <View style={styles.sectionHeaderRow}>
+                  <Text style={styles.sectionHeaderTitle}>CURRICULUM UNITS</Text>
+                  <TouchableOpacity
+                    style={[styles.editSyllabusBtn, { borderColor: `${subjectColor}40` }]}
+                    onPress={() => setEditorVisible(true)}
+                    activeOpacity={0.7}
+                  >
+                    <Edit3 size={14} color={subjectColor} style={{ marginRight: 6 }} />
+                    <Text style={[styles.editSyllabusBtnText, { color: subjectColor }]}>
+                      Edit Syllabus
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
                 {(() => {
                   let theoryCounter = 0;
                   const theoryUnits = units.filter(u => !u.isLab && !u.title?.toLowerCase().includes('laboratory'));
@@ -571,6 +587,19 @@ const SyllabusScreen = ({ route, navigation }) => {
           loadData();
         }}
       />
+
+      <SyllabusEditorModal
+        visible={editorVisible}
+        subject={currentSubject}
+        subjectId={subjectId}
+        units={units}
+        topics={topics}
+        onClose={() => setEditorVisible(false)}
+        onSuccess={() => {
+          setEditorVisible(false);
+          loadData();
+        }}
+      />
     </View>
   );
 };
@@ -670,13 +699,31 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
     unitsSection: {
       gap: spacing.sm,
     },
+    sectionHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: spacing.sm,
+      marginBottom: spacing.xs,
+    },
     sectionHeaderTitle: {
       fontFamily: typography.mono.bold,
       fontSize: 12,
       color: colors.mutedForeground,
       letterSpacing: 1.2,
-      marginBottom: 4,
-      marginTop: 8,
+    },
+    editSyllabusBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 5,
+      paddingHorizontal: 10,
+      borderRadius: radii.md,
+      borderWidth: 1,
+      backgroundColor: 'transparent',
+    },
+    editSyllabusBtnText: {
+      fontFamily: typography.sans.bold,
+      fontSize: 12,
     },
     unitCard: {
       backgroundColor: colors.card,

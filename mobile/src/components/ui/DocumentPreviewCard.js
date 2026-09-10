@@ -11,6 +11,7 @@ import {
   CircleCheck,
   CircleAlert,
   Check,
+  Edit3,
 } from 'lucide-react-native';
 import { useAppTheme, useStyles } from '../../theme/theme';
 import { useAppDialog } from './AppDialog';
@@ -34,6 +35,7 @@ export const DocumentPreviewCard = ({
   onReplace,
   onRemove,
   onExtract,
+  onEditSyllabus,
   accentColor,
   style,
 }) => {
@@ -187,6 +189,17 @@ export const DocumentPreviewCard = ({
           )}
           <Text style={styles.primaryActionText}>{viewing ? 'Opening...' : 'View PDF'}</Text>
         </TouchableOpacity>
+
+        {unitCount > 0 && onEditSyllabus && (
+          <TouchableOpacity
+            style={[styles.secondaryActionBtn, { borderColor: themeAccent }]}
+            onPress={onEditSyllabus}
+            activeOpacity={0.8}
+          >
+            <Edit3 size={16} color={themeAccent} style={{ marginRight: 6 }} />
+            <Text style={[styles.secondaryActionText, { color: themeAccent }]}>Edit Syllabus</Text>
+          </TouchableOpacity>
+        )}
 
         {unitCount === 0 && onExtract && (
           <TouchableOpacity
