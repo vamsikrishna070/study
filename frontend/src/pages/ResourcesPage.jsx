@@ -99,17 +99,20 @@ export default function ResourcesPage() {
   };
 
   const filteredResources = (resources || []).filter((r) => {
+    if (!r) return false;
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase().trim();
-    const title = (r.title || '').toLowerCase();
-    const sub = (r.customSubject || r.subject?.name || r.subject || '').toLowerCase();
-    const topic = (r.topic || '').toLowerCase();
-    const type = (r.resourceType || '').toLowerCase();
-    const tags = Array.isArray(r.tags) ? r.tags.join(' ').toLowerCase() : '';
+    const title = String(r.title || '').toLowerCase();
+    const sub = (typeof r.subject === 'object' && r.subject?.name
+      ? r.subject.name
+      : String(r.customSubject || r.subject || '')).toLowerCase();
+    const topic = String(r.topic || '').toLowerCase();
+    const type = String(r.resourceType || '').toLowerCase();
+    const tags = Array.isArray(r.tags) ? r.tags.filter(Boolean).join(' ').toLowerCase() : '';
     const attNames = Array.isArray(r.attachments)
-      ? r.attachments.map(a => `${a.originalName || ''} ${a.name || ''} ${a.filename || ''}`).join(' ').toLowerCase()
+      ? r.attachments.filter(Boolean).map(a => `${a.originalName || ''} ${a.name || ''} ${a.filename || ''}`).join(' ').toLowerCase()
       : '';
-    const fileDataName = (r.fileData?.originalName || '').toLowerCase();
+    const fileDataName = String(r.fileData?.originalName || '').toLowerCase();
     return (
       title.includes(q) ||
       sub.includes(q) ||

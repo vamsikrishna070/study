@@ -524,18 +524,21 @@ const ResourcesScreen = ({ route, navigation }) => {
   const isFileType = resourceType === 'file';
   const isRecordingType = resourceType === 'recording';
 
-  const filteredData = data.filter((item) => {
+  const filteredData = (data || []).filter((item) => {
+    if (!item) return false;
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase().trim();
-    const title = (item.title || '').toLowerCase();
-    const sub = (item.subject?.name || item.customSubject || item.subject || '').toLowerCase();
-    const topic = (item.topic || '').toLowerCase();
-    const type = (item.resourceType || '').toLowerCase();
-    const tags = Array.isArray(item.tags) ? item.tags.join(' ').toLowerCase() : '';
+    const title = String(item.title || '').toLowerCase();
+    const sub = (typeof item.subject === 'object' && item.subject?.name
+      ? item.subject.name
+      : String(item.customSubject || item.subject || '')).toLowerCase();
+    const topic = String(item.topic || '').toLowerCase();
+    const type = String(item.resourceType || '').toLowerCase();
+    const tags = Array.isArray(item.tags) ? item.tags.filter(Boolean).join(' ').toLowerCase() : '';
     const attNames = Array.isArray(item.attachments)
-      ? item.attachments.map((a) => `${a.originalName || ''} ${a.name || ''} ${a.filename || ''}`).join(' ').toLowerCase()
+      ? item.attachments.filter(Boolean).map((a) => `${a.originalName || ''} ${a.name || ''} ${a.filename || ''}`).join(' ').toLowerCase()
       : '';
-    const fileDataName = (item.fileData?.originalName || '').toLowerCase();
+    const fileDataName = String(item.fileData?.originalName || '').toLowerCase();
     return (
       title.includes(q) ||
       sub.includes(q) ||
@@ -842,7 +845,7 @@ const ResourcesScreen = ({ route, navigation }) => {
                       <Text style={styles.linkUrlText} numberOfLines={1} ellipsizeMode="middle">
                         {item.url || item.fileData?.url}
                       </Text>
-                      <Text style={{ fontSize: 10, fontFamily: typography.fonts.mono, color: colors.accent, textTransform: 'uppercase', marginTop: 2 }}>
+                      <Text style={styles.linkKindText}>
                         {getKindLabel(itemKind)}
                       </Text>
                     </View>
@@ -1266,6 +1269,13 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
       fontSize: 12,
       color: colors.foreground,
       flex: 1,
+    },
+    linkKindText: {
+      fontFamily: typography.mono.regular,
+      fontSize: 10,
+      color: colors.accent,
+      textTransform: 'uppercase',
+      marginTop: 2,
     },
     linkActionBtn: {
       paddingVertical: 5,

@@ -40,17 +40,21 @@ const serialize = (doc) => {
     value.subjectId ||
     null;
 
-  let attachments = value.attachments || [];
+  let attachments = Array.isArray(value.attachments) ? value.attachments : [];
   if (attachments.length === 0 && (value.fileData?.url || value.url)) {
+    const rawUrl = String(value.fileData?.url || value.url || '').trim();
+    const isLink = value.resourceType === 'link' || value.resourceType === 'youtube' ||
+      (!value.fileData?.publicId && /^https?:\/\//i.test(rawUrl) && !/cloudinary\.com/i.test(rawUrl) && !/\.(pdf|png|jpg|jpeg|webp|mp4|mp3|docx?|pptx?)$/i.test(rawUrl));
+
     attachments = [{
       _id: value.fileData?.publicId || value._id || 'legacy_1',
       id: value.fileData?.publicId || value._id || 'legacy_1',
       publicId: value.fileData?.publicId || '',
-      name: value.fileData?.originalName || value.title || 'Attachment',
-      originalName: value.fileData?.originalName || value.title || 'Attachment',
-      url: value.fileData?.url || value.url,
-      mimeType: value.fileData?.mimeType || 'application/pdf',
-      type: value.resourceType || 'file',
+      name: value.fileData?.originalName || value.title || (isLink ? 'Link' : 'Attachment'),
+      originalName: value.fileData?.originalName || value.title || (isLink ? 'Link' : 'Attachment'),
+      url: rawUrl,
+      mimeType: value.fileData?.mimeType || '',
+      type: value.resourceType || (isLink ? 'link' : 'file'),
       size: value.fileData?.size || 0,
       createdAt: value.createdAt || new Date(),
     }];
