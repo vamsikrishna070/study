@@ -60,10 +60,12 @@ export default function AttachmentCard({ attachment, onRemove, readonly }) {
     }
   };
 
+  const fileName = attachment.originalName || attachment.name || attachment.title || 'Attachment';
+
   const handleView = (e) => {
     e.stopPropagation();
     if (attachment.url) {
-      viewDocument(attachment.url);
+      viewDocument(attachment.url, fileName);
     }
   };
 
@@ -110,8 +112,6 @@ export default function AttachmentCard({ attachment, onRemove, readonly }) {
       // Clipboard copy failed
     }
   };
-
-  const fileName = attachment.originalName || attachment.name || attachment.title || 'Attachment';
 
   return (
     <div className="flex flex-col gap-2 rounded-xl border border-border bg-card p-3 shadow-sm transition-all hover:border-accent/40">

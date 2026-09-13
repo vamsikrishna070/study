@@ -1,6 +1,7 @@
 import { v2 as cloudinary } from 'cloudinary';
 import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import multer from 'multer';
+import path from 'node:path';
 import { env } from './env.js';
 
 cloudinary.config({
@@ -16,12 +17,14 @@ const storage = new CloudinaryStorage({
     if (file.mimetype.startsWith('audio/')) folder = 'studyarena/recordings';
     if (file.mimetype.startsWith('image/')) folder = 'studyarena/images';
 
-    const isRaw = !file.mimetype.startsWith('image/') && !file.mimetype.startsWith('video/') && !file.mimetype.startsWith('audio/');
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    const nameWithoutExt = path.basename(file.originalname || 'file', ext).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const publicId = `${Date.now()}-${nameWithoutExt}`;
 
     return {
       folder: folder,
-      resource_type: isRaw ? 'raw' : 'auto',
-      public_id: `${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9]/g, '_')}`
+      resource_type: 'auto',
+      public_id: publicId
     };
   },
 });

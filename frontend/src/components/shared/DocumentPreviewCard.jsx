@@ -52,7 +52,7 @@ export function DocumentPreviewCard({
   const handleView = () => {
     setViewing(true);
     try {
-      viewDocument(file.url);
+      viewDocument(file.url, originalName);
     } finally {
       setTimeout(() => setViewing(false), 500);
     }

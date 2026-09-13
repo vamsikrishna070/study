@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowUpRight, Library, Plus, FileText, Image as ImageIcon, Video, Music, File, ExternalLink, Download, Share2, Trash2, Check, X, Search } from 'lucide-react';
+import { ArrowUpRight, Eye, Library, Plus, FileText, Image as ImageIcon, Video, Music, File, ExternalLink, Download, Share2, Trash2, Check, X, Search } from 'lucide-react';
 import { getGetResourcesQueryKey, useGetResources, useDeleteResource, useUpdateResource } from '../services/apiHooks.js';
 import Shell from '../components/Shell.jsx';
 import { Button, EmptyState, LoadingBlock, PageHeading, QueryState, cx, fmtDate } from '../components/shared.jsx';
 import ResourceModal from '../components/resources/ResourceModal.jsx';
+import { viewDocument, getDownloadUrl, getPreviewUrl } from '../utils/documentViewer.js';
 
 function ResourceIcon({ type, mimeType }) {
   if (mimeType?.includes('image')) return <ImageIcon size={17} className="text-blue-500" />;
@@ -56,7 +57,8 @@ export default function ResourcesPage() {
   const handleDownload = async (url, filename) => {
     if (!url) return;
     try {
-      const response = await fetch(url);
+      const downloadUrl = getDownloadUrl(url);
+      const response = await fetch(downloadUrl);
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -67,7 +69,7 @@ export default function ResourcesPage() {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
     } catch {
-      window.open(url, '_blank');
+      window.open(getDownloadUrl(url), '_blank');
     }
   };
 
@@ -232,15 +234,14 @@ export default function ResourcesPage() {
                               <span className="font-medium truncate flex-1">{att.name || att.originalName || 'Attachment'}</span>
                               <div className="flex items-center gap-1 shrink-0">
                                 {att.url && (
-                                  <a
-                                    href={att.url}
-                                    target="_blank"
-                                    rel="noreferrer"
+                                  <button
+                                    type="button"
+                                    onClick={() => viewDocument(att.url, att.name || att.originalName)}
                                     className="rounded p-1 text-accent hover:bg-accent/10"
-                                    title="Open attachment"
+                                    title="View attachment"
                                   >
-                                    <ArrowUpRight size={13} />
-                                  </a>
+                                    <Eye size={13} />
+                                  </button>
                                 )}
                                 {att.url && (
                                   <button
