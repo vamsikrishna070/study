@@ -1,20 +1,44 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowUpRight, Eye, Library, Plus, FileText, Image as ImageIcon, Video, Music, File, ExternalLink, Download, Share2, Trash2, Check, X, Search } from 'lucide-react';
+import { ArrowUpRight, Eye, Library, Plus, FileText, Image as ImageIcon, Video, Music, File, Film, ExternalLink, Download, Share2, Trash2, Check, X, Search } from 'lucide-react';
 import { getGetResourcesQueryKey, useGetResources, useDeleteResource, useUpdateResource } from '../services/apiHooks.js';
 import Shell from '../components/Shell.jsx';
 import { Button, EmptyState, LoadingBlock, PageHeading, QueryState, cx, fmtDate } from '../components/shared.jsx';
 import ResourceModal from '../components/resources/ResourceModal.jsx';
 import AttachmentCard from '../components/shared/AttachmentCard.jsx';
-import { viewDocument, getDownloadUrl, getPreviewUrl } from '../utils/documentViewer.js';
+import { getAttachmentKind, viewDocument, getDownloadUrl, getPreviewUrl } from '../utils/documentViewer.js';
 
-function ResourceIcon({ type, mimeType }) {
-  if (mimeType?.includes('image')) return <ImageIcon size={17} className="text-blue-500" />;
-  if (mimeType?.includes('video')) return <Video size={17} className="text-purple-500" />;
-  if (mimeType?.includes('audio')) return <Music size={17} className="text-primary" />;
-  if (type === 'Document' || mimeType?.includes('pdf')) return <FileText size={17} className="text-orange-500" />;
-  if (type === 'Presentation') return <File size={17} className="text-amber-500" />;
-  return <ExternalLink size={17} className="text-muted-foreground" />;
+function ResourceIcon({ resource, type, mimeType }) {
+  const kind = getAttachmentKind(resource?.attachments?.[0] || resource?.fileData || resource || { type, mimeType });
+  switch (kind) {
+    case 'instagram_reel':
+    case 'instagram_post':
+      return <Film size={17} className="text-pink-500" />;
+    case 'linkedin_post':
+      return <ExternalLink size={17} className="text-blue-600" />;
+    case 'youtube':
+      return <Film size={17} className="text-red-500" />;
+    case 'twitter':
+      return <ExternalLink size={17} className="text-sky-500" />;
+    case 'github':
+      return <ExternalLink size={17} className="text-foreground" />;
+    case 'link':
+      return <ExternalLink size={17} className="text-muted-foreground" />;
+    case 'pdf':
+      return <FileText size={17} className="text-orange-500" />;
+    case 'presentation':
+      return <File size={17} className="text-amber-500" />;
+    case 'document':
+      return <FileText size={17} className="text-blue-500" />;
+    case 'video':
+      return <Video size={17} className="text-purple-500" />;
+    case 'image':
+      return <ImageIcon size={17} className="text-blue-500" />;
+    case 'audio':
+      return <Music size={17} className="text-primary" />;
+    default:
+      return <File size={17} className="text-muted-foreground" />;
+  }
 }
 
 export default function ResourcesPage() {
@@ -178,10 +202,10 @@ export default function ResourcesPage() {
               : (r.fileData?.url || r.url)
               ? [{
                   id: r.fileData?.publicId || 'legacy',
-                  name: r.fileData?.originalName || r.title,
+                  name: r.fileData?.originalName || r.title || 'Resource',
                   url: r.fileData?.url || r.url,
-                  mimeType: r.fileData?.mimeType || 'application/pdf',
-                  type: r.resourceType || 'file',
+                  mimeType: r.fileData?.mimeType || '',
+                  type: r.resourceType || '',
                   size: r.fileData?.size || 0
                 }]
               : [];
@@ -201,7 +225,7 @@ export default function ResourcesPage() {
               <article key={resId} className="card-lift flex flex-col rounded-2xl border border-card-border bg-card p-5">
                 <div className="flex items-start justify-between">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-secondary text-secondary-foreground">
-                    <ResourceIcon type={r.resourceType} mimeType={r.fileData?.mimeType} />
+                    <ResourceIcon resource={r} type={r.resourceType} mimeType={r.fileData?.mimeType} />
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className={cx('rounded-full px-2 py-0.5 font-mono text-[9px] uppercase', r.watched ? 'bg-accent/15 text-accent font-semibold' : 'bg-muted text-muted-foreground')}>

@@ -141,7 +141,16 @@ export default function ResourceModal({ onClose }) {
 
   const submit = (e) => {
     e.preventDefault();
-    const finalAttachments = attachments;
+    const finalAttachments = isLinkType
+      ? (form.url.trim() ? [{
+          id: 'link_' + Date.now(),
+          name: form.title.trim(),
+          originalName: form.title.trim(),
+          url: form.url.trim(),
+          type: form.resourceType,
+        }] : [])
+      : attachments;
+
     const data = {
       title: form.title.trim(),
       url: isLinkType ? form.url.trim() : (finalAttachments[0]?.url || form.url.trim() || ''),
@@ -153,7 +162,7 @@ export default function ResourceModal({ onClose }) {
       watched: form.watched === 'true',
       tags: form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
       attachments: finalAttachments,
-      fileData: finalAttachments[0] ? {
+      fileData: (!isLinkType && finalAttachments[0]) ? {
         publicId: finalAttachments[0].publicId,
         url: finalAttachments[0].url,
         originalName: finalAttachments[0].originalName || finalAttachments[0].name,

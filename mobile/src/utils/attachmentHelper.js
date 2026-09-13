@@ -61,62 +61,151 @@ export function resolveAttachmentFileName(attachment, fallback = 'document.pdf')
 }
 
 export function getAttachmentKind(attachment) {
-  if (!attachment) return 'unknown';
+  if (!attachment) return 'file';
 
-  const mime = String(attachment.mimeType || '').toLowerCase();
-  const type = String(attachment.type || attachment.resourceType || '').toLowerCase();
-  const name = String(attachment.originalName || attachment.name || '').toLowerCase();
-  const url = String(attachment.url || '').toLowerCase();
+  const rawUrl = typeof attachment === 'string'
+    ? attachment
+    : (attachment.url || attachment.uri || attachment.fileUrl || attachment.fileData?.url || '');
+  const url = String(rawUrl || '').trim();
+  const explicitType = String(attachment.type || attachment.resourceType || '').toLowerCase();
+  const rawMime = String(attachment.mimeType || attachment.fileData?.mimeType || '').toLowerCase();
+  const name = String(attachment.originalName || attachment.name || attachment.filename || attachment.title || '').trim();
 
-  if (type === 'link' || type === 'youtube') return 'link';
+  // 1. External Social / Video Provider URLs take highest precedence
+  if (url) {
+    if (/instagram\.com\/(?:reel|reels)\//i.test(url)) {
+      return 'instagram_reel';
+    }
+    if (/instagram\.com\/(?:p|tv)\//i.test(url) || /instagram\.com/i.test(url)) {
+      return 'instagram_post';
+    }
+    if (/linkedin\.com\/(?:posts|feed\/update|pulse)\//i.test(url) || /linkedin\.com/i.test(url)) {
+      return 'linkedin_post';
+    }
+    if (/youtube\.com|youtu\.be/i.test(url) || explicitType === 'youtube') {
+      return 'youtube';
+    }
+    if (/twitter\.com|x\.com/i.test(url)) {
+      return 'twitter';
+    }
+    if (/github\.com/i.test(url)) {
+      return 'github';
+    }
+  }
 
-  if (mime === 'application/pdf') return 'pdf';
-  if (mime.startsWith('image/')) return 'image';
-  if (mime.startsWith('audio/')) return 'audio';
-  if (mime.startsWith('video/')) return 'video';
-  if (mime.includes('presentation') || mime.includes('powerpoint')) return 'presentation';
-  if (mime.includes('msword') || mime.includes('wordprocessingml') || mime.includes('document')) return 'document';
+  const isHttpWebUrl = /^https?:\/\//i.test(url);
+  const isCloudinary = /cloudinary\.com/i.test(url);
+  const extFromUrl = _getExtension(url);
+  const extFromName = _getExtension(name);
+  const ext = extFromName || extFromUrl;
 
-  if (type === 'recording') return 'audio';
-  if (type === 'image') return 'image';
-  if (type === 'audio') return 'audio';
-  if (type === 'video') return 'video';
-  if (type === 'document') return 'document';
+  // 2. Explicit link type, or external web link with no file extension & no Cloudinary storage
+  if (explicitType === 'link' || (isHttpWebUrl && !isCloudinary && !ext && !attachment.publicId)) {
+    return 'link';
+  }
 
-  const ext = _getExtension(name) || _getExtension(url);
-  if (ext === '.pdf') return 'pdf';
-  if (['.ppt', '.pptx'].includes(ext)) return 'presentation';
-  if (['.doc', '.docx', '.txt', '.rtf', '.odt', '.xls', '.xlsx'].includes(ext)) return 'document';
-  if (['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.svg'].includes(ext)) return 'image';
-  if (['.mp3', '.wav', '.m4a', '.aac', '.ogg', '.flac', '.opus', '.3gp'].includes(ext)) return 'audio';
-  if (['.mp4', '.mov', '.avi', '.mkv', '.webm'].includes(ext)) return 'video';
+  // 3. Audio / Recording
+  if (
+    explicitType === 'recording' ||
+    explicitType === 'audio' ||
+    rawMime.startsWith('audio/') ||
+    (['.mp3', '.wav', '.m4a', '.aac', '.ogg', '.flac', '.opus', '.3gp', '.webm'].includes(ext) && (rawMime.includes('audio') || explicitType === 'recording'))
+  ) {
+    return 'audio';
+  }
+
+  // 4. Image
+  if (
+    explicitType === 'image' ||
+    rawMime.startsWith('image/') ||
+    ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.svg'].includes(ext)
+  ) {
+    return 'image';
+  }
+
+  // 5. Video
+  if (
+    explicitType === 'video' ||
+    rawMime.startsWith('video/') ||
+    ['.mp4', '.mov', '.avi', '.mkv'].includes(ext)
+  ) {
+    return 'video';
+  }
+
+  // 6. Presentation
+  if (
+    rawMime.includes('presentation') ||
+    rawMime.includes('powerpoint') ||
+    ['.ppt', '.pptx'].includes(ext)
+  ) {
+    return 'presentation';
+  }
+
+  // 7. PDF (ensure it is genuinely a PDF, avoiding legacy false MIME on external links)
+  if (
+    (rawMime === 'application/pdf' || rawMime.includes('/pdf') || ext === '.pdf') &&
+    (!isHttpWebUrl || isCloudinary || ext === '.pdf')
+  ) {
+    return 'pdf';
+  }
+
+  // 8. Document
+  if (
+    rawMime.includes('msword') ||
+    rawMime.includes('wordprocessingml') ||
+    rawMime.includes('officedocument') ||
+    ['.doc', '.docx', '.txt', '.rtf', '.odt', '.xls', '.xlsx', '.csv'].includes(ext)
+  ) {
+    return 'document';
+  }
+
+  // 9. If it's a web URL without recognized file characteristics, default to link
+  if (isHttpWebUrl && !isCloudinary && !attachment.publicId) {
+    return 'link';
+  }
 
   return 'file';
 }
 
+export function isLinkKind(kind) {
+  return ['instagram_reel', 'instagram_post', 'linkedin_post', 'youtube', 'twitter', 'github', 'link'].includes(kind);
+}
+
 export function getKindLabel(kind) {
   switch (kind) {
+    case 'instagram_reel': return 'Instagram Reel';
+    case 'instagram_post': return 'Instagram Post';
+    case 'linkedin_post': return 'LinkedIn Post';
+    case 'youtube': return 'YouTube Video';
+    case 'twitter': return 'X Post';
+    case 'github': return 'GitHub';
+    case 'link': return 'Link';
     case 'pdf': return 'PDF';
     case 'image': return 'Image';
-    case 'audio': return 'Audio';
+    case 'audio': return 'Voice Note';
     case 'video': return 'Video';
     case 'presentation': return 'Presentation';
     case 'document': return 'Document';
-    case 'link': return 'Link';
     case 'file': return 'File';
-    default: return 'File';
+    default: return 'Resource';
   }
 }
 
 export function getOpenLabel(kind) {
   switch (kind) {
+    case 'instagram_reel': return 'Open Reel';
+    case 'instagram_post': return 'Open Instagram';
+    case 'linkedin_post': return 'Open LinkedIn';
+    case 'youtube': return 'Play Video';
+    case 'twitter': return 'Open Post';
+    case 'github': return 'Open GitHub';
+    case 'link': return 'Open Link';
     case 'pdf': return 'View PDF';
     case 'image': return 'View Image';
-    case 'video': return 'Play Video';
     case 'audio': return 'Play Audio';
+    case 'video': return 'Play Video';
     case 'presentation': return 'View Presentation';
     case 'document': return 'View Document';
-    case 'link': return 'Open Link';
     default: return 'View File';
   }
 }
@@ -143,9 +232,27 @@ export async function openAttachment(attachment) {
 
   if (!rawUrl) throw new Error('No URL available for this attachment.');
 
-  if (kind === 'link') {
-    await Linking.openURL(rawUrl);
-    return { success: true, method: 'linking' };
+  if (isLinkKind(kind)) {
+    try {
+      const supported = await Linking.canOpenURL(rawUrl);
+      if (supported) {
+        await Linking.openURL(rawUrl);
+        return { success: true, method: 'linking' };
+      }
+    } catch {
+      // Ignore and fallback to WebBrowser
+    }
+
+    try {
+      await WebBrowser.openBrowserAsync(rawUrl, {
+        presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
+        showTitle: true,
+        enableBarCollapsing: true,
+      });
+      return { success: true, method: 'browser', uri: rawUrl };
+    } catch (e) {
+      throw new Error('Could not open link.');
+    }
   }
 
   const mime = _getMimeForKind(kind, attachment);
@@ -188,7 +295,7 @@ export async function openAttachment(attachment) {
 }
 
 function _getExtension(name) {
-  if (!name) return '';
+  if (!name || typeof name !== 'string') return '';
   const clean = name.split('?')[0].split('#')[0];
   const dot = clean.lastIndexOf('.');
   return dot !== -1 ? clean.substring(dot).toLowerCase() : '';

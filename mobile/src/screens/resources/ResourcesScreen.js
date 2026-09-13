@@ -39,7 +39,14 @@ import {
   Trash2,
 } from 'lucide-react-native';
 import { viewDocument } from '../../utils/documentViewer';
-import { getAttachmentKind, getKindLabel, getOpenLabel, openAttachment, resolveAttachmentFileName } from '../../utils/attachmentHelper';
+import {
+  getAttachmentKind,
+  getKindLabel,
+  getOpenLabel,
+  isLinkKind,
+  openAttachment,
+  resolveAttachmentFileName,
+} from '../../utils/attachmentHelper';
 import { formatFileSize } from '../../components/ui/AttachmentCard';
 import { globalAudioPlayer } from '../../services/audioPlayerService';
 import { getResources, createResource, deleteResource, updateResource } from '../../api/resources';
@@ -73,30 +80,57 @@ const WATCHED_OPTIONS = [
   { label: 'Completed', value: 'true' },
 ];
 
-const ResourceIcon = ({ type, mimeType, color }) => {
+const ResourceIcon = ({ resource, type, mimeType, color }) => {
+  const kind = getAttachmentKind(resource?.attachments?.[0] || resource?.fileData || resource || { type, mimeType });
   let IconComponent = ExternalLink;
   let iconColor = color || '#293656';
 
-  if (type === 'youtube' || mimeType?.includes('youtube')) {
-    IconComponent = Video;
-    iconColor = '#ff0000';
-  } else if (type === 'recording' || mimeType?.includes('audio')) {
-    IconComponent = Music;
-    iconColor = '#8d6b8d';
-  } else if (type === 'image' || mimeType?.includes('image')) {
-    IconComponent = ImageIcon;
-    iconColor = '#b58a4a';
-  } else if (type === 'video' || mimeType?.includes('video')) {
-    IconComponent = Video;
-    iconColor = '#4b8f8b';
-  } else if (type === 'file' || mimeType?.includes('pdf') || mimeType?.includes('document')) {
-    IconComponent = FileText;
-    iconColor = color || '#df6b47';
-  }
-
-  if (!IconComponent) {
-    IconComponent = ExternalLink;
-    iconColor = color || '#293656';
+  switch (kind) {
+    case 'instagram_reel':
+    case 'instagram_post':
+      IconComponent = Video;
+      iconColor = '#e1306c';
+      break;
+    case 'linkedin_post':
+      IconComponent = ExternalLink;
+      iconColor = '#0077b5';
+      break;
+    case 'youtube':
+      IconComponent = Video;
+      iconColor = '#ff0000';
+      break;
+    case 'twitter':
+      IconComponent = ExternalLink;
+      iconColor = '#1da1f2';
+      break;
+    case 'github':
+    case 'link':
+      IconComponent = ExternalLink;
+      iconColor = color || '#293656';
+      break;
+    case 'recording':
+    case 'audio':
+      IconComponent = Music;
+      iconColor = '#8d6b8d';
+      break;
+    case 'image':
+      IconComponent = ImageIcon;
+      iconColor = '#b58a4a';
+      break;
+    case 'video':
+      IconComponent = Video;
+      iconColor = '#4b8f8b';
+      break;
+    case 'pdf':
+    case 'document':
+    case 'presentation':
+      IconComponent = FileText;
+      iconColor = color || '#df6b47';
+      break;
+    default:
+      IconComponent = FileText;
+      iconColor = color || '#df6b47';
+      break;
   }
 
   return <IconComponent size={20} color={iconColor} />;
@@ -590,16 +624,17 @@ const ResourcesScreen = ({ route, navigation }) => {
         }
         renderItem={({ item }) => {
           const resId = item._id || item.id;
-          const isLink = item.resourceType === 'link' || item.resourceType === 'youtube';
+          const itemKind = getAttachmentKind(item.attachments?.[0] || item.fileData || item);
+          const isLink = isLinkKind(itemKind);
           const attList = isLink ? [] : (item.attachments && item.attachments.length > 0)
             ? item.attachments.filter(Boolean)
             : (item.fileData?.url || item.url)
             ? [{
                 id: item.fileData?.publicId || 'legacy',
-                name: item.fileData?.originalName || item.title,
+                name: item.fileData?.originalName || item.title || 'Attachment',
                 url: item.fileData?.url || item.url,
-                mimeType: item.fileData?.mimeType || 'application/pdf',
-                type: item.resourceType || 'file',
+                mimeType: item.fileData?.mimeType || '',
+                type: item.resourceType || '',
                 size: item.fileData?.size || 0
               }]
             : [];
@@ -635,6 +670,7 @@ const ResourcesScreen = ({ route, navigation }) => {
               <View style={styles.cardHeaderRow}>
                 <View style={styles.iconBox}>
                   <ResourceIcon
+                    resource={item}
                     type={item.resourceType}
                     mimeType={item.fileData?.mimeType}
                     color={colors.primary}
@@ -797,21 +833,27 @@ const ResourcesScreen = ({ route, navigation }) => {
                 </View>
               )}
 
-              {/* Web / YouTube Link Box (Single subtle container) */}
+              {/* Web / Social / Video Link Box (Single subtle container) */}
               {isLink && (item.url || item.fileData?.url) && (
                 <View style={styles.linkContainer}>
                   <View style={styles.linkInfoCol}>
                     <ExternalLink size={15} color={colors.accent} style={{ marginRight: 8 }} />
-                    <Text style={styles.linkUrlText} numberOfLines={1} ellipsizeMode="middle">
-                      {item.url || item.fileData?.url}
-                    </Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.linkUrlText} numberOfLines={1} ellipsizeMode="middle">
+                        {item.url || item.fileData?.url}
+                      </Text>
+                      <Text style={{ fontSize: 10, fontFamily: typography.fonts.mono, color: colors.accent, textTransform: 'uppercase', marginTop: 2 }}>
+                        {getKindLabel(itemKind)}
+                      </Text>
+                    </View>
                   </View>
                   <TouchableOpacity
                     style={styles.linkActionBtn}
-                    onPress={() => Linking.openURL(item.url || item.fileData?.url).catch(() => viewDocument(item.url || item.fileData?.url, item.title))}
+                    onPress={() => openAttachment({ url: item.url || item.fileData?.url, type: item.resourceType })}
                     activeOpacity={0.7}
+                    accessibilityLabel={`${getOpenLabel(itemKind)} - ${item.title}`}
                   >
-                    <Text style={styles.linkActionBtnText}>Open Link</Text>
+                    <Text style={styles.linkActionBtnText}>{getOpenLabel(itemKind)}</Text>
                   </TouchableOpacity>
                 </View>
               )}

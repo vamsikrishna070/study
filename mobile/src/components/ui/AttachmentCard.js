@@ -17,7 +17,14 @@ import {
   Check,
 } from 'lucide-react-native';
 import { viewDocument, downloadDocument, shareDocument } from '../../utils/documentViewer';
-import { getAttachmentKind, getKindLabel, getOpenLabel, openAttachment, resolveAttachmentFileName } from '../../utils/attachmentHelper';
+import {
+  getAttachmentKind,
+  getKindLabel,
+  getOpenLabel,
+  isLinkKind,
+  openAttachment,
+  resolveAttachmentFileName,
+} from '../../utils/attachmentHelper';
 import { globalAudioPlayer } from '../../services/audioPlayerService';
 import { useAppTheme, useStyles } from '../../theme/theme';
 import { useAppDialog } from './AppDialog';
@@ -73,16 +80,12 @@ export function AttachmentCard({
   const isPdf = kind === 'pdf';
   const isPresentation = kind === 'presentation';
   const isDocument = kind === 'document';
-  const isYouTube = kind === 'link' && (/youtube\.com|youtu\.be/i.test(rawUrl) || attachment.type === 'youtube');
+  const isLink = isLinkKind(kind);
 
-  const fileName = resolveAttachmentFileName(
-    attachment,
-    isPdf ? 'document.pdf' : isImage ? 'image.png' : isAudio ? 'Voice Note' : 'file'
-  );
-
+  const fileName = resolveAttachmentFileName(attachment);
   const size = attachment.size || attachment.fileData?.size || 0;
   const duration = attachment.duration || attachment.fileData?.duration || 0;
-  const sizeText = formatFileSize(size);
+  const sizeText = !isLink ? formatFileSize(size) : '';
   const kindLabel = getKindLabel(kind);
   const openLabel = getOpenLabel(kind);
 
@@ -130,7 +133,7 @@ export function AttachmentCard({
   };
 
   const handleDownload = async () => {
-    if (!rawUrl || isDownloading) return;
+    if (!rawUrl || isDownloading || isLink) return;
     setIsDownloading(true);
     try {
       await downloadDocument(rawUrl, fileName);
@@ -156,19 +159,44 @@ export function AttachmentCard({
   };
 
   const getIcon = () => {
-    if (isYouTube) return <Video size={20} color="#ff0000" />;
-    if (isPdf) return <FileText size={20} color={colors.accent} />;
-    if (isPresentation) return <File size={20} color="#e07a5f" />;
-    if (isDocument) return <FileText size={20} color={colors.accent} />;
-    if (isVideo) return <Video size={20} color="#4b8f8b" />;
-    if (isImage) return <ImageIcon size={20} color="#b58a4a" />;
-    if (kind === 'link') return <ExternalLink size={20} color={colors.primary} />;
-    return <File size={20} color={colors.mutedForeground} />;
+    switch (kind) {
+      case 'instagram_reel':
+      case 'instagram_post':
+        return <Video size={20} color="#e1306c" />;
+      case 'linkedin_post':
+        return <ExternalLink size={20} color="#0077b5" />;
+      case 'youtube':
+        return <Video size={20} color="#ff0000" />;
+      case 'twitter':
+        return <ExternalLink size={20} color="#1da1f2" />;
+      case 'github':
+        return <ExternalLink size={20} color={colors.foreground} />;
+      case 'link':
+        return <ExternalLink size={20} color={colors.mutedForeground} />;
+      case 'pdf':
+        return <FileText size={20} color={colors.accent} />;
+      case 'presentation':
+        return <File size={20} color="#e07a5f" />;
+      case 'document':
+        return <FileText size={20} color={colors.accent} />;
+      case 'video':
+        return <Video size={20} color="#4b8f8b" />;
+      case 'image':
+        return <ImageIcon size={20} color="#b58a4a" />;
+      case 'audio':
+        return <Music size={20} color={colors.primary} />;
+      default:
+        return <File size={20} color={colors.mutedForeground} />;
+    }
   };
 
   const getActionIcon = () => {
-    if (isVideo) return <Play size={14} color={colors.primaryForeground} fill="currentColor" style={{ marginRight: 6 }} />;
-    if (kind === 'link' || isYouTube) return <ExternalLink size={14} color={colors.primaryForeground} style={{ marginRight: 6 }} />;
+    if (kind === 'youtube' || kind === 'video') {
+      return <Play size={14} color={colors.primaryForeground} fill="currentColor" style={{ marginRight: 6 }} />;
+    }
+    if (isLink) {
+      return <ExternalLink size={14} color={colors.primaryForeground} style={{ marginRight: 6 }} />;
+    }
     return <Eye size={14} color={colors.primaryForeground} style={{ marginRight: 6 }} />;
   };
 
@@ -301,24 +329,26 @@ export function AttachmentCard({
 
           {/* Secondary Actions (Download, Share) */}
           <View style={styles.secondaryActionsRow}>
-            <TouchableOpacity
-              style={styles.secondaryBtn}
-              onPress={handleDownload}
-              disabled={isDownloading}
-              activeOpacity={0.7}
-              accessibilityLabel={`Download ${fileName}`}
-            >
-              {isDownloading ? (
-                <ActivityIndicator size="small" color={colors.foreground} style={{ marginRight: 4 }} />
-              ) : downloadSuccess ? (
-                <Check size={13} color={colors.accent} style={{ marginRight: 4 }} />
-              ) : (
-                <Download size={13} color={colors.foreground} style={{ marginRight: 4 }} />
-              )}
-              <Text style={[styles.secondaryBtnText, downloadSuccess && { color: colors.accent }]}>
-                {isDownloading ? 'Saving...' : downloadSuccess ? 'Saved' : 'Download'}
-              </Text>
-            </TouchableOpacity>
+            {!isLink && (
+              <TouchableOpacity
+                style={styles.secondaryBtn}
+                onPress={handleDownload}
+                disabled={isDownloading}
+                activeOpacity={0.7}
+                accessibilityLabel={`Download ${fileName}`}
+              >
+                {isDownloading ? (
+                  <ActivityIndicator size="small" color={colors.foreground} style={{ marginRight: 4 }} />
+                ) : downloadSuccess ? (
+                  <Check size={13} color={colors.accent} style={{ marginRight: 4 }} />
+                ) : (
+                  <Download size={13} color={colors.foreground} style={{ marginRight: 4 }} />
+                )}
+                <Text style={[styles.secondaryBtnText, downloadSuccess && { color: colors.accent }]}>
+                  {isDownloading ? 'Saving...' : downloadSuccess ? 'Saved' : 'Download'}
+                </Text>
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity
               style={styles.secondaryBtn}

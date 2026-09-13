@@ -15,32 +15,35 @@ import {
   Eye,
   Trash2,
 } from 'lucide-react';
-import { Button } from '../shared.jsx';
-import { viewDocument, getDownloadUrl, resolveAttachmentFileName } from '../../utils/documentViewer';
+import {
+  viewDocument,
+  getDownloadUrl,
+  resolveAttachmentFileName,
+  getAttachmentKind,
+  getKindLabel,
+  getOpenLabel,
+  isLinkKind,
+} from '../../utils/documentViewer';
 
 export default function AttachmentCard({ attachment, onRemove, readonly }) {
   if (!attachment) return null;
 
-  const isRecording = attachment.type === 'recording' || attachment.mimeType?.includes('audio');
-  const isImage = attachment.type === 'image' || attachment.mimeType?.includes('image') || /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(attachment.url || '');
-  const isVideo = attachment.type === 'video' || attachment.mimeType?.includes('video') || /\.(mp4|webm|mov|mkv)$/i.test(attachment.url || '');
-  const isYoutube = attachment.type === 'youtube' || attachment.mimeType?.includes('youtube') || /youtube\.com|youtu\.be/i.test(attachment.url || '');
-  const isPdf = attachment.mimeType?.includes('pdf') || /\.pdf$/i.test(attachment.originalName || attachment.name || attachment.url || '');
-  const isPresentation = attachment.mimeType?.includes('presentation') || /\.(ppt|pptx)$/i.test(attachment.originalName || attachment.name || attachment.url || '');
-  const isDocument = isPdf || isPresentation || attachment.type === 'document' ||
-    attachment.mimeType?.includes('document') ||
-    attachment.mimeType?.includes('msword') ||
-    attachment.mimeType?.includes('officedocument') ||
-    /\.(doc|docx|txt|rtf|xls|xlsx)$/i.test(attachment.originalName || attachment.name || attachment.url || '');
+  const kind = getAttachmentKind(attachment);
+  const isAudio = kind === 'audio';
+  const isImage = kind === 'image';
+  const isVideo = kind === 'video';
+  const isPdf = kind === 'pdf';
+  const isPresentation = kind === 'presentation';
+  const isDocument = kind === 'document';
+  const isLink = isLinkKind(kind);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [copied, setCopied] = useState(false);
   const audioRef = useRef(null);
 
-  const fileName = resolveAttachmentFileName(
-    attachment,
-    isPdf ? 'document.pdf' : isImage ? 'image.png' : isRecording ? 'Voice Note' : 'Attachment'
-  );
+  const fileName = resolveAttachmentFileName(attachment);
+  const kindLabel = getKindLabel(kind);
+  const actionLabel = getOpenLabel(kind);
 
   const formatSize = (bytes) => {
     if (!bytes || bytes === 0) return '';
@@ -49,50 +52,45 @@ export default function AttachmentCard({ attachment, onRemove, readonly }) {
   };
 
   const getIcon = () => {
-    if (isRecording) return <Mic size={20} className="text-primary shrink-0" />;
-    if (isImage) return <ImageIcon size={20} className="text-blue-500 shrink-0" />;
-    if (isVideo || isYoutube) return <Film size={20} className="text-purple-500 shrink-0" />;
-    if (isPdf) return <FileText size={20} className="text-orange-500 shrink-0" />;
-    if (isPresentation) return <File size={20} className="text-amber-500 shrink-0" />;
-    if (isDocument) return <FileText size={20} className="text-orange-500 shrink-0" />;
-    return <File size={20} className="text-muted-foreground shrink-0" />;
+    switch (kind) {
+      case 'instagram_reel':
+      case 'instagram_post':
+        return <Film size={20} className="text-pink-500 shrink-0" />;
+      case 'linkedin_post':
+        return <ExternalLink size={20} className="text-blue-600 shrink-0" />;
+      case 'youtube':
+        return <Film size={20} className="text-red-500 shrink-0" />;
+      case 'twitter':
+        return <ExternalLink size={20} className="text-sky-500 shrink-0" />;
+      case 'github':
+        return <ExternalLink size={20} className="text-foreground shrink-0" />;
+      case 'link':
+        return <ExternalLink size={20} className="text-muted-foreground shrink-0" />;
+      case 'pdf':
+        return <FileText size={20} className="text-orange-500 shrink-0" />;
+      case 'presentation':
+        return <File size={20} className="text-amber-500 shrink-0" />;
+      case 'document':
+        return <FileText size={20} className="text-blue-500 shrink-0" />;
+      case 'video':
+        return <Film size={20} className="text-purple-500 shrink-0" />;
+      case 'image':
+        return <ImageIcon size={20} className="text-blue-500 shrink-0" />;
+      case 'audio':
+        return <Mic size={20} className="text-primary shrink-0" />;
+      default:
+        return <File size={20} className="text-muted-foreground shrink-0" />;
+    }
   };
 
-  const getTypeLabel = () => {
-    if (isPdf) return 'PDF';
-    if (isImage) return 'Image';
-    if (isRecording) return 'Voice Note';
-    if (isYoutube) return 'YouTube';
-    if (isVideo) return 'Video';
-    if (isPresentation) return 'Presentation';
-    if (isDocument) return 'Document';
-    if (attachment.type === 'link') return 'Link';
-    return attachment.type || (attachment.mimeType ? attachment.mimeType.split('/')[1] : 'File');
-  };
-
-  const getPrimaryAction = () => {
-    if (isPdf) {
-      return { label: 'View PDF', icon: <Eye size={14} className="shrink-0" /> };
+  const getActionIcon = () => {
+    if (kind === 'youtube' || kind === 'video') {
+      return <Play size={14} fill="currentColor" className="shrink-0" />;
     }
-    if (isImage) {
-      return { label: 'View Image', icon: <Eye size={14} className="shrink-0" /> };
+    if (isLink) {
+      return <ExternalLink size={14} className="shrink-0" />;
     }
-    if (isYoutube) {
-      return { label: 'Open Video', icon: <ExternalLink size={14} className="shrink-0" /> };
-    }
-    if (isVideo) {
-      return { label: 'Play Video', icon: <Play size={14} fill="currentColor" className="shrink-0" /> };
-    }
-    if (isPresentation) {
-      return { label: 'View Presentation', icon: <Eye size={14} className="shrink-0" /> };
-    }
-    if (isDocument) {
-      return { label: 'View Document', icon: <Eye size={14} className="shrink-0" /> };
-    }
-    if (attachment.type === 'link') {
-      return { label: 'Open Link', icon: <ExternalLink size={14} className="shrink-0" /> };
-    }
-    return { label: 'View File', icon: <Eye size={14} className="shrink-0" /> };
+    return <Eye size={14} className="shrink-0" />;
   };
 
   const toggleAudio = (e) => {
@@ -106,16 +104,19 @@ export default function AttachmentCard({ attachment, onRemove, readonly }) {
     }
   };
 
-  const handleView = (e) => {
+  const handleOpen = (e) => {
     e.stopPropagation();
-    if (attachment.url) {
+    if (!attachment.url) return;
+    if (isLink) {
+      window.open(attachment.url, '_blank', 'noopener,noreferrer');
+    } else {
       viewDocument(attachment.url, fileName);
     }
   };
 
   const handleDownload = async (e) => {
     e.stopPropagation();
-    if (!attachment.url) return;
+    if (!attachment.url || isLink) return;
     try {
       const downloadUrl = getDownloadUrl(attachment.url);
       const response = await fetch(downloadUrl);
@@ -157,8 +158,6 @@ export default function AttachmentCard({ attachment, onRemove, readonly }) {
     }
   };
 
-  const { label: actionLabel, icon: actionIcon } = getPrimaryAction();
-
   return (
     <div className="flex flex-col gap-2.5 rounded-xl border border-border bg-card p-3 shadow-sm transition-all hover:border-accent/40">
       <div className="flex items-start justify-between gap-3 min-w-0">
@@ -172,9 +171,9 @@ export default function AttachmentCard({ attachment, onRemove, readonly }) {
           </p>
           <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
             <span className="uppercase font-mono text-[10px] font-semibold text-accent">
-              {getTypeLabel()}
+              {kindLabel}
             </span>
-            {attachment.size > 0 && (
+            {attachment.size > 0 && !isLink && (
               <>
                 <span>•</span>
                 <span className="font-mono">{formatSize(attachment.size)}</span>
@@ -209,7 +208,7 @@ export default function AttachmentCard({ attachment, onRemove, readonly }) {
       )}
 
       {/* Action Row */}
-      {isRecording && attachment.url ? (
+      {isAudio && attachment.url ? (
         <div className="flex items-center gap-2 pt-0.5">
           <button
             type="button"
@@ -238,28 +237,30 @@ export default function AttachmentCard({ attachment, onRemove, readonly }) {
           {attachment.url && (
             <button
               type="button"
-              onClick={handleView}
+              onClick={handleOpen}
               className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm transition-all hover:opacity-90 active:scale-[0.99]"
               title={`${actionLabel} - ${fileName}`}
               aria-label={`${actionLabel} - ${fileName}`}
             >
-              {actionIcon}
+              {getActionIcon()}
               <span>{actionLabel}</span>
             </button>
           )}
 
           {attachment.url && (
             <div className="flex items-center gap-1 shrink-0">
-              <button
-                type="button"
-                onClick={handleDownload}
-                className="flex h-8 items-center gap-1 rounded-lg border border-border bg-secondary/40 px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                title="Download file"
-                aria-label={`Download ${fileName}`}
-              >
-                <Download size={13} />
-                <span className="hidden sm:inline">Download</span>
-              </button>
+              {!isLink && (
+                <button
+                  type="button"
+                  onClick={handleDownload}
+                  className="flex h-8 items-center gap-1 rounded-lg border border-border bg-secondary/40 px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                  title="Download file"
+                  aria-label={`Download ${fileName}`}
+                >
+                  <Download size={13} />
+                  <span className="hidden sm:inline">Download</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={handleShare}
@@ -274,7 +275,7 @@ export default function AttachmentCard({ attachment, onRemove, readonly }) {
         </div>
       )}
 
-      {isRecording && attachment.url && (
+      {isAudio && attachment.url && (
         <audio
           ref={audioRef}
           src={attachment.url}

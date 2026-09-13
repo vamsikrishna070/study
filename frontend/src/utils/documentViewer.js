@@ -1,3 +1,10 @@
+function _getExtension(name) {
+  if (!name || typeof name !== 'string') return '';
+  const clean = name.split('?')[0].split('#')[0];
+  const dot = clean.lastIndexOf('.');
+  return dot !== -1 ? clean.substring(dot).toLowerCase() : '';
+}
+
 export function extractFilenameFromUrl(url) {
   if (!url || typeof url !== 'string') return '';
   try {
@@ -19,11 +26,164 @@ export function extractFilenameFromUrl(url) {
   }
 }
 
-export function resolveAttachmentFileName(attachment, fallback = 'document.pdf') {
-  if (!attachment) return fallback;
+export function getAttachmentKind(attachment) {
+  if (!attachment) return 'file';
+
+  const rawUrl = typeof attachment === 'string'
+    ? attachment
+    : (attachment.url || attachment.uri || attachment.fileUrl || attachment.fileData?.url || '');
+  const url = String(rawUrl || '').trim();
+  const explicitType = String(attachment.type || attachment.resourceType || '').toLowerCase();
+  const rawMime = String(attachment.mimeType || attachment.fileData?.mimeType || '').toLowerCase();
+  const name = String(attachment.originalName || attachment.name || attachment.filename || attachment.title || '').trim();
+
+  // 1. External Social / Video Provider URLs take highest precedence
+  if (url) {
+    if (/instagram\.com\/(?:reel|reels)\//i.test(url)) {
+      return 'instagram_reel';
+    }
+    if (/instagram\.com\/(?:p|tv)\//i.test(url) || /instagram\.com/i.test(url)) {
+      return 'instagram_post';
+    }
+    if (/linkedin\.com\/(?:posts|feed\/update|pulse)\//i.test(url) || /linkedin\.com/i.test(url)) {
+      return 'linkedin_post';
+    }
+    if (/youtube\.com|youtu\.be/i.test(url) || explicitType === 'youtube') {
+      return 'youtube';
+    }
+    if (/twitter\.com|x\.com/i.test(url)) {
+      return 'twitter';
+    }
+    if (/github\.com/i.test(url)) {
+      return 'github';
+    }
+  }
+
+  const isHttpWebUrl = /^https?:\/\//i.test(url);
+  const isCloudinary = /cloudinary\.com/i.test(url);
+  const extFromUrl = _getExtension(url);
+  const extFromName = _getExtension(name);
+  const ext = extFromName || extFromUrl;
+
+  // 2. Explicit link type, or external web link with no file extension & no Cloudinary storage
+  if (explicitType === 'link' || (isHttpWebUrl && !isCloudinary && !ext && !attachment.publicId)) {
+    return 'link';
+  }
+
+  // 3. Audio / Recording
+  if (
+    explicitType === 'recording' ||
+    explicitType === 'audio' ||
+    rawMime.startsWith('audio/') ||
+    (['.mp3', '.wav', '.m4a', '.aac', '.ogg', '.flac', '.opus', '.3gp', '.webm'].includes(ext) && (rawMime.includes('audio') || explicitType === 'recording'))
+  ) {
+    return 'audio';
+  }
+
+  // 4. Image
+  if (
+    explicitType === 'image' ||
+    rawMime.startsWith('image/') ||
+    ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.svg'].includes(ext)
+  ) {
+    return 'image';
+  }
+
+  // 5. Video
+  if (
+    explicitType === 'video' ||
+    rawMime.startsWith('video/') ||
+    ['.mp4', '.mov', '.avi', '.mkv'].includes(ext)
+  ) {
+    return 'video';
+  }
+
+  // 6. Presentation
+  if (
+    rawMime.includes('presentation') ||
+    rawMime.includes('powerpoint') ||
+    ['.ppt', '.pptx'].includes(ext)
+  ) {
+    return 'presentation';
+  }
+
+  // 7. PDF (ensure it is genuinely a PDF, avoiding legacy false MIME on external links)
+  if (
+    (rawMime === 'application/pdf' || rawMime.includes('/pdf') || ext === '.pdf') &&
+    (!isHttpWebUrl || isCloudinary || ext === '.pdf')
+  ) {
+    return 'pdf';
+  }
+
+  // 8. Document
+  if (
+    rawMime.includes('msword') ||
+    rawMime.includes('wordprocessingml') ||
+    rawMime.includes('officedocument') ||
+    ['.doc', '.docx', '.txt', '.rtf', '.odt', '.xls', '.xlsx', '.csv'].includes(ext)
+  ) {
+    return 'document';
+  }
+
+  // 9. If it's a web URL without recognized file characteristics, default to link
+  if (isHttpWebUrl && !isCloudinary && !attachment.publicId) {
+    return 'link';
+  }
+
+  return 'file';
+}
+
+export function isLinkKind(kind) {
+  return ['instagram_reel', 'instagram_post', 'linkedin_post', 'youtube', 'twitter', 'github', 'link'].includes(kind);
+}
+
+export function getKindLabel(kind) {
+  switch (kind) {
+    case 'instagram_reel': return 'Instagram Reel';
+    case 'instagram_post': return 'Instagram Post';
+    case 'linkedin_post': return 'LinkedIn Post';
+    case 'youtube': return 'YouTube Video';
+    case 'twitter': return 'X Post';
+    case 'github': return 'GitHub';
+    case 'link': return 'Link';
+    case 'pdf': return 'PDF';
+    case 'image': return 'Image';
+    case 'audio': return 'Voice Note';
+    case 'video': return 'Video';
+    case 'presentation': return 'Presentation';
+    case 'document': return 'Document';
+    case 'file': return 'File';
+    default: return 'Resource';
+  }
+}
+
+export function getOpenLabel(kind) {
+  switch (kind) {
+    case 'instagram_reel': return 'Open Reel';
+    case 'instagram_post': return 'Open Instagram';
+    case 'linkedin_post': return 'Open LinkedIn';
+    case 'youtube': return 'Play Video';
+    case 'twitter': return 'Open Post';
+    case 'github': return 'Open GitHub';
+    case 'link': return 'Open Link';
+    case 'pdf': return 'View PDF';
+    case 'image': return 'View Image';
+    case 'audio': return 'Play Audio';
+    case 'video': return 'Play Video';
+    case 'presentation': return 'View Presentation';
+    case 'document': return 'View Document';
+    default: return 'View File';
+  }
+}
+
+export function resolveAttachmentFileName(attachment, fallback = '') {
+  if (!attachment) return fallback || 'Resource';
+
+  const kind = getAttachmentKind(attachment);
+  const defaultFallback = fallback || (kind === 'pdf' ? 'document.pdf' : isLinkKind(kind) ? getKindLabel(kind) : 'File');
 
   if (typeof attachment === 'string') {
-    return extractFilenameFromUrl(attachment) || fallback;
+    return isLinkKind(kind) ? getKindLabel(kind) : (extractFilenameFromUrl(attachment) || defaultFallback);
   }
 
   if (attachment.originalName && typeof attachment.originalName === 'string') {
@@ -39,20 +199,20 @@ export function resolveAttachmentFileName(attachment, fallback = 'document.pdf')
   }
 
   const url = attachment.url || attachment.uri || attachment.fileUrl || '';
-  if (url && typeof url === 'string') {
+  if (url && typeof url === 'string' && !isLinkKind(kind)) {
     const extracted = extractFilenameFromUrl(url);
     if (extracted) return extracted;
   }
 
   if (attachment.title && typeof attachment.title === 'string') {
     const title = attachment.title.trim();
-    if (attachment.mimeType?.includes('pdf') || attachment.type === 'document') {
+    if (kind === 'pdf') {
       return title.toLowerCase().endsWith('.pdf') ? title : `${title}.pdf`;
     }
     return title;
   }
 
-  return fallback;
+  return defaultFallback;
 }
 
 export function getPreviewUrl(url, filename = '') {
@@ -63,7 +223,7 @@ export function getPreviewUrl(url, filename = '') {
   if (previewUrl.includes('cloudinary.com')) {
     previewUrl = previewUrl.replace(/\/fl_attachment[^/]*\//, '/');
     if (previewUrl.includes('/raw/upload/')) {
-      const apiBase = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api';
+      const apiBase = import.meta.env?.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api';
       const safeFilename = filename || extractFilenameFromUrl(previewUrl) || 'document.pdf';
       return `${apiBase}/upload/preview?url=${encodeURIComponent(previewUrl)}&filename=${encodeURIComponent(safeFilename)}`;
     }
@@ -86,7 +246,13 @@ export function getDownloadUrl(url) {
 
 export function viewDocument(url, filename = '') {
   if (!url) return;
+  const isLink = /^(https?:\/\/)/i.test(url) && !url.includes('cloudinary.com') && !_getExtension(url);
+  if (isLink) {
+    window.open(url, '_blank', 'noopener,noreferrer');
+    return;
+  }
   const resolvedName = filename || extractFilenameFromUrl(url) || 'document.pdf';
   const previewUrl = getPreviewUrl(url, resolvedName);
   window.open(previewUrl, '_blank', 'noopener,noreferrer');
 }
+
