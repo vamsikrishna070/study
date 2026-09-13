@@ -66,14 +66,14 @@ export function NotesPage() {
       />
 
       <div className="mb-6 space-y-3">
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
           <div className="relative flex-1">
             <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input
-              className={cx(inputClass, 'pl-10')}
+              className={cx(inputClass, 'pl-10 h-10 text-sm')}
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search notes..."
+              placeholder="Search notes by title, topic, tags..."
               data-testid="input-search-notes"
             />
             {search && (
@@ -85,16 +85,16 @@ export function NotesPage() {
           <Button
             variant="quiet"
             onClick={() => setFiltersOpen(f => !f)}
-            className={cx(hasFilters && 'border-accent text-accent')}
+            className={cx('h-10 px-4 gap-2 shrink-0 border transition-colors', filtersOpen || hasFilters ? 'border-accent text-accent bg-accent/5' : 'border-border text-foreground')}
           >
             <SlidersHorizontal size={15} />
-            Filters
-            {hasFilters && <span className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-[9px] font-bold text-accent-foreground">!</span>}
+            <span>Filters</span>
+            {hasFilters && <span className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-[9px] font-bold text-white">!</span>}
           </Button>
         </div>
 
         {filtersOpen && (
-          <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-card p-4">
+          <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm animate-in fade-in duration-200">
             <div className="min-w-[180px] flex-1">
               <label className="mb-1.5 block text-xs font-bold uppercase tracking-[.12em] text-muted-foreground">Subject</label>
               <select className={inputClass} value={filterSubjectId} onChange={e => setFilterSubjectId(e.target.value)} data-testid="select-filter-notes">
@@ -109,7 +109,7 @@ export function NotesPage() {
               </select>
             </div>
             {hasFilters && (
-              <Button variant="quiet" onClick={clearFilters} className="shrink-0">
+              <Button variant="quiet" onClick={clearFilters} className="shrink-0 h-10 text-xs">
                 <X size={14} /> Clear filters
               </Button>
             )}

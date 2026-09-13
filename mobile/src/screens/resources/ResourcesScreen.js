@@ -39,7 +39,7 @@ import {
   Trash2,
 } from 'lucide-react-native';
 import { viewDocument } from '../../utils/documentViewer';
-import { getAttachmentKind, getKindLabel, getOpenLabel, openAttachment } from '../../utils/attachmentHelper';
+import { getAttachmentKind, getKindLabel, getOpenLabel, openAttachment, resolveAttachmentFileName } from '../../utils/attachmentHelper';
 import { formatFileSize } from '../../components/ui/AttachmentCard';
 import { globalAudioPlayer } from '../../services/audioPlayerService';
 import { getResources, createResource, deleteResource, updateResource } from '../../api/resources';
@@ -747,7 +747,7 @@ const ResourcesScreen = ({ route, navigation }) => {
                           </View>
                           <View style={styles.attachmentInfoCol}>
                             <Text style={styles.attachmentName} numberOfLines={1} ellipsizeMode="middle">
-                              {att.name || att.originalName || 'Attachment'}
+                              {resolveAttachmentFileName(att, 'Attachment')}
                             </Text>
                             <Text style={styles.attachmentMeta}>
                               {kindLabel}{sizeText ? ` • ${sizeText}` : ''}

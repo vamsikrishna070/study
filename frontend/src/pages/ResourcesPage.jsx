@@ -5,6 +5,7 @@ import { getGetResourcesQueryKey, useGetResources, useDeleteResource, useUpdateR
 import Shell from '../components/Shell.jsx';
 import { Button, EmptyState, LoadingBlock, PageHeading, QueryState, cx, fmtDate } from '../components/shared.jsx';
 import ResourceModal from '../components/resources/ResourceModal.jsx';
+import AttachmentCard from '../components/shared/AttachmentCard.jsx';
 import { viewDocument, getDownloadUrl, getPreviewUrl } from '../utils/documentViewer.js';
 
 function ResourceIcon({ type, mimeType }) {
@@ -222,58 +223,15 @@ export default function ResourcesPage() {
                 {attList.length > 0 && (
                   <div className="mt-4 space-y-2">
                     <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Attachments ({attList.length})</span>
-                    <div className="space-y-1.5">
-                      {attList.map((att, attIdx) => {
-                        const isPdf = att.mimeType?.includes('pdf') || att.name?.endsWith('.pdf');
-                        const isImg = att.mimeType?.startsWith('image/') || /\.(jpg|jpeg|png|webp)$/i.test(att.url);
-                        const isAudio = att.mimeType?.startsWith('audio/') || att.type === 'recording' || /\.(mp3|wav|m4a|aac|ogg)$/i.test(att.url);
-
-                        return (
-                          <div key={att.id || attIdx} className="flex flex-col gap-1 rounded-xl border border-border/80 bg-secondary/20 p-2 text-xs">
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="font-medium truncate flex-1">{att.name || att.originalName || 'Attachment'}</span>
-                              <div className="flex items-center gap-1 shrink-0">
-                                {att.url && (
-                                  <button
-                                    type="button"
-                                    onClick={() => viewDocument(att.url, att.name || att.originalName)}
-                                    className="rounded p-1 text-accent hover:bg-accent/10"
-                                    title="View attachment"
-                                  >
-                                    <Eye size={13} />
-                                  </button>
-                                )}
-                                {att.url && (
-                                  <button
-                                    onClick={() => handleDownload(att.url, att.name || att.originalName)}
-                                    className="rounded p-1 text-muted-foreground hover:bg-muted"
-                                    title="Download"
-                                  >
-                                    <Download size={13} />
-                                  </button>
-                                )}
-                                {attList.length > 1 && (
-                                  <button
-                                    onClick={() => handleRemoveAttachment(attIdx)}
-                                    className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                                    title="Remove attachment"
-                                  >
-                                    <X size={13} />
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                            {isImg && (
-                              <div className="overflow-hidden rounded-lg border border-border">
-                                <img src={att.url} alt={att.name} className="h-24 w-full object-cover" />
-                              </div>
-                            )}
-                            {isAudio && (
-                              <audio controls src={att.url} className="h-7 w-full outline-none mt-1" />
-                            )}
-                          </div>
-                        );
-                      })}
+                    <div className="space-y-2">
+                      {attList.map((att, attIdx) => (
+                        <AttachmentCard
+                          key={att.id || attIdx}
+                          attachment={att}
+                          onRemove={attList.length > 1 ? () => handleRemoveAttachment(attIdx) : undefined}
+                          readonly={attList.length <= 1}
+                        />
+                      ))}
                     </div>
                   </div>
                 )}

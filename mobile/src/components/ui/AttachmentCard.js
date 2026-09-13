@@ -11,11 +11,16 @@ import {
   Play,
   Pause,
   RotateCcw,
+  Eye,
+  Download,
+  Share2,
+  Check,
 } from 'lucide-react-native';
-import { viewDocument } from '../../utils/documentViewer';
-import { getAttachmentKind, openAttachment } from '../../utils/attachmentHelper';
+import { viewDocument, downloadDocument, shareDocument } from '../../utils/documentViewer';
+import { getAttachmentKind, getKindLabel, getOpenLabel, openAttachment, resolveAttachmentFileName } from '../../utils/attachmentHelper';
 import { globalAudioPlayer } from '../../services/audioPlayerService';
 import { useAppTheme, useStyles } from '../../theme/theme';
+import { useAppDialog } from './AppDialog';
 
 export function formatFileSize(bytes) {
   if (!bytes || bytes === 0) return '';
@@ -41,9 +46,14 @@ export function AttachmentCard({
 }) {
   const { colors, typography, spacing, radii } = useAppTheme();
   const styles = useStyles(createStyles);
+  const { showError } = useAppDialog();
 
   const [playbackState, setPlaybackState] = useState('idle');
   const [errorMessage, setErrorMessage] = useState('');
+  const [isOpening, setIsOpening] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadSuccess, setDownloadSuccess] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
 
   if (!attachment) return null;
 
@@ -56,18 +66,25 @@ export function AttachmentCard({
     attachment.path ||
     '';
 
-  const rawMimeType = attachment.mimeType || attachment.fileData?.mimeType || '';
-  const rawType = attachment.type || attachment.resourceType || '';
-  const originalName = attachment.originalName || attachment.name || '';
-  const size = attachment.size || attachment.fileData?.size || 0;
-  const duration = attachment.duration || attachment.fileData?.duration || 0;
-
   const kind = getAttachmentKind(attachment);
   const isImage = kind === 'image';
   const isAudio = kind === 'audio';
   const isVideo = kind === 'video';
   const isPdf = kind === 'pdf';
-  const isYouTube = kind === 'link' && (/youtube\.com|youtu\.be/i.test(rawUrl) || rawType === 'youtube');
+  const isPresentation = kind === 'presentation';
+  const isDocument = kind === 'document';
+  const isYouTube = kind === 'link' && (/youtube\.com|youtu\.be/i.test(rawUrl) || attachment.type === 'youtube');
+
+  const fileName = resolveAttachmentFileName(
+    attachment,
+    isPdf ? 'document.pdf' : isImage ? 'image.png' : isAudio ? 'Voice Note' : 'file'
+  );
+
+  const size = attachment.size || attachment.fileData?.size || 0;
+  const duration = attachment.duration || attachment.fileData?.duration || 0;
+  const sizeText = formatFileSize(size);
+  const kindLabel = getKindLabel(kind);
+  const openLabel = getOpenLabel(kind);
 
   const handleToggleAudio = async () => {
     if (!rawUrl) {
@@ -96,26 +113,64 @@ export function AttachmentCard({
   };
 
   const handleOpenGeneral = async () => {
-    if (rawUrl) {
+    if (!rawUrl || isOpening) return;
+    setIsOpening(true);
+    try {
+      await openAttachment(attachment);
+    } catch (e) {
+      if (__DEV__) console.warn('openAttachment error:', e);
       try {
-        await openAttachment(attachment);
-      } catch (e) {
-        if (__DEV__) console.warn('openAttachment error:', e);
-
-        try {
-          await viewDocument(rawUrl, originalName || 'Attachment');
-        } catch (innerE) {
-          console.warn('Fallback viewDocument error:', innerE);
-        }
+        await viewDocument(rawUrl, fileName);
+      } catch (innerE) {
+        showError('Couldn’t Open File', innerE?.message || 'Unable to open this file.');
       }
+    } finally {
+      setIsOpening(false);
     }
   };
 
-  const displayName =
-    originalName ||
-    (isYouTube ? 'YouTube Link' : isAudio ? 'Voice Note' : rawUrl) ||
-    'Attachment';
-  const sizeText = formatFileSize(size);
+  const handleDownload = async () => {
+    if (!rawUrl || isDownloading) return;
+    setIsDownloading(true);
+    try {
+      await downloadDocument(rawUrl, fileName);
+      setDownloadSuccess(true);
+      setTimeout(() => setDownloadSuccess(false), 3000);
+    } catch (err) {
+      showError('Download Failed', 'Could not download the file. Please check your connection.');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const handleShare = async () => {
+    if (!rawUrl || isSharing) return;
+    setIsSharing(true);
+    try {
+      await shareDocument(rawUrl, fileName);
+    } catch (err) {
+      showError('Share Failed', 'Unable to share this file right now.');
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
+  const getIcon = () => {
+    if (isYouTube) return <Video size={20} color="#ff0000" />;
+    if (isPdf) return <FileText size={20} color={colors.accent} />;
+    if (isPresentation) return <File size={20} color="#e07a5f" />;
+    if (isDocument) return <FileText size={20} color={colors.accent} />;
+    if (isVideo) return <Video size={20} color="#4b8f8b" />;
+    if (isImage) return <ImageIcon size={20} color="#b58a4a" />;
+    if (kind === 'link') return <ExternalLink size={20} color={colors.primary} />;
+    return <File size={20} color={colors.mutedForeground} />;
+  };
+
+  const getActionIcon = () => {
+    if (isVideo) return <Play size={14} color={colors.primaryForeground} fill="currentColor" style={{ marginRight: 6 }} />;
+    if (kind === 'link' || isYouTube) return <ExternalLink size={14} color={colors.primaryForeground} style={{ marginRight: 6 }} />;
+    return <Eye size={14} color={colors.primaryForeground} style={{ marginRight: 6 }} />;
+  };
 
   if (isAudio) {
     return (
@@ -127,7 +182,7 @@ export function AttachmentCard({
             </View>
             <View style={styles.audioInfoCol}>
               <Text style={styles.nameText} numberOfLines={1}>
-                {displayName}
+                {fileName}
               </Text>
               <View style={styles.metaRow}>
                 <Text style={styles.metaText}>Voice Note</Text>
@@ -141,6 +196,7 @@ export function AttachmentCard({
                 style={styles.removeBtn}
                 onPress={onRemove}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityLabel={`Remove ${fileName}`}
               >
                 <Trash2 size={16} color={colors.destructive} />
               </TouchableOpacity>
@@ -193,51 +249,93 @@ export function AttachmentCard({
     );
   }
 
-  const getIcon = () => {
-    if (isYouTube) return <Video size={20} color="#ff0000" />;
-    if (isPdf) return <FileText size={20} color={colors.accent} />;
-    if (isVideo) return <Video size={20} color="#4b8f8b" />;
-    if (isImage) return <ImageIcon size={20} color="#b58a4a" />;
-    if (rawType === 'link') return <ExternalLink size={20} color={colors.primary} />;
-    return <File size={20} color={colors.mutedForeground} />;
-  };
-
   return (
     <View style={[styles.card, style]}>
-      <TouchableOpacity
-        style={styles.cardContent}
-        onPress={handleOpenGeneral}
-        activeOpacity={rawUrl ? 0.7 : 1}
-      >
+
+      <View style={styles.topRow}>
         <View style={styles.iconBox}>{getIcon()}</View>
         <View style={styles.infoContainer}>
           <Text style={styles.nameText} numberOfLines={1}>
-            {displayName}
+            {fileName}
           </Text>
           <View style={styles.metaRow}>
-            {isYouTube && <Text style={styles.metaText}>YouTube</Text>}
-            {sizeText ? <Text style={styles.metaText}>{sizeText}</Text> : null}
-            {rawUrl && !isYouTube && (
-              <Text style={styles.linkText} numberOfLines={1}>
-                Tap to view
-              </Text>
-            )}
+            <Text style={styles.kindBadge}>{kindLabel}</Text>
+            {sizeText ? <Text style={styles.metaText}>• {sizeText}</Text> : null}
           </View>
         </View>
-      </TouchableOpacity>
+
+        {!readonly && onRemove && (
+          <TouchableOpacity
+            style={styles.removeBtn}
+            onPress={onRemove}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel={`Remove ${fileName}`}
+          >
+            <Trash2 size={16} color={colors.destructive} />
+          </TouchableOpacity>
+        )}
+      </View>
 
       {isImage && rawUrl && (
-        <Image source={{ uri: rawUrl }} style={styles.thumbnail} resizeMode="cover" />
+        <Image source={{ uri: rawUrl }} style={styles.imagePreview} resizeMode="cover" />
       )}
 
-      {!readonly && onRemove && (
-        <TouchableOpacity
-          style={styles.removeBtn}
-          onPress={onRemove}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Trash2 size={16} color={colors.destructive} />
-        </TouchableOpacity>
+      {Boolean(rawUrl) && (
+        <View style={styles.actionSection}>
+          <TouchableOpacity
+            style={styles.primaryViewBtn}
+            onPress={handleOpenGeneral}
+            disabled={isOpening}
+            activeOpacity={0.8}
+            accessibilityLabel={`${openLabel} - ${fileName}`}
+          >
+            {isOpening ? (
+              <ActivityIndicator size="small" color={colors.primaryForeground} style={{ marginRight: 6 }} />
+            ) : (
+              getActionIcon()
+            )}
+            <Text style={styles.primaryViewBtnText}>
+              {isOpening ? 'Opening...' : openLabel}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Secondary Actions (Download, Share) */}
+          <View style={styles.secondaryActionsRow}>
+            <TouchableOpacity
+              style={styles.secondaryBtn}
+              onPress={handleDownload}
+              disabled={isDownloading}
+              activeOpacity={0.7}
+              accessibilityLabel={`Download ${fileName}`}
+            >
+              {isDownloading ? (
+                <ActivityIndicator size="small" color={colors.foreground} style={{ marginRight: 4 }} />
+              ) : downloadSuccess ? (
+                <Check size={13} color={colors.accent} style={{ marginRight: 4 }} />
+              ) : (
+                <Download size={13} color={colors.foreground} style={{ marginRight: 4 }} />
+              )}
+              <Text style={[styles.secondaryBtnText, downloadSuccess && { color: colors.accent }]}>
+                {isDownloading ? 'Saving...' : downloadSuccess ? 'Saved' : 'Download'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.secondaryBtn}
+              onPress={handleShare}
+              disabled={isSharing}
+              activeOpacity={0.7}
+              accessibilityLabel={`Share ${fileName}`}
+            >
+              {isSharing ? (
+                <ActivityIndicator size="small" color={colors.foreground} style={{ marginRight: 4 }} />
+              ) : (
+                <Share2 size={13} color={colors.foreground} style={{ marginRight: 4 }} />
+              )}
+              <Text style={styles.secondaryBtnText}>Share</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       )}
     </View>
   );
@@ -246,15 +344,17 @@ export function AttachmentCard({
 const createStyles = ({ colors, typography, spacing, radii }) =>
   StyleSheet.create({
     card: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      backgroundColor: colors.background,
+      flexDirection: 'column',
+      backgroundColor: colors.card,
       borderWidth: 1,
       borderColor: colors.cardBorder,
       borderRadius: radii.lg,
-      padding: spacing.sm,
+      padding: spacing.sm + 2,
       marginVertical: spacing.xs,
+    },
+    topRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
     },
     audioCard: {
       flexDirection: 'column',
@@ -294,15 +394,9 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
     audioPlayTextActive: {
       color: colors.primaryForeground,
     },
-    cardContent: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      overflow: 'hidden',
-    },
     iconBox: {
-      width: 36,
-      height: 36,
+      width: 38,
+      height: 38,
       borderRadius: radii.md,
       backgroundColor: colors.muted + '80',
       alignItems: 'center',
@@ -314,7 +408,7 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
       marginRight: spacing.xs,
     },
     nameText: {
-      fontFamily: typography.sans.medium,
+      fontFamily: typography.sans.bold,
       fontSize: 13,
       color: colors.foreground,
     },
@@ -324,21 +418,62 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
       gap: 6,
       marginTop: 2,
     },
+    kindBadge: {
+      fontFamily: typography.mono.bold,
+      fontSize: 10,
+      color: colors.accent,
+      textTransform: 'uppercase',
+    },
     metaText: {
       fontFamily: typography.mono.regular,
       fontSize: 11,
       color: colors.mutedForeground,
     },
-    linkText: {
-      fontFamily: typography.sans.regular,
-      fontSize: 11,
-      color: colors.accent,
+    imagePreview: {
+      width: '100%',
+      height: 100,
+      borderRadius: radii.md,
+      marginTop: spacing.xs + 2,
     },
-    thumbnail: {
-      width: 36,
-      height: 36,
+    actionSection: {
+      marginTop: spacing.xs + 4,
+      gap: spacing.xs,
+    },
+    primaryViewBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.primary,
+      borderRadius: radii.md,
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+    },
+    primaryViewBtnText: {
+      fontFamily: typography.sans.bold,
+      fontSize: 12,
+      color: colors.primaryForeground,
+    },
+    secondaryActionsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+    },
+    secondaryBtn: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
       borderRadius: radii.sm,
-      marginRight: spacing.sm,
+      paddingVertical: 5,
+      paddingHorizontal: 8,
+    },
+    secondaryBtnText: {
+      fontFamily: typography.sans.medium,
+      fontSize: 11,
+      color: colors.foreground,
     },
     removeBtn: {
       padding: spacing.xs,
@@ -352,3 +487,4 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
       textAlign: 'center',
     },
   });
+

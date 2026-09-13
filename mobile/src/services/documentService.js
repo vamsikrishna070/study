@@ -22,11 +22,17 @@ export function getOrCreateDirectory(base = 'cache', subDir = DOCUMENTS_CACHE_DI
 
 export function getSafeFilename(filename, fallback = 'document.pdf') {
   if (!filename || typeof filename !== 'string') return fallback;
-  const clean = filename
+  let clean = filename
     .trim()
     .replace(/[\\/:*?"<>|]/g, '_')
-    .replace(/\s+/g, '_')
     .replace(/_{2,}/g, '_');
+
+  const dotIndex = clean.lastIndexOf('.');
+  if (dotIndex === -1 && fallback.includes('.')) {
+    const ext = fallback.substring(fallback.lastIndexOf('.'));
+    clean = `${clean}${ext}`;
+  }
+
   return clean || fallback;
 }
 
