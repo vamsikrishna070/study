@@ -253,12 +253,6 @@ const TasksScreen = ({ route, navigation }) => {
         }
       }
 
-      if (__DEV__) {
-        const allNotifs = await getAllScheduledNotifications();
-        console.log(`[TasksScreen] Currently scheduled notifications: ${allNotifs.length}`);
-        allNotifs.forEach(n => console.log(` - ID: ${n.identifier}, Title: ${n.content.title}, Type: ${n.trigger.type}`));
-      }
-
       setModalVisible(false);
       resetForm();
     } catch (e) {
@@ -481,7 +475,7 @@ const TasksScreen = ({ route, navigation }) => {
       <FlatList
         data={filteredTasks}
         keyExtractor={(item, idx) => item._id || item.id || idx.toString()}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingBottom: 110 + Math.max(insets.bottom, 16) }]}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }

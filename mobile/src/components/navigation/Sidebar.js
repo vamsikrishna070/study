@@ -17,7 +17,8 @@ import {
   Timer,
   Clock,
   RotateCcw,
-  GraduationCap
+  GraduationCap,
+  Calculator,
 } from 'lucide-react-native';
 import { DrawerContentScrollView } from '@react-navigation/drawer';
 import { DrawerActions } from '@react-navigation/native';
@@ -29,6 +30,7 @@ const navItems = [
   { href: 'ScheduleTab', label: 'Schedule', icon: CalendarDays },
   { href: 'PortalDashboard', label: 'SRM Portal', icon: GraduationCap },
   { href: 'PortalAttendance', label: 'Attendance', icon: Clock },
+  { href: 'PortalAttendancePlanner', label: 'Attendance Planner', icon: Calculator },
   { href: 'StudySessions', label: 'Study Sessions', icon: Timer },
   { href: 'SubjectsTab', label: 'Subjects', icon: BookOpen },
   { href: 'Syllabus', label: 'Syllabus', icon: FileStack },
@@ -63,6 +65,10 @@ const Sidebar = (props) => {
     } else if (routeName === 'PortalAttendance') {
       navigation.navigate('PortalDashboard', {
         screen: 'PortalAttendance',
+      });
+    } else if (routeName === 'PortalAttendancePlanner') {
+      navigation.navigate('PortalDashboard', {
+        screen: 'PortalAttendancePlanner',
       });
     } else if (routeName === 'PortalDashboard') {
       navigation.navigate('PortalDashboard', {
@@ -127,21 +133,21 @@ const Sidebar = (props) => {
           onPress={() => handleNavigation('Settings')}
           accessibilityLabel="Settings"
         >
-          {user?.profileImageUrl ? (
+          {user && user.profileImageUrl ? (
             <View style={styles.avatarContainer}>
               <Image source={{ uri: user.profileImageUrl }} style={styles.avatarImage} />
             </View>
           ) : (
             <View style={[styles.avatarContainer, styles.avatarPlaceholder]}>
               <Text style={styles.avatarText}>
-                {user?.name?.split(' ').map(p => p[0]).join('').slice(0, 2) || 'U'}
+                {(user && user.name && user.name.split(' ').map(p => p[0]).join('').slice(0, 2)) || 'U'}
               </Text>
             </View>
           )}
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName} numberOfLines={1}>{user?.displayName || user?.officialName || user?.name || 'Student'}</Text>
+            <Text style={styles.profileName} numberOfLines={1}>{(user && (user.displayName || user.officialName || user.name)) || 'Student'}</Text>
             <Text style={styles.profileDegree} numberOfLines={1}>
-              {user?.degree || 'Degree'} {user?.branch ? `/ ${user.branch}` : ''}
+              {(user && user.degree) || 'Degree'} {user && user.branch ? `/ ${user.branch}` : ''}
             </Text>
           </View>
           <Settings size={15} color={colors.mutedForeground} style={{ opacity: 0.6 }} />

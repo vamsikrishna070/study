@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Target, ChevronRight, Sparkles, Settings as SettingsIcon, MoreHorizontal, LayoutDashboard, BookOpen, FileText, ListChecks, CalendarDays, Library, TrendingUp, Bell, FileStack, History, GraduationCap } from 'lucide-react';
+import { Target, ChevronRight, Sparkles, Settings as SettingsIcon, MoreHorizontal, LayoutDashboard, BookOpen, FileText, ListChecks, CalendarDays, Library, TrendingUp, Bell, FileStack, History, GraduationCap, ClipboardList, Calculator } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { cx } from './shared.jsx';
 import { isSrmApStudent } from '../utils/srmAp.js';
@@ -8,6 +8,8 @@ import { isSrmApStudent } from '../utils/srmAp.js';
 const navItems = [
   { href: '/', label: 'Overview', icon: LayoutDashboard },
   { href: '/portal', label: 'SRM Portal', icon: GraduationCap },
+  { href: '/portal/attendance', label: 'Subject Attendance', icon: ClipboardList, parent: '/portal' },
+  { href: '/portal/attendance-planner', label: 'Attendance Planner', icon: Calculator, parent: '/portal' },
   { href: '/subjects', label: 'Subjects', icon: BookOpen },
   { href: '/study-log', label: 'Study Log', icon: History },
   { href: '/syllabus', label: 'Syllabus', icon: FileStack },
@@ -28,7 +30,7 @@ export default function Shell({ children }) {
   const { user } = useAuth();
 
   const visibleNavItems = navItems.filter(
-    (item) => item.href !== '/portal' || isSrmApStudent(user)
+    (item) => (item.href !== '/portal' && !item.parent?.startsWith('/portal')) || isSrmApStudent(user)
   );
 
   if (!user) return children;
@@ -37,10 +39,18 @@ export default function Shell({ children }) {
   const initials = displayName.split(' ').map(p => p[0]).join('').slice(0, 2) || 'U';
 
   const ProfileAvatar = ({ className }) => {
-    if (user?.profileImageUrl) {
+    const [imgError, setImgError] = useState(false);
+    if (user?.profileImageUrl && !imgError) {
       return (
-        <div className={cx("overflow-hidden rounded-full border border-border/50", className)}>
-          <img src={user.profileImageUrl} alt="Profile" className="h-full w-full object-cover" />
+        <div className={cx("overflow-hidden rounded-full border border-border/50 bg-primary/10", className)}>
+          <img 
+            src={user.profileImageUrl} 
+            alt="Profile" 
+            className="h-full w-full object-cover" 
+            crossOrigin="anonymous"
+            referrerPolicy="no-referrer"
+            onError={() => setImgError(true)}
+          />
         </div>
       );
     }
@@ -66,13 +76,17 @@ export default function Shell({ children }) {
           </Link>
           <div className="mb-3 px-3 font-mono text-[9px] uppercase tracking-[.2em] opacity-45">Workspace</div>
           <nav className="space-y-1">
-            {visibleNavItems.map(({ href, label, icon: Icon }) => (
-              <Link key={href} to={href} onClick={() => setMobileOpen(false)} className={cx('group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors', location === href ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-sidebar-foreground/65 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground')} data-testid={`link-nav-${label.toLowerCase()}`}>
-                <Icon size={17} className={location === href ? 'text-sidebar-primary' : 'opacity-75'} />
-                <span>{label}</span>
-                {location === href && <ChevronRight size={14} className="ml-auto opacity-60" />}
-              </Link>
-            ))}
+            {visibleNavItems.map(({ href, label, icon: Icon, parent }) => {
+              const isActive = location === href || (href !== '/' && location.startsWith(href + '/'));
+              const isChild = Boolean(parent);
+              return (
+                <Link key={href} to={href} onClick={() => setMobileOpen(false)} className={cx('group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors', isChild && 'pl-10 py-2 text-[13px]', isActive ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-sidebar-foreground/65 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground')} data-testid={`link-nav-${label.toLowerCase().replace(/\s+/g, '-')}`}>
+                  <Icon size={isChild ? 15 : 17} className={isActive ? 'text-sidebar-primary' : 'opacity-75'} />
+                  <span>{label}</span>
+                  {isActive && <ChevronRight size={14} className="ml-auto opacity-60" />}
+                </Link>
+              );
+            })}
           </nav>
 
           <div className="mt-auto pt-6">

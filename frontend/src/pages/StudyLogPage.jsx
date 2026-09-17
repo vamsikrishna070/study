@@ -207,6 +207,13 @@ export default function StudyLogPage() {
                 <Trash2 size={14} className="mr-1" /> {del.isPending ? 'Deleting…' : 'Delete Record'}
               </Button>
               <div className="flex items-center gap-2">
+                <Link
+                  to={`/study-session?subject=${selectedSession.subject?._id || selectedSession.subject?.id || selectedSession.subjectId || ''}&topic=${encodeURIComponent(selectedSession.topic || '')}`}
+                >
+                  <Button className="h-10 text-xs">
+                    <Play size={13} className="fill-current mr-1" /> Study Again
+                  </Button>
+                </Link>
                 <Link to={`/study-session/${selectedSession._id || selectedSession.id}`}>
                   <Button variant="outline" className="h-10 text-xs">
                     View Full Page

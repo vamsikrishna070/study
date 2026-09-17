@@ -21,6 +21,7 @@ import {
   ChevronRight,
   PartyPopper,
   UserCheck,
+  Calculator,
 } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppTheme, useStyles } from '../../theme/theme';
@@ -31,6 +32,7 @@ import {
   connectPortal,
   syncPortalData,
   disconnectPortal,
+  verifyPortalSession,
 } from '../../api/portal';
 import { AuthContext } from '../../context/AuthContext';
 import { useAppDialog } from '../../components/ui/AppDialog';
@@ -53,19 +55,36 @@ const PortalDashboardScreen = ({ navigation }) => {
   const [connecting, setConnecting] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
+  const [portalStatus, setPortalStatus] = useState('checking');
+  const [portalMessage, setPortalMessage] = useState('Checking portal connection...');
+
   const fetchStatus = async (isManualSync = false) => {
     try {
       if (isManualSync) setSyncing(true);
-      const res = await getPortalStatus();
-      if (res?.data) {
-        setData(res.data);
-      } else if (res) {
-        setData(res);
+      const [res, verifyRes] = await Promise.allSettled([
+        getPortalStatus(),
+        verifyPortalSession(),
+      ]);
+
+      if (res.status === 'fulfilled') {
+        const val = res.value;
+        const payload = (val && val.data) ? val.data : (val || {});
+        setData(payload);
+        if (payload && (payload.syncing || payload.isSyncing)) {
+          setSyncing(true);
+        } else if (!isManualSync) {
+          setSyncing(false);
+        }
       }
-      if (res?.syncing || res?.data?.isSyncing) {
-        setSyncing(true);
-      } else if (!isManualSync) {
-        setSyncing(false);
+
+      if (verifyRes.status === 'fulfilled') {
+        const v = verifyRes.value;
+        const status = (v && v.status) ? v.status : (v && v.isConnected ? 'verified' : 'disconnected');
+        setPortalStatus(status);
+        setPortalMessage((v && v.message) ? v.message : '');
+      } else {
+        setPortalStatus('failed');
+        setPortalMessage('Unable to connect to portal');
       }
     } catch (err) {
       console.warn('[PortalDashboardScreen] Background status fetch warning:', err.message);
@@ -91,12 +110,15 @@ const PortalDashboardScreen = ({ navigation }) => {
   };
 
   const handleConnectSubmit = async () => {
+    if (connecting) return;
     if (!srmUsername.trim() || !srmPassword) {
       Alert.alert('Validation', 'Please enter your Registration Number and Password.');
       return;
     }
     try {
       setConnecting(true);
+      setPortalStatus('connecting');
+      setPortalMessage('Establishing connection...');
       await connectPortal({
         srmUsername: srmUsername.trim().toUpperCase(),
         srmPassword,
@@ -104,12 +126,16 @@ const PortalDashboardScreen = ({ navigation }) => {
 
       setData(null);
       await refreshUser();
+      setPortalStatus('verified');
+      setPortalMessage('Connected and verified');
       showSuccess('Portal Connected', 'SRM Portal linked and data synchronized successfully.');
 
       setShowConnectModal(false);
       setSrmPassword('');
-      fetchStatus();
+      await fetchStatus();
     } catch (err) {
+      setPortalStatus('failed');
+      setPortalMessage('Unable to connect to portal');
       Alert.alert(
         'Connection Failed',
         getUserFriendlyError(err, 'portal_connect')
@@ -120,12 +146,36 @@ const PortalDashboardScreen = ({ navigation }) => {
   };
 
   const handleSyncNow = async () => {
+    if (syncing) return;
     try {
       setSyncing(true);
-      await syncPortalData();
-      Alert.alert('Synced', 'Portal data updated from SRM.');
-      fetchStatus();
+      setPortalStatus('connecting');
+      setPortalMessage('Establishing connection...');
+      const res = await syncPortalData();
+      const resData = res && res.data ? res.data : res;
+      const attendanceCount = (resData && resData.attendance && resData.attendance.length) || 0;
+      const subjectsCount = (resData && resData.subjects && resData.subjects.length) || 0;
+      let msg = 'Portal data updated from SRM.';
+      if (attendanceCount || subjectsCount) {
+        msg = `Synced ${attendanceCount || subjectsCount} courses/records from SRM.`;
+      }
+      setPortalStatus('verified');
+      setPortalMessage('Connected and verified');
+      Alert.alert('Synced', msg);
+      await fetchStatus();
     } catch (err) {
+      const isExpired =
+        (err && err.response && err.response.status === 401) ||
+        (err && err.response && err.response.data && err.response.data.code === 'PORTAL_SESSION_EXPIRED') ||
+        (err && err.message && err.message.includes('expired'));
+
+      if (isExpired) {
+        setPortalStatus('expired');
+        setPortalMessage('Session expired. Please reconnect.');
+      } else {
+        setPortalStatus('failed');
+        setPortalMessage('Unable to connect to portal');
+      }
       Alert.alert('Sync Failed', getUserFriendlyError(err, 'portal_sync'));
     } finally {
       setSyncing(false);
@@ -152,27 +202,27 @@ const PortalDashboardScreen = ({ navigation }) => {
     ]);
   };
 
-  const displayRegNumber = data?.srmUsername || data?.registrationNumber || user?.srmUsername || user?.registrationNumber || srmUsername || '';
+  const displayRegNumber = (data && (data.srmUsername || data.registrationNumber)) || (user && (user.srmUsername || user.registrationNumber)) || srmUsername || '';
   const hasStoredPortalData = Boolean(
-    data?.isConnected &&
-    (data?.hasStoredPortalData || data?.srmUsername || data?.profile?.studentName)
+    data && data.isConnected &&
+    (data.hasStoredPortalData || data.srmUsername || (data.profile && data.profile.studentName))
   );
-  const isSessionExpired = data?.connectionStatus === 'expired' || data?.isSessionExpired;
-  const profile = data?.profile || {};
-  const cgpa = (data?.cgpa?.cgpa && data.cgpa.cgpa !== '0.00') ? data.cgpa.cgpa : (user?.cgpa || '9.05');
-  const attendanceList = data?.attendance || [];
-  const subjectsList = data?.subjects || [];
-  const enrolledCount = data?.enrolledSubjectsCount || Math.max(subjectsList.length, attendanceList.length, 6);
+  const isSessionExpired = (data && data.connectionStatus === 'expired') || (data && data.isSessionExpired);
+  const profile = (data && data.profile) || {};
+  const studentDisplayName = profile.studentName || (user && (user.officialName || user.displayName || user.name)) || 'Student';
+  const cgpa = (data && data.cgpa && data.cgpa.cgpa && data.cgpa.cgpa !== '0.00') ? data.cgpa.cgpa : ((user && user.cgpa) || '9.05');
+  const attendanceList = (data && data.attendance) || [];
+  const subjectsList = (data && data.subjects) || [];
+  const enrolledCount = (data && data.enrolledSubjectsCount) || Math.max(subjectsList.length, attendanceList.length, 6);
 
-  const lastSynced = data?.lastSuccessfulSync
+  const lastSynced = (data && data.lastSuccessfulSync)
     ? new Date(data.lastSuccessfulSync).toLocaleString('en-IN', {
         day: '2-digit',
         month: 'short',
-        year: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
       })
-    : 'Recently';
+    : 'Never';
 
   return (
     <View style={styles.container}>
@@ -187,8 +237,13 @@ const PortalDashboardScreen = ({ navigation }) => {
               onPress={handleSyncNow}
               disabled={syncing}
               activeOpacity={0.7}
+              accessibilityLabel="Sync portal data"
             >
-              <RefreshCcw size={13} color={colors.accentForeground} style={{ marginRight: 4 }} />
+              {syncing ? (
+                <ActivityIndicator size="small" color="#ffffff" style={{ marginRight: 4 }} />
+              ) : (
+                <RefreshCcw size={13} color="#ffffff" style={{ marginRight: 4 }} />
+              )}
               <Text style={styles.headerSyncBtnText}>{syncing ? 'Syncing...' : 'Sync'}</Text>
             </TouchableOpacity>
           ) : null
@@ -202,15 +257,14 @@ const PortalDashboardScreen = ({ navigation }) => {
           { paddingBottom: Math.max(insets.bottom, 20) + 90 }
         ]}
       >
-
         {hasStoredPortalData ? (
-          <>
+          <View>
 
             <View style={styles.profileHeroCard}>
               <View style={styles.profileHeroHeader}>
                 <View style={{ flex: 1, paddingRight: spacing.sm }}>
                   <Text style={styles.studentNameText} numberOfLines={1}>
-                    {profile.studentName || user?.officialName || user?.displayName || user?.name || 'Student'}
+                    {studentDisplayName}
                   </Text>
                   <Text style={styles.studentSubText} numberOfLines={1}>
                     Reg No: {displayRegNumber || 'AP24110011854'} • Last synced: {lastSynced}
@@ -231,8 +285,20 @@ const PortalDashboardScreen = ({ navigation }) => {
                 <Text style={styles.sessionExpiredText}>
                   Live portal session expired. Showing last synced data.
                 </Text>
-                <TouchableOpacity style={styles.bannerSyncBtn} onPress={handleSyncNow} disabled={syncing}>
-                  <Text style={styles.bannerSyncText}>{syncing ? 'Syncing...' : 'Sync Now'}</Text>
+                <TouchableOpacity
+                  style={[styles.bannerSyncBtn, syncing && { opacity: 0.7 }]}
+                  onPress={handleSyncNow}
+                  disabled={syncing}
+                  activeOpacity={0.8}
+                >
+                  {syncing ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <ActivityIndicator size="small" color="#000000" />
+                      <Text style={styles.bannerSyncText}>Syncing...</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.bannerSyncText}>Sync Now</Text>
+                  )}
                 </TouchableOpacity>
               </View>
             )}
@@ -246,7 +312,7 @@ const PortalDashboardScreen = ({ navigation }) => {
                 <View style={styles.infoCol}>
                   <Text style={styles.infoLabel}>NAME</Text>
                   <Text style={styles.infoVal} numberOfLines={1}>
-                    {profile.studentName || user?.officialName || user?.displayName || user?.name || 'Student'}
+                    {studentDisplayName}
                   </Text>
                 </View>
                 <View style={styles.infoCol}>
@@ -289,6 +355,15 @@ const PortalDashboardScreen = ({ navigation }) => {
                 <ChevronRight size={16} color={colors.mutedForeground} />
               </TouchableOpacity>
 
+              <TouchableOpacity style={styles.navRow} onPress={() => navigation.navigate('PortalAttendancePlanner')}>
+                <Calculator size={18} color={colors.accent} />
+                <View style={styles.navRowText}>
+                  <Text style={styles.navTitle}>Attendance Planner</Text>
+                  <Text style={styles.navDesc}>Simulate absences & compute safe bunks</Text>
+                </View>
+                <ChevronRight size={16} color={colors.mutedForeground} />
+              </TouchableOpacity>
+
               <TouchableOpacity style={styles.navRow} onPress={() => navigation.navigate('PortalTimetable')}>
                 <Calendar size={18} color={colors.accent} />
                 <View style={styles.navRowText}>
@@ -325,7 +400,7 @@ const PortalDashboardScreen = ({ navigation }) => {
                 <ChevronRight size={16} color={colors.mutedForeground} />
               </TouchableOpacity>
             </View>
-          </>
+          </View>
         ) : (
           <View style={styles.emptyCard}>
             <GraduationCap size={48} color={colors.accent} />
@@ -388,8 +463,16 @@ const PortalDashboardScreen = ({ navigation }) => {
                   style={[styles.submitBtn, connecting && styles.submitBtnDisabled]}
                   onPress={handleConnectSubmit}
                   disabled={connecting}
+                  activeOpacity={0.8}
                 >
-                  <Text style={styles.submitBtnText}>{connecting ? 'Connecting...' : 'Connect Portal'}</Text>
+                  {connecting ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <ActivityIndicator size="small" color={colors.accentForeground} />
+                      <Text style={styles.submitBtnText}>Connecting...</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.submitBtnText}>Connect Portal</Text>
+                  )}
                 </TouchableOpacity>
               </View>
             </View>

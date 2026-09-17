@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
-import { BookOpen, AlertTriangle } from 'lucide-react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { BookOpen, AlertTriangle, Calculator, ChevronRight } from 'lucide-react-native';
 import { useAppTheme, useStyles } from '../../theme/theme';
 import { getPortalStatus } from '../../api/portal';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -67,6 +67,23 @@ const PortalAttendanceScreen = ({ navigation }) => {
           </Text>
         </View>
       )}
+
+      <TouchableOpacity
+        style={styles.plannerBanner}
+        onPress={() => navigation.navigate('AttendancePlanner')}
+        activeOpacity={0.75}
+      >
+        <View style={styles.plannerBannerLeft}>
+          <View style={styles.plannerIconWrap}>
+            <Calculator size={18} color={colors.accent} />
+          </View>
+          <View style={{ flex: 1, marginLeft: 10 }}>
+            <Text style={styles.plannerBannerTitle}>Attendance Planner</Text>
+            <Text style={styles.plannerBannerSub}>Simulate absences & compute safe bunks</Text>
+          </View>
+        </View>
+        <ChevronRight size={18} color={colors.mutedForeground} />
+      </TouchableOpacity>
 
       <View style={styles.metricCard}>
         <Text style={styles.metricLabel}>ENROLLED SUBJECTS</Text>
@@ -288,12 +305,46 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
     },
     statVal: {
       fontFamily: typography.sans.bold,
-      fontSize: 13,
+      fontSize: 18,
       color: colors.foreground,
     },
     statLbl: {
       fontFamily: typography.sans.regular,
       fontSize: 9,
+      color: colors.mutedForeground,
+    },
+    plannerBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: colors.card,
+      borderRadius: radii.md,
+      padding: spacing.sm,
+      marginBottom: spacing.md,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+    },
+    plannerBannerLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+    },
+    plannerIconWrap: {
+      width: 32,
+      height: 32,
+      borderRadius: radii.sm,
+      backgroundColor: `${colors.accent}1A`,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    plannerBannerTitle: {
+      fontFamily: typography.sans.bold,
+      fontSize: 13,
+      color: colors.foreground,
+    },
+    plannerBannerSub: {
+      fontFamily: typography.sans.regular,
+      fontSize: 11,
       color: colors.mutedForeground,
     },
   });

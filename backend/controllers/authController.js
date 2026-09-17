@@ -35,20 +35,30 @@ const publicUser = (user) => {
   };
 };
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 
 export async function register(req, res) {
   let { name, email, password, collegeId, university, degree, branch, batch, semester } = req.body;
-  if (!name || !email || !password) return res.status(400).json({ success: false, message: 'Name, email, and password are required' });
+  
+  if (!name || typeof name !== 'string' || name.trim().length < 2) {
+    return res.status(400).json({ success: false, message: 'Please enter your full name (at least 2 characters)' });
+  }
+  if (!email || typeof email !== 'string' || !EMAIL_REGEX.test(email.trim().toLowerCase())) {
+    return res.status(400).json({ success: false, message: 'Please enter a valid email address' });
+  }
+  if (!password || typeof password !== 'string' || password.length < 6) {
+    return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+  }
+
   email = email.trim().toLowerCase();
-  if (password.length < 6) return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
 
   const existing = await User.findOne({ email });
   if (existing) {
     if (existing.isVerified) {
       return res.status(409).json({ success: false, message: 'An account with that email already exists' });
     } else {
-
       await User.deleteOne({ _id: existing._id });
     }
   }
@@ -83,9 +93,13 @@ export async function register(req, res) {
   try {
     await sendVerificationEmail({ email: user.email, name: user.name, otp });
   } catch (error) {
-    console.error('[AuthController] Registration email dispatch failed:', error);
-    await User.deleteOne({ _id: user._id }).catch(err => console.error('[AuthController] Failed to cleanup user record:', err.message));
-    return res.status(500).json({ success: false, message: 'We couldn\'t send the verification email. Please try again shortly.' });
+    console.error('[AuthController] Registration email dispatch failed:', error.message || error);
+    if (process.env.NODE_ENV === 'production') {
+      await User.deleteOne({ _id: user._id }).catch(err => console.error('[AuthController] Failed to cleanup user record:', err.message));
+      return res.status(500).json({ success: false, message: 'We couldn\'t send the verification email. Please try again shortly.' });
+    } else {
+      console.warn(`[DEV AUTH] Email delivery failed in development (${error.message}). User account created for OTP testing.`);
+    }
   }
 
   res.status(201).json({ success: true, message: 'Verification email sent' });
@@ -117,7 +131,9 @@ export async function verifyEmail(req, res) {
 
 export async function resendOtp(req, res) {
   let { email, purpose = 'registration' } = req.body;
-  if (!email) return res.status(400).json({ success: false, message: 'Email is required' });
+  if (!email || !EMAIL_REGEX.test(String(email).trim().toLowerCase())) {
+    return res.status(400).json({ success: false, message: 'A valid email is required' });
+  }
   email = email.trim().toLowerCase();
 
   const user = await User.findOne({ email }).select('+otpExpires +resetPasswordExpires');
@@ -143,7 +159,10 @@ export async function resendOtp(req, res) {
     try {
       await sendVerificationEmail({ email: user.email, name: user.name, otp });
     } catch (error) {
-      return res.status(500).json({ success: false, message: error.message || 'Unable to send verification email' });
+      console.error('[AuthController] Failed to resend verification email:', error.message || error);
+      if (process.env.NODE_ENV === 'production') {
+        return res.status(500).json({ success: false, message: 'Unable to send verification email' });
+      }
     }
 
     return res.json({ success: true, message: 'A new verification code has been sent' });
@@ -160,8 +179,10 @@ export async function resendOtp(req, res) {
     try {
       await sendPasswordResetEmail({ email: user.email, name: user.name, otp });
     } catch (error) {
-      console.error('[AuthController] Failed to send password reset email:', error.message);
-      return res.status(500).json({ success: false, message: error.message || 'Unable to send password reset email' });
+      console.error('[AuthController] Failed to send password reset email:', error.message || error);
+      if (process.env.NODE_ENV === 'production') {
+        return res.status(500).json({ success: false, message: 'Unable to send password reset email' });
+      }
     }
 
     return res.json({ success: true, message: 'If an account exists, a reset code was sent' });
@@ -200,9 +221,9 @@ export async function forgotPassword(req, res) {
   await user.save();
 
   try {
-    await sendPasswordResetEmail(user.email, otp);
+    await sendPasswordResetEmail({ email: user.email, name: user.name, otp });
   } catch (error) {
-    console.error('[AuthController] Failed to send password reset email:', error.message);
+    console.error('[AuthController] Failed to send password reset email:', error.message || error);
   }
 
   res.json({ success: true, message: 'If an account exists, a reset code was sent' });

@@ -293,17 +293,6 @@ export async function saveCustomAudio(asset) {
   const cleanBase = getSafeFilename(baseName, 'custom_sound');
   const uniqueName = `audio_${Date.now()}_${cleanBase}${ext}`;
 
-  console.log(`[AUDIO PICK DEBUG]
-asset: ${JSON.stringify(asset)}
-uri: ${sourceUri}
-name: ${rawName}
-mimeType: ${asset.mimeType || 'unknown'}
-size: ${asset.size ?? -1}
-fileName: ${uniqueName}
-isContentUri: ${isContentUri}
-isFileUri: ${isFileUri}
-copyStarted: true`);
-
   const soundsDir = getOrCreateDirectory('document', CUSTOM_SOUNDS_DIR_NAME);
   const destinationFile = new File(soundsDir, uniqueName);
 
@@ -314,7 +303,6 @@ copyStarted: true`);
       await sourceFile.copy(destinationFile);
     } catch (copyErr) {
       copyMethod = 'arrayBuffer fallback';
-      console.warn('[AUDIO PICK DEBUG] sourceFile.copy direct failed, trying arrayBuffer stream:', copyErr?.message);
       const buffer = await sourceFile.arrayBuffer();
       if (buffer && buffer.byteLength > 0) {
         await destinationFile.write(new Uint8Array(buffer));
@@ -325,12 +313,6 @@ copyStarted: true`);
 
     const destinationExists = destinationFile.exists;
     const destinationSize = destinationFile.size;
-
-    console.log(`[AUDIO PICK DEBUG]
-copyCompleted: true (${copyMethod})
-destinationUri: ${destinationFile.uri}
-destinationExists: ${destinationExists}
-destinationSize: ${destinationSize}`);
 
     if (!destinationExists || destinationSize === 0) {
       throw new Error(`Audio file copy failed validation: exists=${destinationExists}, size=${destinationSize}`);

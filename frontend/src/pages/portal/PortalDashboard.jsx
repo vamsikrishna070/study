@@ -16,6 +16,7 @@ import {
   PartyPopper,
   UserCheck,
   Loader2,
+  Calculator,
 } from 'lucide-react';
 import Shell from '../../components/Shell.jsx';
 import { LoadingBlock, QueryState, cx } from '../../components/shared.jsx';
@@ -35,6 +36,12 @@ const PORTAL_FEATURES = [
     desc: 'Subject-wise conduct counts & percentage progress',
     href: '/portal/attendance',
     icon: BookOpen,
+  },
+  {
+    title: 'Attendance Planner',
+    desc: 'Simulate bunks & calculate safe margins before dropping below 75%',
+    href: '/portal/attendance-planner',
+    icon: Calculator,
   },
   {
     title: 'Weekly Timetable',
@@ -190,7 +197,8 @@ export default function PortalDashboard() {
                 <button
                   onClick={handleSyncNow}
                   disabled={syncMutation.isPending}
-                  className="focus-ring inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-bold text-accent-foreground shadow-sm hover:opacity-90 disabled:opacity-50"
+                  style={{ backgroundColor: '#EF4444' }}
+                  className="focus-ring inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:opacity-90 disabled:opacity-50 transition-all"
                 >
                   <RefreshCw size={15} className={syncMutation.isPending ? 'animate-spin' : ''} />
                   <span>{syncMutation.isPending ? 'Syncing...' : 'Sync Now'}</span>

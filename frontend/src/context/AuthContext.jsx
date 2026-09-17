@@ -42,23 +42,43 @@ export function AuthProvider({ children }) {
   const checkAuth = async () => {
     const token = localStorage.getItem('studyarena_token');
     if (!token) {
+      setUser(null);
+      setIsAuthenticated(false);
       setIsLoading(false);
       return;
+    }
+
+
+    const cachedUserRaw = localStorage.getItem('studyarena_cached_user');
+    if (cachedUserRaw) {
+      try {
+        const cachedUser = JSON.parse(cachedUserRaw);
+        setUser(cachedUser);
+        setIsAuthenticated(true);
+        setIsLoading(false);
+      } catch (_) {}
     }
 
     try {
       apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       const { data } = await apiClient.get('/auth/me');
-      if (data.success) {
+      if (data.success && data.data) {
         setUser(data.data);
         setIsAuthenticated(true);
-
+        localStorage.setItem('studyarena_cached_user', JSON.stringify(data.data));
         recordDailyActivity();
       }
     } catch (error) {
-      console.error('Auth check failed:', error);
-      localStorage.removeItem('studyarena_token');
-      delete apiClient.defaults.headers.common['Authorization'];
+      if (error.response?.status === 401) {
+        console.warn('[Web AuthContext] Explicit 401 on /auth/me: token expired or invalid.');
+        localStorage.removeItem('studyarena_token');
+        localStorage.removeItem('studyarena_cached_user');
+        delete apiClient.defaults.headers.common['Authorization'];
+        setUser(null);
+        setIsAuthenticated(false);
+      } else {
+        console.warn('[Web AuthContext] Network unavailable or server slow on startup; retaining user session.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -69,6 +89,7 @@ export function AuthProvider({ children }) {
       const { data } = await apiClient.post('/auth/login', { email, password });
       if (data.success) {
         localStorage.setItem('studyarena_token', data.data.token);
+        localStorage.setItem('studyarena_cached_user', JSON.stringify(data.data.user));
         apiClient.defaults.headers.common['Authorization'] = `Bearer ${data.data.token}`;
         setUser(data.data.user);
         setIsAuthenticated(true);
@@ -100,6 +121,7 @@ export function AuthProvider({ children }) {
       const { data } = await apiClient.post('/auth/verify-email', { email, otp });
       if (data.success) {
         localStorage.setItem('studyarena_token', data.data.token);
+        localStorage.setItem('studyarena_cached_user', JSON.stringify(data.data.user));
         apiClient.defaults.headers.common['Authorization'] = `Bearer ${data.data.token}`;
         setUser(data.data.user);
         setIsAuthenticated(true);
@@ -137,6 +159,7 @@ export function AuthProvider({ children }) {
       const { data } = await apiClient.post('/auth/reset-password', { email, otp, newPassword });
       if (data.success) {
         localStorage.setItem('studyarena_token', data.data.token);
+        localStorage.setItem('studyarena_cached_user', JSON.stringify(data.data.user));
         apiClient.defaults.headers.common['Authorization'] = `Bearer ${data.data.token}`;
         setUser(data.data.user);
         setIsAuthenticated(true);
@@ -155,6 +178,7 @@ export function AuthProvider({ children }) {
       console.error('[AuthContext] Logout request error:', e);
     }
     localStorage.removeItem('studyarena_token');
+    localStorage.removeItem('studyarena_cached_user');
     delete apiClient.defaults.headers.common['Authorization'];
     setUser(null);
     setIsAuthenticated(false);

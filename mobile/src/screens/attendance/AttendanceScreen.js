@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useContext } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   useWindowDimensions,
+  ActivityIndicator,
+  Modal,
+  Alert,
 } from 'react-native';
 import {
   BookOpen,
@@ -19,13 +22,22 @@ import {
   XCircle,
   UserCheck,
   RefreshCw,
+  Calculator,
+  ChevronRight,
+  Radio,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenHeader } from '../../components/ui/ScreenHeader';
 import { PageHeading } from '../../components/ui/PageHeading';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
-import { getTodayAttendance, markAttendanceCode } from '../../api/portal';
+import {
+  getTodayAttendance,
+  markAttendanceCode,
+  verifyPortalSession,
+  connectPortal,
+} from '../../api/portal';
+import { AuthContext } from '../../context/AuthContext';
 import { getUserFriendlyError } from '../../utils/errorUtils';
 import { typography, spacing, radii, useAppTheme, useStyles } from '../../theme/theme';
 
@@ -34,6 +46,7 @@ export default function AttendanceScreen({ navigation }) {
   const styles = useStyles(createStyles);
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
+  const { user, refreshUser } = useContext(AuthContext);
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -45,18 +58,64 @@ export default function AttendanceScreen({ navigation }) {
   const [feedback, setFeedback] = useState(null);
   const [activeTab, setActiveTab] = useState('today');
 
+  const [portalStatus, setPortalStatus] = useState('checking');
+  const [portalMessage, setPortalMessage] = useState('Checking portal connection...');
+
+  const [showConnectModal, setShowConnectModal] = useState(false);
+  const [srmUsername, setSrmUsername] = useState('');
+  const [srmPassword, setSrmPassword] = useState('');
+  const [connecting, setConnecting] = useState(false);
+
   const horizontalScrollRef = useRef(null);
+
+  const checkConnection = useCallback(async (isSilent = false) => {
+    try {
+      if (!isSilent) {
+        setPortalStatus('checking');
+        setPortalMessage('Checking portal connection...');
+      }
+      const verifyRes = await verifyPortalSession();
+      const status = (verifyRes && verifyRes.status) ? verifyRes.status : (verifyRes && verifyRes.isConnected ? 'verified' : 'disconnected');
+      setPortalStatus(status);
+      setPortalMessage((verifyRes && verifyRes.message) ? verifyRes.message : '');
+      return status;
+    } catch (err) {
+      console.warn('[AttendanceScreen] verifyPortalSession warning:', err.message);
+      setPortalStatus('failed');
+      setPortalMessage('Unable to connect to portal');
+      return 'failed';
+    }
+  }, []);
 
   const loadData = useCallback(async () => {
     try {
       setError(null);
-      setFeedback(null);
-      const res = await getTodayAttendance();
-      const payload = res?.data ?? res ?? {};
-      setData(payload);
+
+      const [res, verifyRes] = await Promise.allSettled([
+        getTodayAttendance(),
+        verifyPortalSession(),
+      ]);
+
+      if (res.status === 'fulfilled') {
+        const val = res.value;
+        const payload = (val && val.data) ? val.data : (val || {});
+        setData(payload);
+      } else {
+        console.error('[AttendanceScreen] Error loading attendance:', res.reason);
+        setError(getUserFriendlyError(res.reason, 'portal_connect'));
+      }
+
+      if (verifyRes.status === 'fulfilled') {
+        const v = verifyRes.value;
+        const status = (v && v.status) ? v.status : (v && v.isConnected ? 'verified' : 'disconnected');
+        setPortalStatus(status);
+        setPortalMessage((v && v.message) ? v.message : '');
+      } else {
+        setPortalStatus('failed');
+        setPortalMessage('Unable to connect to portal');
+      }
     } catch (err) {
-      console.error('[AttendanceScreen] Error loading attendance:', err);
-      setError(getUserFriendlyError(err, 'portal_connect'));
+      console.error('[AttendanceScreen] Unexpected load error:', err);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -67,12 +126,52 @@ export default function AttendanceScreen({ navigation }) {
     loadData();
   }, [loadData]);
 
+  const handleOpenInitiate = () => {
+    setSrmUsername(user?.srmUsername || data?.registrationNumber || '');
+    setSrmPassword('');
+    setShowConnectModal(true);
+  };
+
+  const handleConnectSubmit = async () => {
+    if (connecting) return;
+    const cleanUsername = srmUsername.trim().toUpperCase();
+    if (!cleanUsername || !srmPassword) {
+      Alert.alert('Validation Error', 'Please enter your Registration Number and Password.');
+      return;
+    }
+
+    try {
+      setConnecting(true);
+      await connectPortal({
+        srmUsername: cleanUsername,
+        srmPassword,
+      });
+
+      await refreshUser();
+      setShowConnectModal(false);
+      setSrmPassword('');
+      setFeedback({
+        type: 'success',
+        text: 'Session initiated successfully!',
+      });
+      await loadData();
+    } catch (err) {
+      Alert.alert(
+        'Session Initiation Failed',
+        getUserFriendlyError(err, 'portal_connect')
+      );
+    } finally {
+      setConnecting(false);
+    }
+  };
+
   const handleSyncNow = async () => {
     if (syncing) return;
     setSyncing(true);
     try {
       const { syncPortalData } = require('../../api/portal');
       await syncPortalData();
+      await checkConnection(true);
     } catch (_) {
     } finally {
       await loadData();
@@ -93,45 +192,78 @@ export default function AttendanceScreen({ navigation }) {
   };
 
   const handleMarkCode = async () => {
-    if (!code.trim() || submitting) return;
+    const trimmed = code.trim().toUpperCase();
+    if (!trimmed || submitting) return;
+
+    if (portalStatus !== 'verified') {
+      setFeedback({
+        type: 'error',
+        text: 'Portal session not active. Please initiate a new session.',
+      });
+      return;
+    }
+
+    if (trimmed.length < 3) {
+      setFeedback({
+        type: 'error',
+        text: 'Please enter a valid attendance code (e.g. C123456).',
+      });
+      return;
+    }
     setSubmitting(true);
     setFeedback(null);
 
     try {
-      const res = await markAttendanceCode(code.trim().toUpperCase());
+      const res = await markAttendanceCode(trimmed);
       if (res.success) {
         setFeedback({
           type: 'success',
-          text: res.message || '✓ Attendance marked successfully!',
+          text: res.message || '✓ Attendance Captured Successfully!',
         });
         setCode('');
         await loadData();
       } else {
+        if (res.code === 'PORTAL_SESSION_EXPIRED') {
+          setPortalStatus('expired');
+          setPortalMessage('Session expired. Please reconnect.');
+        }
         setFeedback({
           type: 'error',
-          text: res.message || 'The attendance code is invalid or has expired.',
+          text: res.message || 'Incorrect Attendance Code!',
         });
       }
     } catch (err) {
+      const serverMsg = (err && err.response && err.response.data && err.response.data.message) ? err.response.data.message : null;
+      const isExpired =
+        (err && err.response && err.response.status === 401) ||
+        (err && err.response && err.response.data && err.response.data.code === 'PORTAL_SESSION_EXPIRED') ||
+        (serverMsg && serverMsg.includes('expired'));
+
+      if (isExpired) {
+        setPortalStatus('expired');
+        setPortalMessage('Session expired. Please reconnect.');
+      }
+
       setFeedback({
         type: 'error',
-        text: getUserFriendlyError(err, 'portal_connect'),
+        text: isExpired ? 'Portal session expired. Please initiate a new session.' : (serverMsg || getUserFriendlyError(err, 'portal_sync')),
       });
     } finally {
       setSubmitting(false);
     }
   };
 
-  const payload = data?.data?.data ?? data?.data ?? data ?? {};
-  const dayOrder = payload?.dayOrder ?? data?.dayOrder;
-  const todayAttendance = Array.isArray(payload?.attendance)
+  const rawData = data && data.data ? data.data : data;
+  const payload = rawData && rawData.data ? rawData.data : (rawData || {});
+  const dayOrder = payload.dayOrder || (data && data.dayOrder);
+  const todayAttendance = Array.isArray(payload.attendance)
     ? payload.attendance
-    : Array.isArray(data?.attendance)
+    : (data && Array.isArray(data.attendance))
     ? data.attendance
     : [];
-  const subjectStats = Array.isArray(payload?.subjectStats)
+  const subjectStats = Array.isArray(payload.subjectStats)
     ? payload.subjectStats
-    : Array.isArray(data?.subjectStats)
+    : (data && Array.isArray(data.subjectStats))
     ? data.subjectStats
     : [];
 
@@ -167,20 +299,20 @@ export default function AttendanceScreen({ navigation }) {
         ) : (
           todayAttendance.map((cls, idx) => {
             if (!cls) return null;
-            const isPresent = cls?.status === 'PRESENT';
-            const isAbsent = cls?.status === 'ABSENT';
-            const isOdMl = cls?.status === 'OD/ML' || cls?.status === 'OD' || cls?.status === 'ML';
+            const isPresent = cls.status === 'PRESENT';
+            const isAbsent = cls.status === 'ABSENT';
+            const isOdMl = cls.status === 'OD/ML' || cls.status === 'OD' || cls.status === 'ML';
 
             return (
               <Card key={idx} style={styles.classCard}>
                 <View style={styles.classHeader}>
                   <View style={styles.hourBadge}>
-                    <Text style={styles.hourText}>H{cls?.hour || idx + 1}</Text>
+                    <Text style={styles.hourText}>H{cls.hour || idx + 1}</Text>
                   </View>
                   <View style={{ flex: 1, marginLeft: 10 }}>
-                    <Text style={styles.subjectCode}>{cls?.subjectCode || 'CLASS'}</Text>
+                    <Text style={styles.subjectCode}>{cls.subjectCode || 'CLASS'}</Text>
                     <Text style={styles.subjectName} numberOfLines={1}>
-                      {cls?.subjectName || cls?.subjectCode || 'Course Session'}
+                      {cls.subjectName || cls.subjectCode || 'Course Session'}
                     </Text>
                   </View>
                   <View
@@ -199,17 +331,17 @@ export default function AttendanceScreen({ navigation }) {
                         isOdMl && { color: '#8B5CF6' },
                       ]}
                     >
-                      {cls?.status || 'NOT MARKED'}
+                      {cls.status || 'NOT MARKED'}
                     </Text>
                   </View>
                 </View>
 
-                {(cls?.startTime || cls?.endTime || cls?.room) && (
+                {(cls.startTime || cls.endTime || cls.room) && (
                   <View style={styles.classMeta}>
                     <Clock size={13} color={colors.mutedForeground} style={{ marginRight: 4 }} />
-                    <Text style={styles.metaText}>{cls?.startTime || ''}{cls?.endTime ? ` - ${cls.endTime}` : ''}</Text>
-                    {Boolean(cls?.room) && <Text style={styles.metaDot}>•</Text>}
-                    {Boolean(cls?.room) && <Text style={styles.metaText}>{cls.room}</Text>}
+                    <Text style={styles.metaText}>{cls.startTime || ''}{cls.endTime ? ` - ${cls.endTime}` : ''}</Text>
+                    {Boolean(cls.room) && <Text style={styles.metaDot}>•</Text>}
+                    {Boolean(cls.room) && <Text style={styles.metaText}>{cls.room}</Text>}
                   </View>
                 )}
               </Card>
@@ -224,8 +356,26 @@ export default function AttendanceScreen({ navigation }) {
     <View style={[styles.panelContainer, { width: isWide ? undefined : panelWidth, flex: isWide ? 1 : undefined }]}>
       <View style={styles.panelHeader}>
         <Text style={styles.panelTitle}>SUBJECT-WISE ATTENDANCE ({subjectStats.length})</Text>
-        <Text style={styles.panelSub}>Complete subject record</Text>
+        <Text style={styles.panelSub}>Complete subject record & planning</Text>
       </View>
+
+      <TouchableOpacity
+        style={styles.plannerBanner}
+        onPress={() => navigation.navigate('AttendancePlanner')}
+        activeOpacity={0.75}
+        accessibilityLabel="Open Attendance Planner"
+      >
+        <View style={styles.plannerBannerLeft}>
+          <View style={styles.plannerIconWrap}>
+            <Calculator size={18} color={colors.accent} />
+          </View>
+          <View style={{ flex: 1, marginLeft: 10 }}>
+            <Text style={styles.plannerBannerTitle}>Attendance Planner</Text>
+            <Text style={styles.plannerBannerSub}>Simulate absences & compute safe bunks</Text>
+          </View>
+        </View>
+        <ChevronRight size={18} color={colors.mutedForeground} />
+      </TouchableOpacity>
 
       <ScrollView
         style={styles.panelScroll}
@@ -240,53 +390,59 @@ export default function AttendanceScreen({ navigation }) {
           </Card>
         ) : (
           subjectStats.map((sub, idx) => (
-            <Card key={idx} style={styles.subCard}>
-              <View style={styles.subHeader}>
-                <View style={{ flex: 1, paddingRight: 10 }}>
-                  <Text style={styles.subjectCode}>{sub.subjectCode}</Text>
-                  <Text style={styles.subjectName} numberOfLines={1}>{sub.subjectName}</Text>
+            <TouchableOpacity
+              key={idx}
+              activeOpacity={0.75}
+              onPress={() => navigation.navigate('AttendancePlanner', { initialSubjectCode: sub.subjectCode })}
+            >
+              <Card style={styles.subCard}>
+                <View style={styles.subHeader}>
+                  <View style={{ flex: 1, paddingRight: 10 }}>
+                    <Text style={styles.subjectCode}>{sub.subjectCode}</Text>
+                    <Text style={styles.subjectName} numberOfLines={1}>{sub.subjectName}</Text>
+                  </View>
+                  <Text
+                    style={[
+                      styles.pctText,
+                      sub.percentage < 75 ? { color: '#F59E0B' } : { color: '#10B981' },
+                    ]}
+                  >
+                    {typeof sub.percentage === 'number'
+                      ? (sub.percentage % 1 === 0 ? `${sub.percentage}%` : `${sub.percentage.toFixed(2)}%`)
+                      : `${sub.percentage}%`}
+                  </Text>
                 </View>
-                <Text
-                  style={[
-                    styles.pctText,
-                    sub.percentage < 75 ? { color: '#F59E0B' } : { color: '#10B981' },
-                  ]}
-                >
-                  {typeof sub.percentage === 'number'
-                    ? (sub.percentage % 1 === 0 ? `${sub.percentage}%` : `${sub.percentage.toFixed(2)}%`)
-                    : `${sub.percentage}%`}
-                </Text>
-              </View>
 
-              <View style={styles.progressBg}>
-                <View
-                  style={[
-                    styles.progressFill,
-                    { width: `${Math.min(Math.max(sub.percentage || 0, 0), 100)}%` },
-                    sub.percentage < 75 ? { backgroundColor: '#F59E0B' } : { backgroundColor: '#10B981' },
-                  ]}
-                />
-              </View>
+                <View style={styles.progressBg}>
+                  <View
+                    style={[
+                      styles.progressFill,
+                      { width: `${Math.min(Math.max(sub.percentage || 0, 0), 100)}%` },
+                      sub.percentage < 75 ? { backgroundColor: '#F59E0B' } : { backgroundColor: '#10B981' },
+                    ]}
+                  />
+                </View>
 
-              <View style={styles.statsGrid}>
-                <View style={styles.statBox}>
-                  <Text style={styles.statLabel}>Conducted</Text>
-                  <Text style={styles.statVal}>{sub.conducted}</Text>
+                <View style={styles.statsGrid}>
+                  <View style={styles.statBox}>
+                    <Text style={styles.statLabel}>Conducted</Text>
+                    <Text style={styles.statVal}>{sub.conducted}</Text>
+                  </View>
+                  <View style={styles.statBox}>
+                    <Text style={styles.statLabel}>Present</Text>
+                    <Text style={[styles.statVal, { color: '#10B981' }]}>{sub.present}</Text>
+                  </View>
+                  <View style={styles.statBox}>
+                    <Text style={styles.statLabel}>Absent</Text>
+                    <Text style={[styles.statVal, { color: '#EF4444' }]}>{sub.absent}</Text>
+                  </View>
+                  <View style={styles.statBox}>
+                    <Text style={styles.statLabel}>OD/ML</Text>
+                    <Text style={[styles.statVal, { color: '#8B5CF6' }]}>{sub.odMl || 0}</Text>
+                  </View>
                 </View>
-                <View style={styles.statBox}>
-                  <Text style={styles.statLabel}>Present</Text>
-                  <Text style={[styles.statVal, { color: '#10B981' }]}>{sub.present}</Text>
-                </View>
-                <View style={styles.statBox}>
-                  <Text style={styles.statLabel}>Absent</Text>
-                  <Text style={[styles.statVal, { color: '#EF4444' }]}>{sub.absent}</Text>
-                </View>
-                <View style={styles.statBox}>
-                  <Text style={styles.statLabel}>OD/ML</Text>
-                  <Text style={[styles.statVal, { color: '#8B5CF6' }]}>{sub.odMl || 0}</Text>
-                </View>
-              </View>
-            </Card>
+              </Card>
+            </TouchableOpacity>
           ))
         )}
       </ScrollView>
@@ -301,7 +457,11 @@ export default function AttendanceScreen({ navigation }) {
       activeOpacity={0.75}
       accessibilityLabel="Sync attendance"
     >
-      <RefreshCw size={13} color="#ffffff" style={syncing ? { transform: [{ rotate: '45deg' }] } : undefined} />
+      {syncing ? (
+        <ActivityIndicator size="small" color="#ffffff" style={{ marginRight: 4 }} />
+      ) : (
+        <RefreshCw size={13} color="#ffffff" style={{ marginRight: 4 }} />
+      )}
       <Text style={styles.headerSyncBtnText}>{syncing ? 'Syncing...' : 'Sync'}</Text>
     </TouchableOpacity>
   );
@@ -334,66 +494,130 @@ export default function AttendanceScreen({ navigation }) {
             </Button>
           </Card>
         ) : (
-          <>
+          <View style={{ flex: 1 }}>
 
-            <Card style={styles.compactCard}>
-              <View style={styles.cardHeader}>
-                <View style={styles.cardHeaderLeft}>
-                  <Text style={styles.cardTitle}>MARK ATTENDANCE CODE</Text>
-                  <Text style={styles.cardSub}>Enter attendance code announced during class</Text>
+            {/* Session Inactive State: Show Initiate Session Card, Hide Code Form */}
+            {portalStatus !== 'verified' ? (
+              <Card style={styles.compactCard}>
+                <View style={styles.inactiveCardContent}>
+                  <View style={styles.inactiveIconWrap}>
+                    {portalStatus === 'checking' ? (
+                      <ActivityIndicator size="small" color={colors.accent} />
+                    ) : (
+                      <Radio size={20} color={colors.accent} />
+                    )}
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={styles.inactiveTitle}>
+                      {portalStatus === 'checking' ? 'Checking session...' : 'Portal session not active'}
+                    </Text>
+                    <Text style={styles.inactiveDesc}>
+                      {portalStatus === 'checking'
+                        ? 'Verifying your SRM portal session status.'
+                        : 'Please initiate a new session to submit attendance codes.'}
+                    </Text>
+                  </View>
                 </View>
-                {Boolean(dayOrder) && (
-                  <View style={styles.dayOrderBadge}>
-                    <Text style={styles.dayOrderText}>Day Order {dayOrder}</Text>
+
+                {portalStatus !== 'checking' && (
+                  <View style={{ marginTop: 12 }}>
+                    <Button
+                      onPress={handleOpenInitiate}
+                      style={styles.initiateBtn}
+                      accessibilityLabel="Initiate Portal Session"
+                    >
+                      Initiate Session
+                    </Button>
                   </View>
                 )}
-              </View>
 
-              <View style={styles.codeForm}>
-                <TextInput
-                  value={code}
-                  onChangeText={(text) => setCode(text.toUpperCase())}
-                  placeholder="Enter the Attendance Code here"
-                  placeholderTextColor={colors.mutedForeground}
-                  autoCapitalize="characters"
-                  maxLength={15}
-                  editable={!submitting}
-                  keyboardType="default"
-                  style={styles.codeInput}
-                />
-                <Button
-                  onPress={handleMarkCode}
-                  loading={submitting}
-                  disabled={!code.trim() || submitting}
-                  style={styles.submitBtn}
-                >
-                  Submit
-                </Button>
-              </View>
-
-              {feedback && (
-                <View
-                  style={[
-                    styles.feedbackBox,
-                    feedback.type === 'success' ? styles.feedbackSuccess : styles.feedbackError,
-                  ]}
-                >
-                  {feedback.type === 'success' ? (
-                    <CheckCircle2 size={16} color="#10B981" style={{ marginRight: 6 }} />
-                  ) : (
-                    <XCircle size={16} color="#EF4444" style={{ marginRight: 6 }} />
-                  )}
-                  <Text
+                {feedback && (
+                  <View
                     style={[
-                      styles.feedbackText,
-                      { color: feedback.type === 'success' ? '#10B981' : '#EF4444' },
+                      styles.feedbackBox,
+                      feedback.type === 'success' ? styles.feedbackSuccess : styles.feedbackError,
                     ]}
                   >
-                    {feedback.text}
-                  </Text>
+                    {feedback.type === 'success' ? (
+                      <CheckCircle2 size={16} color="#10B981" style={{ marginRight: 6 }} />
+                    ) : (
+                      <XCircle size={16} color="#EF4444" style={{ marginRight: 6 }} />
+                    )}
+                    <Text
+                      style={[
+                        styles.feedbackText,
+                        { color: feedback.type === 'success' ? '#10B981' : '#EF4444' },
+                      ]}
+                    >
+                      {feedback.text}
+                    </Text>
+                  </View>
+                )}
+              </Card>
+            ) : (
+              /* Active Portal Session: Show Mark Attendance Code Form */
+              <Card style={styles.compactCard}>
+                <View style={styles.cardHeader}>
+                  <View style={styles.cardHeaderLeft}>
+                    <Text style={styles.cardTitle}>MARK ATTENDANCE CODE</Text>
+                    <Text style={styles.cardSub}>Enter the code displayed by faculty during live class.</Text>
+                  </View>
+                  {Boolean(dayOrder) && (
+                    <View style={styles.dayOrderBadge}>
+                      <Text style={styles.dayOrderText}>Day Order {dayOrder}</Text>
+                    </View>
+                  )}
                 </View>
-              )}
-            </Card>
+
+                <View style={styles.codeForm}>
+                  <TextInput
+                    value={code}
+                    onChangeText={(text) => setCode(text.toUpperCase())}
+                    placeholder="Enter the Attendance Code here"
+                    placeholderTextColor={colors.mutedForeground}
+                    autoCapitalize="characters"
+                    maxLength={15}
+                    editable={!submitting}
+                    keyboardType="default"
+                    style={styles.codeInput}
+                  />
+                  <Button
+                    onPress={handleMarkCode}
+                    loading={submitting}
+                    loadingText="Submitting..."
+                    disabled={!code.trim() || submitting}
+                    style={styles.submitBtn}
+                  >
+                    Submit
+                  </Button>
+                </View>
+
+                <Text style={styles.codeHintText}>Format: Capital letter + 6 digits (e.g. C123456)</Text>
+
+                {feedback && (
+                  <View
+                    style={[
+                      styles.feedbackBox,
+                      feedback.type === 'success' ? styles.feedbackSuccess : styles.feedbackError,
+                    ]}
+                  >
+                    {feedback.type === 'success' ? (
+                      <CheckCircle2 size={16} color="#10B981" style={{ marginRight: 6 }} />
+                    ) : (
+                      <XCircle size={16} color="#EF4444" style={{ marginRight: 6 }} />
+                    )}
+                    <Text
+                      style={[
+                        styles.feedbackText,
+                        { color: feedback.type === 'success' ? '#10B981' : '#EF4444' },
+                      ]}
+                    >
+                      {feedback.text}
+                    </Text>
+                  </View>
+                )}
+              </Card>
+            )}
 
             {!isWide && (
               <View style={styles.segmentedTabBar}>
@@ -448,9 +672,79 @@ export default function AttendanceScreen({ navigation }) {
                 </ScrollView>
               )}
             </View>
-          </>
+          </View>
         )}
       </View>
+
+      {/* Initiate Session Modal */}
+      <Modal
+        visible={showConnectModal}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => !connecting && setShowConnectModal(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Initiate Portal Session</Text>
+            <Text style={styles.modalDesc}>
+              Enter your SRM Student Portal credentials to establish an active session and enable real-time attendance submission.
+            </Text>
+
+            <Text style={styles.inputLabel}>REGISTRATION NUMBER</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="e.g. AP21110010001"
+              placeholderTextColor={colors.mutedForeground}
+              value={srmUsername}
+              onChangeText={(t) => setSrmUsername(t.toUpperCase())}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              editable={!connecting}
+            />
+
+            <Text style={styles.inputLabel}>PORTAL PASSWORD</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="••••••••••••"
+              placeholderTextColor={colors.mutedForeground}
+              value={srmPassword}
+              onChangeText={setSrmPassword}
+              secureTextEntry
+              editable={!connecting}
+            />
+
+            {connecting && (
+              <View style={styles.connectingRow}>
+                <ActivityIndicator size="small" color={colors.accent} />
+                <Text style={styles.connectingText}>Establishing session & syncing...</Text>
+              </View>
+            )}
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.cancelBtn}
+                onPress={() => setShowConnectModal(false)}
+                disabled={connecting}
+              >
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.submitBtnAction,
+                  (!srmUsername.trim() || !srmPassword || connecting) && styles.submitBtnDisabled,
+                ]}
+                onPress={handleConnectSubmit}
+                disabled={!srmUsername.trim() || !srmPassword || connecting}
+              >
+                <Text style={styles.submitBtnText}>
+                  {connecting ? 'Connecting...' : 'Initiate Session'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -479,11 +773,133 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
       fontSize: 13,
       color: colors.foreground,
     },
-    submitBtn: { width: 85, height: 40 },
+    submitBtn: { minWidth: 95, height: 40, paddingHorizontal: 8 },
+    codeHintText: {
+      fontFamily: typography.sans.regular,
+      fontSize: 11,
+      color: colors.mutedForeground,
+      marginTop: 4,
+    },
     feedbackBox: { flexDirection: 'row', alignItems: 'center', marginTop: 10, padding: 8, borderRadius: radii.md },
     feedbackSuccess: { backgroundColor: '#10B9811A' },
     feedbackError: { backgroundColor: '#EF44441A' },
     feedbackText: { fontFamily: typography.sans.medium, fontSize: 11 },
+
+    inactiveCardContent: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+    },
+    inactiveIconWrap: {
+      width: 36,
+      height: 36,
+      borderRadius: radii.md,
+      backgroundColor: `${colors.accent}1A`,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: 2,
+    },
+    inactiveTitle: {
+      fontFamily: typography.sans.bold,
+      fontSize: 14,
+      color: colors.foreground,
+    },
+    inactiveDesc: {
+      fontFamily: typography.sans.regular,
+      fontSize: 12,
+      color: colors.mutedForeground,
+      marginTop: 2,
+    },
+    initiateBtn: {
+      backgroundColor: colors.accent,
+    },
+
+    modalBackdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: spacing.lg,
+    },
+    modalContent: {
+      width: '100%',
+      maxWidth: 400,
+      backgroundColor: colors.card,
+      borderRadius: radii.lg,
+      padding: spacing.lg,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+    },
+    modalTitle: {
+      fontFamily: typography.serif.bold,
+      fontSize: 18,
+      color: colors.foreground,
+    },
+    modalDesc: {
+      fontFamily: typography.sans.regular,
+      fontSize: 12,
+      color: colors.mutedForeground,
+      marginTop: 4,
+      marginBottom: spacing.md,
+    },
+    inputLabel: {
+      fontFamily: typography.mono.regular,
+      fontSize: 10,
+      color: colors.mutedForeground,
+      marginTop: spacing.sm,
+      marginBottom: 4,
+    },
+    modalInput: {
+      height: 44,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      borderRadius: radii.md,
+      backgroundColor: colors.background,
+      paddingHorizontal: spacing.md,
+      fontFamily: typography.sans.bold,
+      fontSize: 14,
+      color: colors.foreground,
+    },
+    connectingRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      marginTop: spacing.md,
+    },
+    connectingText: {
+      fontFamily: typography.sans.regular,
+      fontSize: 12,
+      color: colors.mutedForeground,
+    },
+    modalActions: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      gap: spacing.sm,
+      marginTop: spacing.lg,
+    },
+    cancelBtn: {
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      borderRadius: radii.md,
+    },
+    cancelBtnText: {
+      fontFamily: typography.sans.medium,
+      fontSize: 14,
+      color: colors.mutedForeground,
+    },
+    submitBtnAction: {
+      backgroundColor: colors.accent,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.sm,
+      borderRadius: radii.md,
+    },
+    submitBtnDisabled: {
+      opacity: 0.5,
+    },
+    submitBtnText: {
+      fontFamily: typography.sans.bold,
+      fontSize: 14,
+      color: '#ffffff',
+    },
 
     segmentedTabBar: {
       flexDirection: 'row',
@@ -532,6 +948,40 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
       paddingBottom: 8,
       borderBottomWidth: 1,
       borderBottomColor: `${colors.cardBorder}80`,
+    },
+    plannerBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: `${colors.card}`,
+      borderRadius: radii.md,
+      padding: spacing.sm,
+      marginBottom: 10,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+    },
+    plannerBannerLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+    },
+    plannerIconWrap: {
+      width: 32,
+      height: 32,
+      borderRadius: radii.sm,
+      backgroundColor: `${colors.accent}1A`,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    plannerBannerTitle: {
+      fontFamily: typography.sans.bold,
+      fontSize: 13,
+      color: colors.foreground,
+    },
+    plannerBannerSub: {
+      fontFamily: typography.sans.regular,
+      fontSize: 11,
+      color: colors.mutedForeground,
     },
     panelTitle: {
       fontFamily: typography.sans.bold,
@@ -596,3 +1046,4 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
       color: '#ffffff',
     },
   });
+

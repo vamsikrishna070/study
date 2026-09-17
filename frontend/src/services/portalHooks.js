@@ -8,12 +8,16 @@ import {
   getTodayAttendance,
   markAttendanceCode,
   getTimetableData,
+  getAttendancePlanner,
+  verifyPortalSession,
 } from './portalClient.js';
 
 export const getPortalStatusQueryKey = () => ['portal', 'status'];
+export const getPortalVerifyQueryKey = () => ['portal', 'verify'];
 export const getCalendarQueryKey = () => ['portal', 'calendar'];
 export const getTodayAttendanceQueryKey = () => ['portal', 'attendance', 'today'];
 export const getTimetableQueryKey = () => ['portal', 'timetable'];
+export const getAttendancePlannerQueryKey = () => ['portal', 'attendance', 'planner'];
 
 export const useGetPortalStatus = (options) =>
   useQuery({
@@ -23,14 +27,24 @@ export const useGetPortalStatus = (options) =>
     ...options,
   });
 
+export const useVerifyPortal = (options) =>
+  useQuery({
+    queryKey: getPortalVerifyQueryKey(),
+    queryFn: verifyPortalSession,
+    staleTime: 60 * 1000,
+    ...options,
+  });
+
 export const useConnectPortal = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: connectPortal,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: getPortalStatusQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getPortalVerifyQueryKey() });
       queryClient.invalidateQueries({ queryKey: getTodayAttendanceQueryKey() });
       queryClient.invalidateQueries({ queryKey: getTimetableQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getAttendancePlannerQueryKey() });
     },
   });
 };
@@ -41,8 +55,10 @@ export const useSyncPortal = () => {
     mutationFn: syncPortalData,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: getPortalStatusQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getPortalVerifyQueryKey() });
       queryClient.invalidateQueries({ queryKey: getTodayAttendanceQueryKey() });
       queryClient.invalidateQueries({ queryKey: getTimetableQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getAttendancePlannerQueryKey() });
     },
   });
 };
@@ -60,8 +76,10 @@ export const useDisconnectPortal = () => {
     mutationFn: disconnectPortal,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: getPortalStatusQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getPortalVerifyQueryKey() });
       queryClient.invalidateQueries({ queryKey: getTodayAttendanceQueryKey() });
       queryClient.invalidateQueries({ queryKey: getTimetableQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getAttendancePlannerQueryKey() });
     },
   });
 };
@@ -81,6 +99,8 @@ export const useMarkAttendanceCode = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: getTodayAttendanceQueryKey() });
       queryClient.invalidateQueries({ queryKey: getPortalStatusQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getPortalVerifyQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getAttendancePlannerQueryKey() });
     },
   });
 };
@@ -89,6 +109,14 @@ export const useGetTimetable = (options) =>
   useQuery({
     queryKey: getTimetableQueryKey(),
     queryFn: getTimetableData,
+    staleTime: 5 * 60 * 1000,
+    ...options,
+  });
+
+export const useGetAttendancePlanner = (options) =>
+  useQuery({
+    queryKey: getAttendancePlannerQueryKey(),
+    queryFn: getAttendancePlanner,
     staleTime: 5 * 60 * 1000,
     ...options,
   });

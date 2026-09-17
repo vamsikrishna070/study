@@ -7,11 +7,13 @@ import { Header } from '../../components/ui/Header';
 import { PageHeading } from '../../components/ui/PageHeading';
 import { QueryState } from '../../components/ui/QueryState';
 import { typography, spacing, radii, useAppTheme, useStyles } from '../../theme/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const ProgressScreen = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
   const { colors, typography, spacing, radii, theme } = useAppTheme();
   const styles = useStyles(createStyles);
-  const { logout } = useContext(AuthContext);
+  const { logout } = useContext(AuthContext);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -53,7 +55,7 @@ const ProgressScreen = ({ navigation }) => {
       <Header />
       <ScrollView
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[styles.scroll, { paddingBottom: 110 + Math.max(insets.bottom, 16) }]}
       >
         <PageHeading 
           eyebrow="The long view" 
@@ -196,4 +198,6 @@ const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.crea
     backgroundColor: colors.primary,
     borderRadius: radii.round,
   }
-});export default ProgressScreen;
+});
+
+export default ProgressScreen;

@@ -4,16 +4,40 @@ import {
   reSyncPortalData,
   getAcademicCalendarData,
   disconnectPortalAccount,
+  verifyPortalConnection,
 } from '../../services/portal/srmPortalService.js';
 import {
   getCurrentAttendance,
   submitAttendanceCode,
   getTimetable,
+  getAttendancePlannerData,
 } from '../../services/portal/srmAttendanceService.js';
 
 export async function connectPortal(req, res) {
   try {
-    const { srmUsername, srmPassword } = req.body;
+    let body = req.body;
+    if (typeof body === 'string') {
+      try {
+        body = JSON.parse(body);
+      } catch {
+
+      }
+    }
+
+    let srmUsername = (body && typeof body === 'object')
+      ? (body.srmUsername || body.registrationNumber || '')
+      : (typeof body === 'string' ? body : '');
+    let srmPassword = (body && typeof body === 'object')
+      ? (body.srmPassword || body.password || '')
+      : '';
+
+    if (typeof srmUsername === 'string') {
+      srmUsername = srmUsername.trim().replace(/^["']+|["']+$/g, '');
+    }
+    if (typeof srmPassword === 'string') {
+      srmPassword = srmPassword.trim().replace(/^["']+|["']+$/g, '');
+    }
+
     if (!srmUsername || !srmPassword) {
       return res.status(400).json({
         success: false,
@@ -37,7 +61,7 @@ export async function connectPortal(req, res) {
       message = 'SRM Portal verification could not be completed. Please try again.';
     } else if (code === 'PORTAL_UNAVAILABLE') {
       statusCode = 503;
-      message = 'SRM Portal is currently unavailable. Please try again later.';
+      message = 'SRM Portal is currently unreachable. Please try again later.';
     } else if (code === 'SCRAPE_FAILED' || code === 'SYNC_FAILED') {
       statusCode = 502;
       message = 'Your SRM Portal login succeeded, but some academic data could not be synchronized. Please try again.';
@@ -54,6 +78,28 @@ export async function connectPortal(req, res) {
   }
 }
 
+export async function verifyPortal(req, res) {
+  try {
+    const result = await verifyPortalConnection(req.user._id);
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error('[PortalController] verifyPortal error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Unable to verify portal connection right now. Please try again.',
+      data: {
+        status: 'failed',
+        message: 'Unable to connect to portal',
+        isConnected: false,
+        isVerified: false,
+      },
+    });
+  }
+}
+
 export async function getStatus(req, res) {
   try {
     const userId = req.user._id;
@@ -61,6 +107,10 @@ export async function getStatus(req, res) {
     res.json({
       success: true,
       cached: true,
+      isConnected: Boolean(data.isConnected),
+      connectionStatus: data.connectionStatus || 'disconnected',
+      isVerified: Boolean(data.isVerified),
+      verificationMessage: data.verificationMessage || (data.isConnected ? 'Connected and verified' : 'Portal connection required'),
       syncing: Boolean(data.isSyncing),
       lastSyncedAt: data.lastSuccessfulSync || null,
       data,
@@ -147,8 +197,8 @@ export async function getTodayAttendance(req, res) {
 
 export async function markAttendance(req, res) {
   try {
-    const { attendanceCode } = req.body;
-    if (!attendanceCode || typeof attendanceCode !== 'string' || !attendanceCode.trim()) {
+    const rawCode = req.body.attendanceCode || req.body.code;
+    if (!rawCode || typeof rawCode !== 'string' || !rawCode.trim()) {
       return res.status(400).json({
         success: false,
         code: 'INVALID_CODE',
@@ -156,9 +206,9 @@ export async function markAttendance(req, res) {
       });
     }
 
-    console.log(`[ATTENDANCE] Attendance code submission started`);
-    const result = await submitAttendanceCode(req.user._id, attendanceCode.trim());
-    console.log(`[ATTENDANCE] Attendance code submission ${result.success ? 'succeeded' : 'failed'}`);
+    const attendanceCode = rawCode.trim().toUpperCase();
+    const result = await submitAttendanceCode(req.user._id, attendanceCode);
+
     if (!result.success) {
       const statusCode = result.code === 'PORTAL_SESSION_EXPIRED' ? 401 : 400;
       return res.status(statusCode).json(result);
@@ -166,7 +216,7 @@ export async function markAttendance(req, res) {
 
     res.json({
       success: true,
-      message: result.message || 'Attendance marked successfully!',
+      message: result.message || 'Attendance Captured Successfully!',
       data: result,
     });
   } catch (error) {
@@ -200,3 +250,24 @@ export async function getTimetableData(req, res) {
     });
   }
 }
+
+export async function getAttendancePlanner(req, res) {
+  try {
+    const userId = req.user._id;
+    const data = await getAttendancePlannerData(userId);
+    res.json({
+      success: true,
+      data,
+      cached: true,
+      lastSyncedAt: data.lastSynced || new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('[PortalController] getAttendancePlanner error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: "We couldn't calculate your attendance planner right now. Please try again.",
+      error: error.message,
+    });
+  }
+}
+

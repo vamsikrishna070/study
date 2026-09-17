@@ -412,7 +412,7 @@ const ExamsScreen = ({ route, navigation }) => {
       <FlatList
         data={filteredExams}
         keyExtractor={(item, idx) => item._id || item.id || idx.toString()}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingBottom: 110 + Math.max(insets.bottom, 16) }]}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }

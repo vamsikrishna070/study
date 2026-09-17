@@ -39,3 +39,14 @@ export const getTimetableData = async () => {
   const res = await apiClient.get('/portal/timetable');
   return res.data.data;
 };
+
+export const getAttendancePlanner = async () => {
+  const res = await apiClient.get('/portal/attendance/planner');
+  return res.data.data;
+};
+
+export const verifyPortalSession = async () => {
+  const res = await apiClient.get('/portal/verify');
+  return res.data.data;
+};
+

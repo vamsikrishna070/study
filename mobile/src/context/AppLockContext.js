@@ -23,7 +23,6 @@ const AppLockProvider = ({ children }) => {
   const lastBackgroundTime = useRef(Date.now());
   const isLoaded = useRef(false);
 
-
   useEffect(() => {
     const init = async () => {
       try {
@@ -35,14 +34,8 @@ const AppLockProvider = ({ children }) => {
         const isEnrolled = await LocalAuthentication.isEnrolledAsync();
         const supportedTypes = await LocalAuthentication.supportedAuthenticationTypesAsync();
 
-        console.log('[AppLock] biometric hardware:', hasHardware);
-        console.log('[AppLock] biometric enrolled:', isEnrolled);
-        console.log('[AppLock] supported types:', supportedTypes);
-        console.log('[AppLock] stored biometricEnabled:', storedBiometric);
-
         setBiometricStatus({ hasHardware, isEnrolled, supportedTypes });
         setBiometricAvailable(hasHardware && isEnrolled);
-
 
         const isBioPrefEnabled = storedBiometric === 'true';
         setBiometricEnabled(isBioPrefEnabled);
@@ -56,7 +49,6 @@ const AppLockProvider = ({ children }) => {
           setLockTimeout(parseInt(storedTimeout, 10));
         }
       } catch (err) {
-        console.error('[AppLock] SecureStore initialization failed:', err);
         setIsLockEnabled(false);
         setIsLocked(false);
         setBiometricEnabled(false);
@@ -68,7 +60,6 @@ const AppLockProvider = ({ children }) => {
     init();
   }, []);
 
-
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextAppState => {
       if (!isLoaded.current || !isLockEnabled) {
@@ -76,11 +67,9 @@ const AppLockProvider = ({ children }) => {
         return;
       }
 
-
       if (appState.current.match(/active/) && nextAppState.match(/inactive|background/)) {
         lastBackgroundTime.current = Date.now();
       }
-
 
       if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
         const timeSpentInBackground = Date.now() - lastBackgroundTime.current;

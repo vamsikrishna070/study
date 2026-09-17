@@ -41,11 +41,12 @@ const PortalExamsScreen = ({ navigation }) => {
   }, []);
 
   const handleSyncNow = async () => {
+    if (syncing) return;
     try {
       setSyncing(true);
       await syncPortalData();
       Alert.alert('Synced', 'Official SRM marks synchronized successfully.');
-      loadStatus();
+      await loadStatus();
     } catch (err) {
       Alert.alert('Sync Failed', getUserFriendlyError(err, 'portal_sync'));
     } finally {
@@ -67,8 +68,18 @@ const PortalExamsScreen = ({ navigation }) => {
     : 'Not synced';
 
   const syncButton = (
-    <TouchableOpacity style={styles.syncBtn} onPress={handleSyncNow} disabled={syncing}>
-      <RefreshCw size={12} color={colors.accentForeground} />
+    <TouchableOpacity
+      style={styles.syncBtn}
+      onPress={handleSyncNow}
+      disabled={syncing}
+      activeOpacity={0.75}
+      accessibilityLabel="Sync exams"
+    >
+      {syncing ? (
+        <ActivityIndicator size="small" color={colors.accentForeground} style={{ marginRight: 4 }} />
+      ) : (
+        <RefreshCw size={12} color={colors.accentForeground} style={{ marginRight: 4 }} />
+      )}
       <Text style={styles.syncBtnText}>{syncing ? 'Syncing...' : 'Sync'}</Text>
     </TouchableOpacity>
   );

@@ -128,8 +128,6 @@ class AudioPlayerManager {
     let status = 'idle';
 
     if (!rawUri || typeof rawUri !== 'string') {
-      console.log(`[AUDIO DEBUG]\nrawUri: ${rawUri}\nresolvedUri: \nscheme: invalid\nexists: false\nsize: 0\nplayerCreated: false\nstatus: error`);
-      console.error('[AUDIO DEBUG] REAL EXCEPTION: No audio URI provided.');
       onStatusUpdate?.({ status: 'error', error: 'No audio URI provided.' });
       return;
     }
@@ -145,10 +143,8 @@ class AudioPlayerManager {
           currentTime: this.currentPlayer.currentTime || 0,
           duration: this.currentPlayer.duration || 0,
         });
-        console.log(`[AUDIO DEBUG]\nrawUri: ${trimmed}\nresolvedUri: ${this.currentResolvedUri}\nscheme: ${this.currentScheme}\nexists: true\nsize: ${this.currentSize}\nplayerCreated: true\nstatus: playing (resumed)`);
         return;
       } catch (resumeErr) {
-        console.error('[AUDIO DEBUG] REAL EXCEPTION on player.play() (resume):', resumeErr);
       }
     }
 
@@ -175,8 +171,6 @@ class AudioPlayerManager {
         player = createAudioPlayer(resolvedUri);
         playerCreated = !!player;
       } catch (createErr) {
-        console.error('[AUDIO DEBUG] REAL EXCEPTION on createAudioPlayer():', createErr);
-        console.log(`[AUDIO DEBUG]\nrawUri: ${trimmed}\nresolvedUri: ${resolvedUri}\nscheme: ${scheme}\nexists: ${exists}\nsize: ${size}\nplayerCreated: false\nstatus: error`);
         this.emitStatus({ status: 'error', error: `createAudioPlayer failed: ${createErr?.message || createErr}` });
         await this.stop();
         return;
@@ -188,7 +182,6 @@ class AudioPlayerManager {
         if (!audioStatus) return;
 
         if (audioStatus.error) {
-          console.error('[AUDIO DEBUG] REAL EXCEPTION from playbackStatusUpdate:', audioStatus.error);
           this.emitStatus({
             status: 'error',
             error: audioStatus.error,
@@ -223,19 +216,13 @@ class AudioPlayerManager {
         player.play();
         status = 'playing';
       } catch (playErr) {
-        console.error('[AUDIO DEBUG] REAL EXCEPTION on player.play():', playErr);
-        console.log(`[AUDIO DEBUG]\nrawUri: ${trimmed}\nresolvedUri: ${resolvedUri}\nscheme: ${scheme}\nexists: ${exists}\nsize: ${size}\nplayerCreated: ${playerCreated}\nstatus: error`);
         this.emitStatus({ status: 'error', error: `player.play failed: ${playErr?.message || playErr}` });
         await this.stop();
         return;
       }
 
-      console.log(`[AUDIO DEBUG]\nrawUri: ${trimmed}\nresolvedUri: ${resolvedUri}\nscheme: ${scheme}\nexists: ${exists}\nsize: ${size}\nplayerCreated: ${playerCreated}\nstatus: ${status}`);
-
       this.emitStatus({ status: 'playing' });
     } catch (err) {
-      console.error('[AUDIO DEBUG] REAL EXCEPTION during audio preparation:', err);
-      console.log(`[AUDIO DEBUG]\nrawUri: ${trimmed}\nresolvedUri: ${resolvedUri}\nscheme: ${scheme}\nexists: ${exists}\nsize: ${size}\nplayerCreated: ${playerCreated}\nstatus: error`);
       this.emitStatus({ status: 'error', error: err?.message || String(err) });
       await this.stop();
     }

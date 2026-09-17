@@ -19,7 +19,7 @@ const openNearestDrawer = (navigation) => {
     return;
   }
 
-  const drawerParent = navigation.getParent('AppDrawer') || navigation.getParent();
+  const drawerParent = navigation.getParent('AppDrawer') || (typeof navigation.getParent === 'function' ? navigation.getParent() : null);
   if (drawerParent) {
     if (typeof drawerParent.openDrawer === 'function') {
       drawerParent.openDrawer();
@@ -30,10 +30,6 @@ const openNearestDrawer = (navigation) => {
       return;
     }
   }
-
-  try {
-    navigation.dispatch(DrawerActions.openDrawer());
-  } catch (_) {}
 };
 
 export const ScreenHeader = ({
@@ -42,6 +38,7 @@ export const ScreenHeader = ({
   showDrawer = false,
   showMenu = false,
   onBack,
+  onBackPress,
   onDrawerPress,
   onMenuPress,
   rightElement,
@@ -58,8 +55,9 @@ export const ScreenHeader = ({
   const isBackMode = showBack !== undefined ? Boolean(showBack) : !isDrawerMode;
 
   const handleBack = () => {
-    if (onBack) {
-      onBack();
+    const onBackCallback = onBack || onBackPress;
+    if (onBackCallback) {
+      onBackCallback();
     } else if (navigation.canGoBack()) {
       navigation.goBack();
     } else if (typeof navigation.navigate === 'function') {

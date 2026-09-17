@@ -1007,11 +1007,18 @@ export async function getPortalAccountData(userId) {
     triggerBackgroundSync(targetUserId);
   }
 
+  const isConnected = account.connectionStatus === 'connected';
+  const isSessionExpired = account.connectionStatus === 'expired';
+
   return {
-    isConnected: true,
+    isConnected: isConnected,
     hasStoredPortalData: hasStoredData,
-    connectionStatus: account.connectionStatus || 'connected',
-    isSessionExpired: account.connectionStatus === 'expired',
+    connectionStatus: account.connectionStatus || 'disconnected',
+    isSessionExpired: isSessionExpired,
+    isVerified: isConnected && !isSessionExpired,
+    verificationMessage: isConnected
+      ? 'Connected and verified'
+      : (isSessionExpired ? 'Connection expired. Please reconnect.' : 'Portal connection required'),
     isSyncing: Boolean(isSyncing),
     srmUsername: account.srmUsername,
     registrationNumber: account.srmUsername,
@@ -1028,6 +1035,173 @@ export async function getPortalAccountData(userId) {
     exams: account.examsCache || [],
     results: account.resultsCache || [],
   };
+}
+
+export async function verifyPortalConnection(userId, { autoRelogin = true } = {}) {
+  if (!userId) {
+    return {
+      status: 'disconnected',
+      message: 'Portal connection required',
+      isConnected: false,
+      isVerified: false,
+      isSessionExpired: false,
+      registrationNumber: null,
+      lastVerifiedAt: new Date().toISOString(),
+      lastSuccessfulSync: null,
+    };
+  }
+
+  const user = typeof userId === 'object' && userId?._id ? userId : await User.findById(userId);
+  const targetUserId = user?._id || userId;
+  const account = await findPortalAccountForUser(user || targetUserId);
+
+  if (!account || !account.srmUsername || account.connectionStatus === 'disconnected') {
+    return {
+      status: 'disconnected',
+      message: 'Portal connection required',
+      isConnected: false,
+      isVerified: false,
+      isSessionExpired: false,
+      registrationNumber: account?.srmUsername || null,
+      lastVerifiedAt: new Date().toISOString(),
+      lastSuccessfulSync: account?.lastSuccessfulSync || null,
+    };
+  }
+
+
+  const existingSession = decryptPortalSecret(account.encryptedSessionId);
+  if (existingSession) {
+    try {
+      const checkRes = await fetch(`${BASE_URL}/HRDSystem`, {
+        method: 'POST',
+        headers: {
+          ...DEFAULT_HEADERS,
+          'Cookie': `JSESSIONID=${existingSession}`,
+        },
+      });
+
+      if (checkRes.ok) {
+        const text = await checkRes.text();
+        const isLoginPage =
+          text.includes('StudentLoginToPortal') ||
+          text.includes('txtUserName') ||
+          text.includes('txtAuthKey') ||
+          text.includes('StudentLoginPage');
+
+        if (text && text.length > 200 && !isLoginPage) {
+          if (account.connectionStatus !== 'connected') {
+            account.connectionStatus = 'connected';
+            await account.save();
+          }
+          return {
+            status: 'verified',
+            message: 'Connected and verified',
+            isConnected: true,
+            isVerified: true,
+            isSessionExpired: false,
+            registrationNumber: account.srmUsername,
+            lastVerifiedAt: new Date().toISOString(),
+            lastSuccessfulSync: account.lastSuccessfulSync || null,
+          };
+        }
+      }
+    } catch (networkErr) {
+      console.warn('[verifyPortalConnection] Network probe warning:', networkErr.message);
+      return {
+        status: 'failed',
+        message: 'Unable to connect to portal',
+        isConnected: false,
+        isVerified: false,
+        isSessionExpired: false,
+        registrationNumber: account.srmUsername,
+        lastVerifiedAt: new Date().toISOString(),
+        lastSuccessfulSync: account.lastSuccessfulSync || null,
+      };
+    }
+  }
+
+
+  const rawPassword = decryptPortalSecret(account.encryptedPassword);
+  if (!rawPassword || !autoRelogin) {
+    if (account.connectionStatus !== 'expired') {
+      account.connectionStatus = 'expired';
+      await account.save();
+    }
+    return {
+      status: 'expired',
+      message: 'Connection expired. Please reconnect.',
+      isConnected: false,
+      isVerified: false,
+      isSessionExpired: true,
+      registrationNumber: account.srmUsername,
+      lastVerifiedAt: new Date().toISOString(),
+      lastSuccessfulSync: account.lastSuccessfulSync || null,
+    };
+  }
+
+  try {
+    console.log(`[verifyPortalConnection] Attempting re-authentication for ${account.srmUsername}...`);
+    const freshSession = await attemptSrmLogin(account.srmUsername, rawPassword);
+    account.encryptedSessionId = encryptPortalSecret(freshSession);
+    account.connectionStatus = 'connected';
+    await account.save();
+
+    return {
+      status: 'verified',
+      message: 'Connected and verified',
+      isConnected: true,
+      isVerified: true,
+      isSessionExpired: false,
+      registrationNumber: account.srmUsername,
+      lastVerifiedAt: new Date().toISOString(),
+      lastSuccessfulSync: account.lastSuccessfulSync || null,
+    };
+  } catch (reLoginErr) {
+    console.warn(`[verifyPortalConnection] Re-authentication failed:`, reLoginErr.message);
+    const isCreds = reLoginErr.code === 'INVALID_CREDENTIALS' || reLoginErr.message?.toLowerCase().includes('credential') || reLoginErr.message?.toLowerCase().includes('password');
+    const isUnreachable = reLoginErr.code === 'PORTAL_UNAVAILABLE' || reLoginErr.message?.toLowerCase().includes('unreachable') || reLoginErr.message?.toLowerCase().includes('network');
+
+    if (isCreds) {
+      account.connectionStatus = 'expired';
+      await account.save();
+      return {
+        status: 'expired',
+        message: 'Connection expired. Please reconnect.',
+        isConnected: false,
+        isVerified: false,
+        isSessionExpired: true,
+        registrationNumber: account.srmUsername,
+        lastVerifiedAt: new Date().toISOString(),
+        lastSuccessfulSync: account.lastSuccessfulSync || null,
+      };
+    }
+
+    if (isUnreachable) {
+      return {
+        status: 'failed',
+        message: 'Unable to connect to portal',
+        isConnected: false,
+        isVerified: false,
+        isSessionExpired: false,
+        registrationNumber: account.srmUsername,
+        lastVerifiedAt: new Date().toISOString(),
+        lastSuccessfulSync: account.lastSuccessfulSync || null,
+      };
+    }
+
+    account.connectionStatus = 'expired';
+    await account.save();
+    return {
+      status: 'expired',
+      message: 'Connection expired. Please reconnect.',
+      isConnected: false,
+      isVerified: false,
+      isSessionExpired: true,
+      registrationNumber: account.srmUsername,
+      lastVerifiedAt: new Date().toISOString(),
+      lastSuccessfulSync: account.lastSuccessfulSync || null,
+    };
+  }
 }
 
 export async function reSyncPortalData(userId) {

@@ -83,7 +83,9 @@ export default function StudyHistoryScreen({ navigation, route }) {
 
   useEffect(() => {
     if (route?.params?.sessionId) {
-      navigation.navigate('StudySessionDetail', { sessionId: route.params.sessionId });
+      const sId = route.params.sessionId;
+      navigation.setParams({ sessionId: undefined });
+      navigation.navigate('StudySessionDetail', { sessionId: sId });
     }
   }, [route?.params?.sessionId, navigation]);
 

@@ -15,8 +15,13 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('studyarena_token');
-      window.dispatchEvent(new Event('unauthorized'));
+      const url = String(error.config?.url || '');
+      const isPortalEndpoint = url.includes('/portal/') || url.includes('/portal');
+      if (!isPortalEndpoint) {
+        localStorage.removeItem('studyarena_token');
+        localStorage.removeItem('studyarena_cached_user');
+        window.dispatchEvent(new Event('unauthorized'));
+      }
     }
     return Promise.reject(error);
   },

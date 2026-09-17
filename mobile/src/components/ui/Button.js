@@ -10,6 +10,7 @@ export function Button({
   onPress,
   disabled,
   loading,
+  loadingText,
   style,
   textStyle,
 }) {
@@ -115,9 +116,18 @@ export function Button({
       onPress={onPress}
       disabled={disabled || loading}
       activeOpacity={0.8}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: Boolean(disabled || loading), busy: Boolean(loading) }}
     >
       {loading ? (
-        <ActivityIndicator color={vStyles.text.color} size="small" />
+        <View style={styles.contentContainer}>
+          <ActivityIndicator color={vStyles.text.color} size="small" />
+          {loadingText ? (
+            <Text style={[styles.baseText, sStyles.text, vStyles.text, textStyle]}>
+              {loadingText}
+            </Text>
+          ) : null}
+        </View>
       ) : (
         <View style={styles.contentContainer}>
           {React.Children.map(children, (child) => {

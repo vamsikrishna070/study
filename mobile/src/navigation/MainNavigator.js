@@ -1,8 +1,9 @@
 import React, { useContext } from 'react';
-import { Dimensions } from 'react-native';
+import { Dimensions, Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { createStackNavigator } from '@react-navigation/stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LayoutDashboard, BookOpen, ListChecks, CalendarDays, Award } from 'lucide-react-native';
 import { typography, useAppTheme } from '../theme/theme';
 import { AuthContext } from '../context/AuthContext';
@@ -32,6 +33,7 @@ import StudySessionDetailScreen from '../screens/study/StudySessionDetailScreen'
 
 import PortalDashboardScreen from '../screens/portal/PortalDashboardScreen';
 import AttendanceScreen from '../screens/attendance/AttendanceScreen';
+import AttendancePlannerScreen from '../screens/attendance/AttendancePlannerScreen';
 import TimetableScreen from '../screens/timetable/TimetableScreen';
 import PortalExamsScreen from '../screens/portal/PortalExamsScreen';
 import PortalResultsScreen from '../screens/portal/PortalResultsScreen';
@@ -50,6 +52,7 @@ const PortalStackNavigator = () => {
     <PortalStack.Navigator screenOptions={{ headerShown: false }} initialRouteName="PortalDashboardMain">
       <PortalStack.Screen name="PortalDashboardMain" component={PortalDashboardScreen} />
       <PortalStack.Screen name="PortalAttendance" component={AttendanceScreen} />
+      <PortalStack.Screen name="PortalAttendancePlanner" component={AttendancePlannerScreen} />
       <PortalStack.Screen name="PortalTimetable" component={TimetableScreen} />
       <PortalStack.Screen name="PortalExams" component={PortalExamsScreen} />
       <PortalStack.Screen name="PortalResults" component={PortalResultsScreen} />
@@ -60,6 +63,9 @@ const PortalStackNavigator = () => {
 
 const TabNavigator = () => {
   const { colors, typography } = useAppTheme();
+  const insets = useSafeAreaInsets();
+  const tabHeight = 60 + Math.max(insets.bottom, 6);
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -68,8 +74,8 @@ const TabNavigator = () => {
           backgroundColor: `${colors.card}F2`,
           borderTopColor: colors.cardBorder,
           borderTopWidth: 1,
-          height: 60,
-          paddingBottom: 8,
+          height: tabHeight,
+          paddingBottom: Math.max(insets.bottom, 8),
           paddingTop: 8,
         },
         tabBarActiveTintColor: colors.accent,
@@ -117,6 +123,7 @@ const DrawerNavigator = () => {
       <Drawer.Screen name="PortalDashboard" component={PortalStackNavigator} />
       <Drawer.Screen name="Schedule" component={TimetableScreen} />
       <Drawer.Screen name="Attendance" component={AttendanceScreen} />
+      <Drawer.Screen name="AttendancePlanner" component={AttendancePlannerScreen} />
       <Drawer.Screen name="StudySessions" component={StartSessionScreen} />
       <Drawer.Screen name="StudyHistory" component={StudyHistoryScreen} />
       <Drawer.Screen name="StudyAnalytics" component={StudyAnalyticsScreen} />
@@ -132,16 +139,19 @@ const DrawerNavigator = () => {
 };
 
 const MainNavigator = () => {
-  const { isNewRegistration } = useContext(AuthContext);
+  const { user, isNewRegistration } = useContext(AuthContext);
+  const hasCollegeInfo = user && (user.collegeId || user.university || user.degree);
+  const needsOnboarding = isNewRegistration || !hasCollegeInfo;
 
   return (
     <Stack.Navigator
-      initialRouteName={isNewRegistration ? 'Onboarding' : 'DrawerRoot'}
+      initialRouteName={needsOnboarding ? 'Onboarding' : 'DrawerRoot'}
       screenOptions={{ headerShown: false }}
     >
       <Stack.Screen name="DrawerRoot" component={DrawerNavigator} />
       <Stack.Screen name="Onboarding" component={OnboardingScreen} />
       <Stack.Screen name="SubjectDetail" component={SubjectDetailScreen} />
+      <Stack.Screen name="AttendancePlanner" component={AttendancePlannerScreen} />
       <Stack.Screen name="Tasks" component={TasksScreen} />
       <Stack.Screen name="Exams" component={ExamsScreen} />
       <Stack.Screen name="Notes" component={NotesScreen} />

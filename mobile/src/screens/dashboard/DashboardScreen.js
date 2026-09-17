@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useCallback, useContext } from 'react';
-import { View, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, Text, TouchableOpacity, TextInput } from 'react-native';
+import { View, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, Text, TouchableOpacity, TextInput, Image } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { Bell, ListChecks, BookOpen, Play, Flame, Clock, ArrowRight, CheckCircle2, XCircle, MapPin, UserCheck, KeyRound } from 'lucide-react-native';
+import { Bell, ListChecks, BookOpen, Play, Flame, Clock, ArrowRight, CheckCircle2, XCircle, MapPin, UserCheck, KeyRound, Calculator, Sparkles } from 'lucide-react-native';
 import { getReminders } from '../../api/reminders';
 import { getExams } from '../../api/exams';
 import { getTasks } from '../../api/tasks';
 import { getSubjects } from '../../api/subjects';
 import { getStudyStats } from '../../api/studySessions';
 import { getTodayAttendance, markAttendanceCode } from '../../api/portal';
+import { getCachedDashboard, setCachedDashboard } from '../../storage/user';
 import { AuthContext } from '../../context/AuthContext';
 import { Header } from '../../components/ui/Header';
 import { PageHeading } from '../../components/ui/PageHeading';
@@ -15,6 +16,7 @@ import { Card } from '../../components/ui/Card';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { QueryState } from '../../components/ui/QueryState';
 import { Button } from '../../components/ui/Button';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { typography, spacing, radii, useAppTheme, useStyles } from '../../theme/theme';
 
 const isTaskCompleted = (t) => {
@@ -56,9 +58,67 @@ const safeFormatDateTime = (dateVal, fallbackText = 'Scheduled') => {
   }
 };
 
+const UserGreetingAvatar = ({ user, size = 42, colors, typography }) => {
+  const [imgError, setImgError] = useState(false);
+  const displayName = user?.displayName || user?.officialName || user?.name || 'Student';
+
+  const getInitials = (name) => {
+    if (!name || typeof name !== 'string') return 'S';
+    return name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0].toUpperCase()).join('');
+  };
+
+  if (user?.profileImageUrl && !imgError) {
+    return (
+      <View
+        style={{
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          overflow: 'hidden',
+          backgroundColor: colors.muted,
+          borderWidth: 1.5,
+          borderColor: colors.cardBorder,
+        }}
+      >
+        <Image
+          source={{ uri: user.profileImageUrl }}
+          style={{ width: '100%', height: '100%' }}
+          onError={() => setImgError(true)}
+        />
+      </View>
+    );
+  }
+
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        backgroundColor: colors.primary,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1.5,
+        borderColor: colors.cardBorder,
+      }}
+    >
+      <Text
+        style={{
+          fontFamily: typography.sans.bold,
+          fontSize: Math.round(size * 0.38),
+          color: colors.primaryForeground,
+        }}
+      >
+        {getInitials(displayName)}
+      </Text>
+    </View>
+  );
+};
+
 const DashboardScreen = ({ navigation }) => {
   const { colors, typography, spacing, radii, theme } = useAppTheme();
   const styles = useStyles(createStyles);
+  const insets = useSafeAreaInsets();
   const { user, logout } = useContext(AuthContext);
 
   const [loading, setLoading] = useState(true);
@@ -77,25 +137,58 @@ const DashboardScreen = ({ navigation }) => {
   const [submittingCode, setSubmittingCode] = useState(false);
   const [codeFeedback, setCodeFeedback] = useState(null);
 
-  const loadData = async () => {
+
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      try {
+        const cached = await getCachedDashboard();
+        if (cached && isMounted) {
+          setData((prev) => ({
+            ...prev,
+            ...cached,
+          }));
+          setLoading(false);
+        }
+      } catch (err) {
+        console.warn('[DashboardScreen] Failed reading cached dashboard:', err);
+      }
+    })();
+    return () => { isMounted = false; };
+  }, []);
+
+  const loadData = useCallback(async () => {
     try {
       setError(null);
-      const [reminders, exams, tasks, subjects, studyStats, attendanceRes] = await Promise.all([
+      const results = await Promise.allSettled([
         getReminders(),
         getExams(),
         getTasks(),
         getSubjects(),
-        getStudyStats().catch(() => null),
-        getTodayAttendance().catch(() => null),
+        getStudyStats(),
+        getTodayAttendance(),
       ]);
-      setData({
-        reminders: reminders.data || reminders || [],
-        exams: exams.data || exams || [],
-        tasks: tasks.data || tasks || [],
-        subjects: subjects.data || subjects || [],
-        studyStats: studyStats || null,
-        todayAttendance: attendanceRes || null,
-      });
+
+      const [remRes, exRes, taskRes, subRes, statsRes, attRes] = results;
+
+      const reminders = remRes.status === 'fulfilled' ? (remRes.value.data || remRes.value || []) : [];
+      const exams = exRes.status === 'fulfilled' ? (exRes.value.data || exRes.value || []) : [];
+      const tasks = taskRes.status === 'fulfilled' ? (taskRes.value.data || taskRes.value || []) : [];
+      const subjects = subRes.status === 'fulfilled' ? (subRes.value.data || subRes.value || []) : [];
+      const studyStats = statsRes.status === 'fulfilled' ? (statsRes.value || null) : null;
+      const todayAttendance = attRes.status === 'fulfilled' ? (attRes.value || null) : null;
+
+      const freshData = {
+        reminders,
+        exams,
+        tasks,
+        subjects,
+        studyStats,
+        todayAttendance,
+      };
+
+      setData(freshData);
+      setCachedDashboard(freshData);
     } catch (e) {
       if (e.response && e.response.status === 401) {
         setError('Session expired. Please log in again.');
@@ -109,15 +202,15 @@ const DashboardScreen = ({ navigation }) => {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [logout]);
 
   useFocusEffect(
     useCallback(() => {
       loadData();
-    }, [])
+    }, [loadData])
   );
 
-  const onRefresh = useCallback(() => { setRefreshing(true); loadData(); }, []);
+  const onRefresh = useCallback(() => { setRefreshing(true); loadData(); }, [loadData]);
 
   const handleMarkCodeDashboard = async () => {
     if (!attendanceCode.trim() || submittingCode) return;
@@ -148,10 +241,19 @@ const DashboardScreen = ({ navigation }) => {
     }
   };
 
-  if (loading) {
+  const hasData = Boolean(
+    data.subjects.length > 0 ||
+    data.tasks.length > 0 ||
+    data.reminders.length > 0 ||
+    data.exams.length > 0 ||
+    data.studyStats
+  );
+
+  if (loading && !hasData) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={[styles.emptySubtitle, { marginTop: 12 }]}>Loading your dashboard...</Text>
       </View>
     );
   }
@@ -177,11 +279,25 @@ const DashboardScreen = ({ navigation }) => {
       <Header />
       <ScrollView
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[styles.scroll, { paddingBottom: 110 + Math.max(insets.bottom, 16) }]}
         keyboardShouldPersistTaps="handled"
       >
         <PageHeading
           eyebrow="Dashboard"
+          avatar={
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => navigation.navigate('Profile')}
+              accessibilityLabel="View Profile"
+            >
+              <UserGreetingAvatar
+                user={user}
+                size={42}
+                colors={colors}
+                typography={typography}
+              />
+            </TouchableOpacity>
+          }
           title={`${getGreeting()}, ${user?.displayName || user?.officialName || user?.name || 'Student'}`}
           detail="Here is an overview of your academic progress."
         />
@@ -327,6 +443,33 @@ const DashboardScreen = ({ navigation }) => {
                     </Text>
                   </View>
                 )}
+              </Card>
+
+              {}
+              <Card
+                style={styles.plannerBannerCard}
+                onPress={() => navigation.navigate('AttendancePlanner')}
+                accessibilityRole="button"
+                accessibilityLabel="Attendance Planner. Plan absences and check your projected attendance."
+              >
+                <View style={styles.plannerBannerContent}>
+                  <View style={styles.plannerIconWrap}>
+                    <Calculator size={18} color={colors.primary} />
+                  </View>
+                  <View style={styles.plannerTextWrap}>
+                    <View style={styles.plannerTitleRow}>
+                      <Text style={styles.plannerTitle}>Attendance Planner</Text>
+                      <View style={styles.plannerBadge}>
+                        <Sparkles size={10} color={colors.accent} style={{ marginRight: 3 }} />
+                        <Text style={styles.plannerBadgeText}>SIMULATOR</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.plannerDesc}>
+                      Plan absences and check your projected 75% attendance.
+                    </Text>
+                  </View>
+                  <ArrowRight size={16} color={colors.mutedForeground} style={{ marginLeft: 8 }} />
+                </View>
               </Card>
 
               {attendanceClasses.length === 0 ? (
@@ -681,6 +824,62 @@ const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.crea
   feedbackSuccess: { backgroundColor: '#10B9811A' },
   feedbackError: { backgroundColor: '#EF44441A' },
   feedbackText: { fontFamily: typography.sans.medium, fontSize: 12 },
+
+  plannerBannerCard: {
+    padding: spacing.md,
+    marginBottom: spacing.xs,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: `${colors.primary}25`,
+    backgroundColor: colors.card,
+  },
+  plannerBannerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  plannerIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: radii.md,
+    backgroundColor: `${colors.primary}15`,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.sm,
+  },
+  plannerTextWrap: {
+    flex: 1,
+  },
+  plannerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  plannerTitle: {
+    fontFamily: typography.sans.bold,
+    fontSize: 14,
+    color: colors.foreground,
+  },
+  plannerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: `${colors.accent}15`,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radii.sm,
+  },
+  plannerBadgeText: {
+    fontFamily: typography.mono.bold,
+    fontSize: 9,
+    color: colors.accent,
+    letterSpacing: 0.5,
+  },
+  plannerDesc: {
+    fontFamily: typography.sans.regular,
+    fontSize: 12,
+    color: colors.mutedForeground,
+    marginTop: 2,
+    lineHeight: 16,
+  },
 
   attendanceCard: {
     marginBottom: spacing.xs,

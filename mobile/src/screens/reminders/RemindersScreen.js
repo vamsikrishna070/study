@@ -382,7 +382,6 @@ const RemindersScreen = ({ navigation }) => {
 
           const nextTimestamp = getNextTriggerTimestamp(updated);
           if (nextTimestamp && nextTimestamp > Date.now()) {
-            console.log(`[REMINDER] Scheduling edited native alarm: "${updated.title}" at ${new Date(nextTimestamp).toISOString()}`);
             await scheduleAlarm(
               editingId,
               nextTimestamp,
@@ -412,7 +411,6 @@ const RemindersScreen = ({ navigation }) => {
 
           const nextTimestamp = getNextTriggerTimestamp(created);
           if (nextTimestamp && nextTimestamp > Date.now()) {
-            console.log(`[REMINDER] Scheduling new native alarm: "${created.title}" at ${new Date(nextTimestamp).toISOString()}`);
             await scheduleAlarm(
               created._id,
               nextTimestamp,
@@ -997,7 +995,7 @@ const RemindersScreen = ({ navigation }) => {
 const makeStyles = (colors, typography, spacing, radii, insets, isDark) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  listContent: { paddingHorizontal: spacing.md, paddingBottom: 80 },
+  listContent: { paddingHorizontal: spacing.md, paddingBottom: 110 + Math.max(insets?.bottom || 0, 16) },
   listHeader: {
     flexDirection: 'row',
     alignItems: 'flex-start',

@@ -534,11 +534,16 @@ const ResourcesScreen = ({ route, navigation }) => {
       : String(item.customSubject || item.subject || '')).toLowerCase();
     const topic = String(item.topic || '').toLowerCase();
     const type = String(item.resourceType || '').toLowerCase();
-    const tags = Array.isArray(item.tags) ? item.tags.filter(Boolean).join(' ').toLowerCase() : '';
+    const tags = Array.isArray(item.tags)
+      ? item.tags.filter(Boolean).join(' ').toLowerCase()
+      : typeof item.tags === 'string'
+      ? item.tags.toLowerCase()
+      : '';
     const attNames = Array.isArray(item.attachments)
       ? item.attachments.filter(Boolean).map((a) => `${a.originalName || ''} ${a.name || ''} ${a.filename || ''}`).join(' ').toLowerCase()
       : '';
     const fileDataName = String(item.fileData?.originalName || '').toLowerCase();
+    const desc = String(item.description || '').toLowerCase();
     return (
       title.includes(q) ||
       sub.includes(q) ||
@@ -546,7 +551,8 @@ const ResourcesScreen = ({ route, navigation }) => {
       type.includes(q) ||
       tags.includes(q) ||
       attNames.includes(q) ||
-      fileDataName.includes(q)
+      fileDataName.includes(q) ||
+      desc.includes(q)
     );
   });
 
@@ -555,8 +561,8 @@ const ResourcesScreen = ({ route, navigation }) => {
       <Header />
       <FlatList
         data={filteredData}
-        keyExtractor={(item, idx) => item._id || item.id || idx.toString()}
-        contentContainerStyle={styles.listContent}
+        keyExtractor={(item, idx) => item?._id || item?.id || `res_${idx}`}
+        contentContainerStyle={[styles.listContent, { paddingBottom: 110 + Math.max(insets.bottom, 16) }]}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
@@ -625,12 +631,14 @@ const ResourcesScreen = ({ route, navigation }) => {
             )
           ) : null
         }
-        renderItem={({ item }) => {
-          const resId = item._id || item.id;
+        renderItem={({ item, index }) => {
+          if (!item) return null;
+          const resId = item._id || item.id || `res_${index}`;
           const itemKind = getAttachmentKind(item.attachments?.[0] || item.fileData || item);
           const isLink = isLinkKind(itemKind);
-          const attList = isLink ? [] : (item.attachments && item.attachments.length > 0)
-            ? item.attachments.filter(Boolean)
+          const rawAtts = Array.isArray(item.attachments) ? item.attachments.filter(Boolean) : [];
+          const attList = isLink ? [] : rawAtts.length > 0
+            ? rawAtts
             : (item.fileData?.url || item.url)
             ? [{
                 id: item.fileData?.publicId || 'legacy',
@@ -644,6 +652,7 @@ const ResourcesScreen = ({ route, navigation }) => {
 
           const handleRemoveSingleAttachment = (attIdx) => {
             const attToDelete = attList[attIdx];
+            if (!attToDelete) return;
             showDeleteConfirm({
               title: 'Delete File?',
               message: `Are you sure you want to delete:\n\n"${attToDelete.name || attToDelete.originalName || 'Attachment'}"`,
@@ -664,8 +673,14 @@ const ResourcesScreen = ({ route, navigation }) => {
           };
 
           const subjectDisplayName = item.subjectCode
-            ? `${item.subjectCode} - ${typeof item.subject === 'object' ? item.subject?.name : item.subject}`
-            : (item.subject?.name || (typeof item.subject === 'string' ? item.subject : ''));
+            ? `${item.subjectCode} - ${typeof item.subject === 'object' ? (item.subject?.name || '') : item.subject}`
+            : (typeof item.subject === 'object' ? (item.subject?.name || '') : (typeof item.subject === 'string' ? item.subject : (item.customSubject || '')));
+
+          const tagsList = Array.isArray(item.tags)
+            ? item.tags.filter(Boolean)
+            : typeof item.tags === 'string'
+            ? item.tags.split(',').map((t) => t.trim()).filter(Boolean)
+            : [];
 
           return (
             <View style={styles.card}>
@@ -682,7 +697,7 @@ const ResourcesScreen = ({ route, navigation }) => {
 
                 <View style={styles.cardTitleCol}>
                   <Text style={styles.cardTitle} numberOfLines={2}>
-                    {item.title}
+                    {item.title || 'Untitled Resource'}
                   </Text>
                   <View style={styles.metaRow}>
                     {Boolean(subjectDisplayName) && (
@@ -698,7 +713,7 @@ const ResourcesScreen = ({ route, navigation }) => {
                         </Text>
                       </>
                     )}
-                    {item.rating > 0 && (
+                    {Number(item.rating) > 0 && (
                       <>
                         {(Boolean(subjectDisplayName) || Boolean(item.topic)) && (
                           <Text style={styles.metaDot}>•</Text>
@@ -744,7 +759,8 @@ const ResourcesScreen = ({ route, navigation }) => {
                     </Text>
                   </View>
                   {attList.map((att, attIdx) => {
-                    const attUrl = att.url;
+                    if (!att) return null;
+                    const attUrl = att.url || att.uri || '';
                     const kind = getAttachmentKind(att);
                     const kindLabel = getKindLabel(kind);
                     const openLabel = getOpenLabel(kind);
@@ -764,7 +780,10 @@ const ResourcesScreen = ({ route, navigation }) => {
                       : colors.mutedForeground;
 
                     const handleOpen = async () => {
-                      if (!attUrl) return;
+                      if (!attUrl) {
+                        showError('No URL', 'No download or preview link available for this file.');
+                        return;
+                      }
                       try {
                         await openAttachment(att);
                       } catch (e) {
@@ -795,7 +814,7 @@ const ResourcesScreen = ({ route, navigation }) => {
 
                           {/* Action controls */}
                           <View style={styles.attachmentActionsCol}>
-                            {!isAudioKind && attUrl && (
+                            {!isAudioKind && Boolean(attUrl) && (
                               <TouchableOpacity
                                 onPress={handleOpen}
                                 activeOpacity={0.7}
@@ -817,7 +836,7 @@ const ResourcesScreen = ({ route, navigation }) => {
                           </View>
                         </View>
 
-                        {isImageKind && attUrl && (
+                        {isImageKind && Boolean(attUrl) && (
                           <Image
                             source={{ uri: attUrl }}
                             style={styles.attachmentImageThumb}
@@ -825,7 +844,7 @@ const ResourcesScreen = ({ route, navigation }) => {
                           />
                         )}
 
-                        {isAudioKind && attUrl && (
+                        {isAudioKind && Boolean(attUrl) && (
                           <View style={{ marginTop: 6 }}>
                             <ResourceAudioBar url={attUrl} title={att.name || item.title} />
                           </View>
@@ -864,7 +883,7 @@ const ResourcesScreen = ({ route, navigation }) => {
               {/* Card Footer: Tags on Left, Resource Actions (Edit / Delete) on Right */}
               <View style={styles.cardFooter}>
                 <View style={styles.tagsContainer}>
-                  {(item.tags || []).map((tag, i) => (
+                  {tagsList.map((tag, i) => (
                     <View key={i} style={styles.tagPill}>
                       <Text style={styles.tagText}>#{tag}</Text>
                     </View>
@@ -1242,9 +1261,11 @@ const createStyles = ({ colors, typography, spacing, radii }) =>
       padding: 5,
     },
     attachmentImageThumb: {
-      height: 90,
+      width: '100%',
+      height: 120,
       borderRadius: radii.sm,
       marginTop: 8,
+      backgroundColor: `${colors.muted}40`,
     },
     linkContainer: {
       flexDirection: 'row',

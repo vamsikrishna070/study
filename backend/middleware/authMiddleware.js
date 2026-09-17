@@ -10,7 +10,7 @@ export async function protect(req, res, next) {
     }
     if (!env.JWT_SECRET) return res.status(500).json({ success: false, message: 'JWT_SECRET is not configured' });
     const decoded = jwt.verify(header.slice(7), env.JWT_SECRET);
-    req.user = await User.findById(decoded.userId);
+    req.user = await User.findById(decoded.userId).select('-password');
     if (!req.user) return res.status(401).json({ success: false, message: 'User no longer exists' });
     return next();
   } catch {

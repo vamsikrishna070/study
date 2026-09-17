@@ -54,6 +54,7 @@ export default function SettingsPage() {
   const [profileImageUrl, setProfileImageUrl] = useState(user?.profileImageUrl || "");
   const [profileImagePublicId, setProfileImagePublicId] = useState(user?.profileImagePublicId || "");
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [imgError, setImgError] = useState(false);
 
   const [saved, setSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -343,9 +344,16 @@ export default function SettingsPage() {
           <section className="rounded-2xl border border-card-border bg-card p-6 sm:p-8">
             <div className="flex items-start gap-5">
               <div className="relative group">
-                {profileImageUrl ? (
+                {profileImageUrl && !imgError ? (
                   <div className="h-16 w-16 overflow-hidden rounded-full border-2 border-border">
-                    <img src={profileImageUrl} alt="Profile" className="h-full w-full object-cover" />
+                    <img 
+                      src={profileImageUrl} 
+                      alt="Profile" 
+                      className="h-full w-full object-cover" 
+                      crossOrigin="anonymous"
+                      referrerPolicy="no-referrer"
+                      onError={() => setImgError(true)}
+                    />
                   </div>
                 ) : (
                   <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary font-display text-xl text-primary-foreground">

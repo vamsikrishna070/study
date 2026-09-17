@@ -44,7 +44,8 @@ const serialize = (doc) => {
   if (attachments.length === 0 && (value.fileData?.url || value.url)) {
     const rawUrl = String(value.fileData?.url || value.url || '').trim();
     const isLink = value.resourceType === 'link' || value.resourceType === 'youtube' ||
-      (!value.fileData?.publicId && /^https?:\/\//i.test(rawUrl) && !/cloudinary\.com/i.test(rawUrl) && !/\.(pdf|png|jpg|jpeg|webp|mp4|mp3|docx?|pptx?)$/i.test(rawUrl));
+      (!value.fileData?.publicId && /^https?:\/\//i.test(rawUrl) && !/cloudinary\.com/i.test(rawUrl) &&
+!/\.(pdf|png|jpg|jpeg|webp|mp4|mp3|docx?|pptx?)$/i.test(rawUrl));
 
     attachments = [{
       _id: value.fileData?.publicId || value._id || 'legacy_1',
@@ -307,8 +308,6 @@ export async function updateTopic(req, res) {
   await item.save();
   await item.populate("subject", "name");
   await updateSubjectProgressHelper(item.subject?._id || item.subject, req.user._id);
-
-  console.log(`[SYLLABUS] Completion API updated topic ${item._id}: status=${item.status}, completed=${item.completed}`);
 
   res.json({ success: true, data: serialize(item) });
 }

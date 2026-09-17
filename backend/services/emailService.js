@@ -1,6 +1,6 @@
 import { env } from '../config/env.js';
 
-const BREVO_API_URL = env.BREVO_API_URL;
+const DEFAULT_BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email';
 const REQUEST_TIMEOUT_MS = 10000;
 
 function buildOtpHtml({ title, subtitle, otp, expiryMinutes = 15 }) {
@@ -65,9 +65,10 @@ function buildOtpHtml({ title, subtitle, otp, expiryMinutes = 15 }) {
 }
 
 export const sendEmail = async ({ to, name = '', subject, text, html }) => {
-  const apiKey = process.env.BREVO_API_KEY;
-  const fromEmail = process.env.BREVO_FROM_EMAIL;
-  const fromName = process.env.BREVO_FROM_NAME || 'StudyArena';
+  const apiKey = process.env.BREVO_API_KEY || env.BREVO_API_KEY;
+  const fromEmail = process.env.BREVO_FROM_EMAIL || env.BREVO_FROM_EMAIL;
+  const fromName = process.env.BREVO_FROM_NAME || env.BREVO_FROM_NAME || 'StudyArena';
+  const apiUrl = process.env.BREVO_API_URL || env.BREVO_API_URL || DEFAULT_BREVO_API_URL;
 
   if (!apiKey) {
     console.error('[EmailService] BREVO_API_KEY is not configured in environment variables.');
@@ -127,7 +128,7 @@ export const sendEmail = async ({ to, name = '', subject, text, html }) => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-    const response = await fetch(BREVO_API_URL, {
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'api-key': apiKey,

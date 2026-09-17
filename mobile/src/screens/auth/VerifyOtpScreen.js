@@ -177,10 +177,9 @@ const VerifyOtpScreen = ({ route, navigation }) => {
                 activeOpacity={1}
                 onPress={() => inputRef.current?.focus()}
               >
-
                 <View style={styles.otpBoxesContainer} pointerEvents="none">
                   {otpDigits.map((digit, index) => {
-                    const isCurrentBox = isFocused && (otp.length === index || (otp.length === 6 && index === 5));
+                    const isCurrentBox = isFocused && otp.length === index;
                     const isFilled = digit !== ' ';
                     return (
                       <View
@@ -192,6 +191,9 @@ const VerifyOtpScreen = ({ route, navigation }) => {
                         ]}
                       >
                         <Text style={styles.otpBoxText}>{isFilled ? digit : ''}</Text>
+                        {isCurrentBox && !isFilled && (
+                          <View style={styles.blinkingCursor} />
+                        )}
                       </View>
                     );
                   })}
@@ -375,21 +377,28 @@ const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.crea
     position: 'relative',
     marginVertical: spacing.xs,
     width: '100%',
+    alignItems: 'center',
   },
   otpBoxesContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    width: '100%',
+    maxWidth: 340,
   },
   otpBox: {
     flex: 1,
-    height: 52,
+    maxWidth: 48,
+    minWidth: 36,
+    aspectRatio: 1,
     borderWidth: 1.5,
     borderColor: colors.cardBorder,
-    borderRadius: radii.lg,
+    borderRadius: radii.md,
     backgroundColor: colors.background,
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
   },
   otpBoxActive: {
     borderColor: colors.accent,
@@ -400,8 +409,18 @@ const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.crea
   },
   otpBoxText: {
     fontFamily: typography.sans.bold,
-    fontSize: 22,
+    fontSize: 20,
     color: colors.foreground,
+    textAlign: 'center',
+    textAlignVertical: 'center',
+    includeFontPadding: false,
+  },
+  blinkingCursor: {
+    position: 'absolute',
+    width: 2,
+    height: 20,
+    backgroundColor: colors.accent,
+    borderRadius: 1,
   },
   hiddenInputOverlay: {
     position: 'absolute',
@@ -411,9 +430,7 @@ const createStyles = ({ colors, typography, spacing, radii }) => StyleSheet.crea
     bottom: 0,
     width: '100%',
     height: '100%',
-    color: 'transparent',
-    backgroundColor: 'transparent',
-    fontSize: 24,
+    opacity: 0,
     zIndex: 10,
   },
   submitButton: {

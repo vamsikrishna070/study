@@ -61,7 +61,7 @@ export default function StudySessionDetailScreen({ route, navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
-  // Edit modal states
+
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [availableSubjects, setAvailableSubjects] = useState([]);
   const [editStudyType, setEditStudyType] = useState('syllabus');
@@ -221,10 +221,26 @@ export default function StudySessionDetailScreen({ route, navigation }) {
     }
   };
 
+  const handleBack = () => {
+    if (navigation && typeof navigation.canGoBack === 'function' && navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      try {
+        navigation.navigate('DrawerRoot', { screen: 'HomeDrawer', params: { screen: 'OverviewTab' } });
+      } catch (_) {
+        try {
+          navigation.navigate('DrawerRoot');
+        } catch (err) {
+          console.warn('[StudySessionDetail] Fallback navigation error:', err);
+        }
+      }
+    }
+  };
+
   if (loading && !session) {
     return (
       <View style={styles.container}>
-        <Header showBack={true} />
+        <Header showBack={true} navigation={navigation} onBack={handleBack} />
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={colors.accent} />
           <Text style={styles.loadingText}>Loading session details...</Text>
@@ -236,13 +252,13 @@ export default function StudySessionDetailScreen({ route, navigation }) {
   if (error && !session) {
     return (
       <View style={styles.container}>
-        <Header showBack={true} />
+        <Header showBack={true} navigation={navigation} onBack={handleBack} />
         <View style={styles.centered}>
           <QueryState error={error} onRetry={fetchSession} label="Study Session" />
           <Button
             variant="outline"
             style={{ marginTop: 16 }}
-            onPress={() => navigation.navigate('StudyHistory')}
+            onPress={handleBack}
           >
             Go to Study History
           </Button>
@@ -270,7 +286,7 @@ export default function StudySessionDetailScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
-      <Header showBack={true} />
+      <Header showBack={true} navigation={navigation} onBack={handleBack} />
       <ScrollView
         contentContainerStyle={styles.scroll}
         refreshControl={
@@ -296,7 +312,7 @@ export default function StudySessionDetailScreen({ route, navigation }) {
           }
         />
 
-        {/* Hero Duration & Type Card */}
+        {}
         <Card style={styles.heroCard}>
           <View style={styles.heroTopRow}>
             <View>
@@ -350,7 +366,7 @@ export default function StudySessionDetailScreen({ route, navigation }) {
           )}
         </Card>
 
-        {/* Subjects & Topics Covered Card */}
+        {}
         <Card style={styles.card}>
           <View style={styles.cardHeaderRow}>
             <BookOpen size={18} color={colors.accent} style={{ marginRight: 8 }} />
@@ -420,7 +436,7 @@ export default function StudySessionDetailScreen({ route, navigation }) {
           )}
         </Card>
 
-        {/* Goal Card if available */}
+        {}
         {Boolean(session.goal) && (
           <Card style={styles.card}>
             <View style={styles.cardHeaderRow}>
@@ -431,7 +447,7 @@ export default function StudySessionDetailScreen({ route, navigation }) {
           </Card>
         )}
 
-        {/* Notes / Reflection Card */}
+        {}
         {Boolean(session.notes) && (
           <Card style={styles.card}>
             <View style={styles.cardHeaderRow}>
@@ -442,7 +458,7 @@ export default function StudySessionDetailScreen({ route, navigation }) {
           </Card>
         )}
 
-        {/* Linked Task or Exam */}
+        {}
         {(session.task?.title || session.exam?.name) && (
           <Card style={styles.card}>
             <View style={styles.cardHeaderRow}>
@@ -464,7 +480,7 @@ export default function StudySessionDetailScreen({ route, navigation }) {
           </Card>
         )}
 
-        {/* Action Buttons */}
+        {}
         <View style={styles.actionButtons}>
           <Button
             variant="primary"
@@ -505,7 +521,7 @@ export default function StudySessionDetailScreen({ route, navigation }) {
         </View>
       </ScrollView>
 
-      {/* Edit Modal */}
+      {}
       <Modal
         visible={editModalVisible}
         animationType="slide"

@@ -40,11 +40,13 @@ import { SyllabusEditorModal } from '../../components/subjects/SyllabusEditorMod
 import { DocumentPreviewCard } from '../../components/ui/DocumentPreviewCard';
 import { pickAndUploadDocument } from '../../utils/fileUploader';
 import { useAppDialog } from '../../components/ui/AppDialog';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme, useStyles } from '../../theme/theme';
 
 const SyllabusScreen = ({ route, navigation }) => {
   const { colors, typography, spacing, radii } = useAppTheme();
   const styles = useStyles(createStyles);
+  const insets = useSafeAreaInsets();
   const { showSuccess, showError, showDeleteConfirm, showDialog } = useAppDialog();
 
   const passedSubject = route?.params?.subject;
@@ -148,7 +150,6 @@ const SyllabusScreen = ({ route, navigation }) => {
         },
       });
 
-      console.log('[SYLLABUS MOBILE] Extract started');
       setExtracting(true);
       const res = await extractSyllabus(
         subjectId,
@@ -156,8 +157,6 @@ const SyllabusScreen = ({ route, navigation }) => {
         uploaded.mimeType,
         uploaded.originalName
       );
-      console.log('[SYLLABUS MOBILE] Request completed');
-      console.log('[SYLLABUS MOBILE] Response status:', res?.success ? 200 : 'unknown');
 
       const extracted = Array.isArray(res?.data?.units)
         ? res.data.units
@@ -169,10 +168,7 @@ const SyllabusScreen = ({ route, navigation }) => {
         ? res
         : [];
 
-      console.log('[SYLLABUS MOBILE] Units count:', extracted.length);
-
       if (extracted.length > 0) {
-        console.log('[SYLLABUS MOBILE] Opening review modal');
         setParsedUnits(extracted);
         setReviewVisible(true);
       } else {
@@ -185,7 +181,6 @@ const SyllabusScreen = ({ route, navigation }) => {
       }
       loadData();
     } catch (e) {
-      console.error('[SYLLABUS MOBILE] Error:', e);
       showError('Extraction Failed', e?.response?.data?.message || e.message || 'Failed to extract syllabus.');
     } finally {
       setUploadingPdf(false);
@@ -195,7 +190,6 @@ const SyllabusScreen = ({ route, navigation }) => {
 
   const handleExtractExisting = async () => {
     if (!currentSubject?.syllabusFile?.url) return;
-    console.log('[SYLLABUS MOBILE] Extract existing started');
     setExtracting(true);
     try {
       const res = await extractSyllabus(
@@ -204,7 +198,6 @@ const SyllabusScreen = ({ route, navigation }) => {
         currentSubject.syllabusFile.mimeType,
         currentSubject.syllabusFile.originalName
       );
-      console.log('[SYLLABUS MOBILE] Request completed');
 
       const extracted = Array.isArray(res?.data?.units)
         ? res.data.units
@@ -216,10 +209,7 @@ const SyllabusScreen = ({ route, navigation }) => {
         ? res
         : [];
 
-      console.log('[SYLLABUS MOBILE] Units count:', extracted.length);
-
       if (extracted.length > 0) {
-        console.log('[SYLLABUS MOBILE] Opening review modal');
         setParsedUnits(extracted);
         setReviewVisible(true);
       } else {
@@ -231,7 +221,6 @@ const SyllabusScreen = ({ route, navigation }) => {
         });
       }
     } catch (err) {
-      console.error('[SYLLABUS MOBILE] Error:', err);
       showError('Extraction Failed', err?.response?.data?.message || 'Failed to extract syllabus.');
     } finally {
       setExtracting(false);
@@ -257,8 +246,6 @@ const SyllabusScreen = ({ route, navigation }) => {
     const newStatus = isCompleted ? 'not-started' : 'completed';
     const newCompleted = !isCompleted;
 
-    console.log(`[SYLLABUS] Completing topic: ${topicId}`);
-
     setTopics((prev) =>
       prev.map((t) =>
         (t._id || t.id) === topicId
@@ -270,7 +257,6 @@ const SyllabusScreen = ({ route, navigation }) => {
     try {
       const res = await updateTopicCompletion(topicId, newCompleted);
       const updatedTopic = res?.data || res;
-      console.log(`[SYLLABUS] Completion API response:`, updatedTopic?.status || updatedTopic?.completed);
 
       if (updatedTopic) {
         setTopics((prev) =>
@@ -285,7 +271,6 @@ const SyllabusScreen = ({ route, navigation }) => {
               : t
           )
         );
-        console.log(`[SYLLABUS] Local state updated:`, newCompleted);
       }
     } catch (e) {
       console.error(`[SYLLABUS] Completion API failed:`, e);
@@ -328,7 +313,7 @@ const SyllabusScreen = ({ route, navigation }) => {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[styles.scroll, { paddingBottom: 110 + Math.max(insets.bottom, 16) }]}
       >
         <PageHeading
           eyebrow="The curriculum"

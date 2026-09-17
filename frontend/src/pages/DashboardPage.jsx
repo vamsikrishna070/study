@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Activity,
@@ -28,6 +29,7 @@ import TodayTimetableCard from "../components/dashboard/TodayTimetableCard.jsx";
 
 export function DashboardPage() {
   const { user: authUser } = useAuth();
+  const [imgError, setImgError] = useState(false);
   const query = useGetDashboard();
   const data = query.data;
   if (query.isLoading)
@@ -75,11 +77,14 @@ export function DashboardPage() {
               }).format(new Date())}
             </p>
             <h1 className="mt-2 flex items-center gap-4 font-display text-5xl leading-[.95] tracking-tight sm:text-6xl">
-              {user?.profileImageUrl ? (
+              {user?.profileImageUrl && !imgError ? (
                 <img
                   src={user.profileImageUrl}
                   alt="Profile"
                   className="h-16 w-16 rounded-full object-cover shadow-sm border border-border sm:h-[4.5rem] sm:w-[4.5rem]"
+                  crossOrigin="anonymous"
+                  referrerPolicy="no-referrer"
+                  onError={() => setImgError(true)}
                 />
               ) : (
                 <div className="flex h-16 w-16 items-center justify-center rounded-full bg-accent/10 text-2xl font-bold text-accent shadow-sm border border-accent/20 sm:h-[4.5rem] sm:w-[4.5rem]">

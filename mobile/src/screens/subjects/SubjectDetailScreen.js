@@ -125,8 +125,6 @@ const SubjectDetailScreen = ({ route, navigation }) => {
     const newStatus = isCompleted ? 'not-started' : 'completed';
     const newCompleted = !isCompleted;
 
-    console.log(`[SYLLABUS] Completing topic: ${topicId}`);
-
     setTopics((prev) =>
       prev.map((t) =>
         (t._id || t.id) === topicId
@@ -138,7 +136,6 @@ const SubjectDetailScreen = ({ route, navigation }) => {
     try {
       const res = await updateTopicCompletion(topicId, newCompleted);
       const updatedTopic = res?.data || res;
-      console.log(`[SYLLABUS] Completion API response:`, updatedTopic?.status || updatedTopic?.completed);
 
       if (updatedTopic) {
         setTopics((prev) =>
@@ -153,7 +150,6 @@ const SubjectDetailScreen = ({ route, navigation }) => {
               : t
           )
         );
-        console.log(`[SYLLABUS] Local state updated:`, newCompleted);
       }
     } catch (err) {
       console.error(`[SYLLABUS] Completion API failed:`, err);

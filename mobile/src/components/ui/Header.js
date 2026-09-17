@@ -11,9 +11,33 @@ const getInitials = (name) => {
   return name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0].toUpperCase()).join('');
 };
 
-export const Header = ({ showBack, navigation: customNavigation }) => {
+export const findDrawerNavigator = (nav) => {
+  if (!nav) return null;
+  if (typeof nav.openDrawer === 'function') {
+    return nav;
+  }
+  if (typeof nav.getParent === 'function') {
+    const namedDrawer = nav.getParent('AppDrawer');
+    if (namedDrawer && (typeof namedDrawer.openDrawer === 'function' || typeof namedDrawer.dispatch === 'function')) {
+      return namedDrawer;
+    }
+  }
+  let current = nav;
+  while (current && typeof current.getParent === 'function') {
+    const parent = current.getParent();
+    if (!parent) break;
+    if (typeof parent.openDrawer === 'function') {
+      return parent;
+    }
+    current = parent;
+  }
+  return null;
+};
+
+export const Header = ({ showBack, navigation: customNavigation, onBack, onBackPress }) => {
   const { colors, typography, spacing, radii } = useAppTheme();
   const styles = useStyles(createStyles);
+  const [imgError, setImgError] = React.useState(false);
 
   const hookNavigation = useNavigation();
   const navigation = customNavigation || hookNavigation;
@@ -21,38 +45,65 @@ export const Header = ({ showBack, navigation: customNavigation }) => {
   const { user } = useContext(AuthContext);
   const insets = useSafeAreaInsets();
 
-  const shouldShowBack = showBack !== undefined ? showBack : Boolean(route.params?.subjectId);
+  const drawerNav = findDrawerNavigator(navigation);
+  const isExplicitDetailRoute = route?.name === 'SubjectDetail' || route?.name === 'StudySessionDetail' || route?.name === 'PortalResults';
+
+  let shouldShowBack = false;
+  if (showBack !== undefined) {
+    shouldShowBack = Boolean(showBack);
+  } else if (isExplicitDetailRoute) {
+    shouldShowBack = true;
+  } else if (!drawerNav && navigation?.canGoBack && navigation.canGoBack()) {
+    shouldShowBack = true;
+  }
 
   const handleLeftButtonPress = () => {
+    if (onBack) {
+      onBack();
+      return;
+    }
+    if (onBackPress) {
+      onBackPress();
+      return;
+    }
+
     if (shouldShowBack) {
-      if (navigation.canGoBack()) {
+      if (navigation && typeof navigation.goBack === 'function' && navigation.canGoBack && navigation.canGoBack()) {
         navigation.goBack();
+        return;
+      }
+      const parent = navigation?.getParent ? navigation.getParent() : null;
+      if (parent && typeof parent.canGoBack === 'function' && parent.canGoBack()) {
+        parent.goBack();
+        return;
+      }
+      try {
+        navigation.navigate('DrawerRoot');
+      } catch (_) {
+        try {
+          navigation.navigate('HomeDrawer');
+        } catch (err) {
+          console.warn('[Header] Fallback navigation failed:', err);
+        }
       }
       return;
     }
 
-    if (typeof navigation.openDrawer === 'function') {
-      navigation.openDrawer();
+    if (drawerNav) {
+      if (typeof drawerNav.openDrawer === 'function') {
+        drawerNav.openDrawer();
+      } else if (typeof drawerNav.dispatch === 'function') {
+        drawerNav.dispatch(DrawerActions.openDrawer());
+      }
       return;
     }
 
-    const drawerParent = navigation.getParent('AppDrawer') || navigation.getParent();
-    if (drawerParent && typeof drawerParent.openDrawer === 'function') {
-      drawerParent.openDrawer();
-      return;
-    }
-
-    if (drawerParent && typeof drawerParent.dispatch === 'function') {
-      drawerParent.dispatch(DrawerActions.openDrawer());
-      return;
-    }
-
-    try {
-      navigation.dispatch(DrawerActions.openDrawer());
-    } catch (_) {}
-
-    if (navigation.canGoBack()) {
+    if (navigation && typeof navigation.canGoBack === 'function' && navigation.canGoBack()) {
       navigation.goBack();
+    } else {
+      try {
+        navigation.navigate('DrawerRoot');
+      } catch (_) {}
     }
   };
 
@@ -100,8 +151,12 @@ export const Header = ({ showBack, navigation: customNavigation }) => {
             accessibilityLabel="Profile"
             activeOpacity={0.8}
           >
-            {user?.profileImageUrl ? (
-              <Image source={{ uri: user.profileImageUrl }} style={styles.avatarImage} />
+            {user?.profileImageUrl && !imgError ? (
+              <Image
+                source={{ uri: user.profileImageUrl }}
+                style={styles.avatarImage}
+                onError={() => setImgError(true)}
+              />
             ) : (
               <View style={styles.avatarPlaceholder}>
                 <Text style={styles.avatarText}>

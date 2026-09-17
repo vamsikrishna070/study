@@ -271,7 +271,7 @@ const SubjectsScreen = ({ navigation }) => {
           />
         }
         keyExtractor={(item) => item._id || item.id || Math.random().toString()}
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[styles.scroll, { paddingBottom: 110 + Math.max(insets.bottom, 16) }]}
         ListHeaderComponent={
           <>
             <PageHeading

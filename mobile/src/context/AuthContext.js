@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect } from 'react';
 import { getToken, removeToken } from '../storage/token';
+import { getCachedUser, setCachedUser, removeCachedUser } from '../storage/user';
 import { loginUser, registerUser, verifyEmail, logoutUser, getCurrentUser, recordActivity } from '../api/auth';
 
 export const AuthContext = createContext();
@@ -23,9 +24,10 @@ export const AuthProvider = ({ children }) => {
       const res = await recordActivity(todayStr);
       if (res && res.user) {
         setUser(res.user);
+        await setCachedUser(res.user);
       }
     } catch (e) {
-      console.error('[Mobile AuthContext] recordActivity error:', e);
+      console.warn('[Mobile AuthContext] recordActivity error:', e?.message || e);
     }
   };
 
@@ -34,46 +36,96 @@ export const AuthProvider = ({ children }) => {
       const token = await getToken();
       if (token && token !== 'null' && token !== 'undefined') {
         const userData = await getCurrentUser();
-        setUser(userData.user || userData);
-        syncDailyActivity();
+        const freshUser = userData.user || userData;
+        if (freshUser) {
+          setUser(freshUser);
+          await setCachedUser(freshUser);
+          syncDailyActivity();
+        }
       }
     } catch (error) {
-      console.error('Error in refreshUser:', error);
+      if (error.response && error.response.status === 401) {
+        console.warn('[Mobile AuthContext] refreshUser 401 Unauthorized: token expired.');
+        await removeToken();
+        await removeCachedUser();
+        setUser(null);
+      } else {
+        console.warn('[Mobile AuthContext] refreshUser network error (retaining session):', error?.message || error);
+      }
     }
   };
 
   useEffect(() => {
+    let isMounted = true;
+
     const loadUser = async () => {
       try {
-        const token = await getToken();
-        if (token && token !== 'null' && token !== 'undefined') {
+        const [token, cachedUser] = await Promise.all([
+          getToken(),
+          getCachedUser(),
+        ]);
+
+        const hasValidToken = Boolean(token && token !== 'null' && token !== 'undefined');
+
+        if (hasValidToken) {
+          if (cachedUser) {
+
+            if (isMounted) {
+              setUser(cachedUser);
+              setLoading(false);
+            }
+          }
+
+
           try {
             const userData = await getCurrentUser();
-            setUser(userData.user || userData);
-            syncDailyActivity();
-          } catch (error) {
-            console.error('Error loading user (AuthContext). Token might be invalid.', error?.message || error);
-            await removeToken();
-            setUser(null);
+            const freshUser = userData.user || userData;
+            if (isMounted && freshUser) {
+              setUser(freshUser);
+              await setCachedUser(freshUser);
+              syncDailyActivity();
+            }
+          } catch (netError) {
+            if (netError.response && netError.response.status === 401) {
+
+              console.warn('[Mobile AuthContext] Token expired or invalid on server (401). Clearing session.');
+              await removeToken();
+              await removeCachedUser();
+              if (isMounted) setUser(null);
+            } else {
+
+
+              console.warn('[Mobile AuthContext] Network unavailable or slow during startup; keeping authenticated session.');
+            }
           }
         } else {
-          setUser(null);
+          if (isMounted) {
+            setUser(null);
+          }
         }
       } catch (e) {
-        console.error('Error in loadUser initialization:', e);
-        setUser(null);
+        console.error('[Mobile AuthContext] Error in loadUser initialization:', e);
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
+
     loadUser();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const login = async (email, password) => {
     try {
       const data = await loginUser(email, password);
       setIsNewRegistration(false);
-      setUser(data.user || data);
+      const authenticatedUser = data.user || data;
+      setUser(authenticatedUser);
+      await setCachedUser(authenticatedUser);
       return data;
     } catch (error) {
       console.error('Login error:', error?.message || error);
@@ -95,7 +147,9 @@ export const AuthProvider = ({ children }) => {
     try {
       const data = await verifyEmail(email, otp);
       setIsNewRegistration(true);
-      setUser(data.user || data);
+      const authenticatedUser = data.user || data;
+      setUser(authenticatedUser);
+      await setCachedUser(authenticatedUser);
       return data;
     } catch (error) {
       console.error('Verify error:', error?.message || error);
@@ -109,6 +163,8 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('Logout error:', error?.message || error);
     } finally {
+      await removeToken();
+      await removeCachedUser();
       setIsNewRegistration(false);
       setUser(null);
     }

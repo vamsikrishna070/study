@@ -1,6 +1,6 @@
 export function safeString(val, fallback = '') {
   if (val === null || val === undefined) return fallback;
-  if (typeof val === 'string') return val.trim();
+  if (typeof val === 'string') return val.trim().replace(/^["']+|["']+$/g, '');
   if (typeof val === 'number' || typeof val === 'boolean') return String(val).trim();
   return fallback;
 }

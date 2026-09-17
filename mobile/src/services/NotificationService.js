@@ -89,9 +89,6 @@ export const setupNotifications = async () => {
 };
 
 export const scheduleReminderNotification = async (reminder) => {
-  console.log('[Reminder] Creating reminder');
-  console.log('[Reminder] Recurrence:', reminder.scheduleType || 'one-time');
-
   try {
     const triggerDate = new Date(reminder.remindAt);
     const type = reminder.scheduleType || 'one-time';
@@ -118,7 +115,6 @@ export const scheduleReminderNotification = async (reminder) => {
         minute: triggerDate.getMinutes(),
         channelId,
       };
-      console.log('[Reminder] Trigger:', JSON.stringify(trigger));
       const id = await Notifications.scheduleNotificationAsync({
         content: {
           title,
@@ -145,7 +141,6 @@ export const scheduleReminderNotification = async (reminder) => {
           minute: triggerDate.getMinutes(),
           channelId,
         };
-        console.log('[Reminder] Trigger:', JSON.stringify(trigger));
         const id = await Notifications.scheduleNotificationAsync({
           content: {
             title,
@@ -168,7 +163,6 @@ export const scheduleReminderNotification = async (reminder) => {
         minute: triggerDate.getMinutes(),
         channelId,
       };
-      console.log('[Reminder] Trigger:', JSON.stringify(trigger));
       const id = await Notifications.scheduleNotificationAsync({
         content: {
           title,
@@ -191,7 +185,6 @@ export const scheduleReminderNotification = async (reminder) => {
         minute: triggerDate.getMinutes(),
         channelId,
       };
-      console.log('[Reminder] Trigger:', JSON.stringify(trigger));
       const id = await Notifications.scheduleNotificationAsync({
         content: {
           title,
@@ -214,7 +207,6 @@ export const scheduleReminderNotification = async (reminder) => {
         date: triggerDate,
         channelId,
       };
-      console.log('[Reminder] Trigger:', JSON.stringify(trigger));
       const id = await Notifications.scheduleNotificationAsync({
         content: {
           title,
@@ -230,13 +222,6 @@ export const scheduleReminderNotification = async (reminder) => {
     }
 
     const finalId = scheduledIds.length === 1 ? scheduledIds[0] : JSON.stringify(scheduledIds);
-    console.log('[Reminder] Notification ID:', finalId);
-    console.log('[Reminder] Scheduling result: SUCCESS');
-
-    const allScheduled = await Notifications.getAllScheduledNotificationsAsync();
-    console.log('[Reminder] Scheduled notifications count:', allScheduled.length);
-    console.log('[Reminder] Scheduled notifications:', JSON.stringify(allScheduled, null, 2));
-
     return finalId;
   } catch (err) {
     console.error("[Reminder] Scheduling result: ERROR -", err);
