@@ -27,12 +27,18 @@ export function AuthProvider({ children }) {
     return `${year}-${month}-${day}`;
   };
 
-  const recordDailyActivity = async () => {
+  const recordDailyActivity = async (currentUser) => {
     try {
       const todayStr = getLocalDateString();
+      const lastRecorded = localStorage.getItem('studyarena_last_activity_date');
+      if (lastRecorded === todayStr || currentUser?.lastActiveDate === todayStr) {
+        return;
+      }
       const { data } = await apiClient.post('/auth/activity', { date: todayStr });
       if (data.success && data.data?.user) {
         setUser(data.data.user);
+        localStorage.setItem('studyarena_last_activity_date', todayStr);
+        localStorage.setItem('studyarena_cached_user', JSON.stringify(data.data.user));
       }
     } catch (e) {
       console.error('Failed to record daily activity:', e);
@@ -48,14 +54,16 @@ export function AuthProvider({ children }) {
       return;
     }
 
-
+    let cachedUser = null;
     const cachedUserRaw = localStorage.getItem('studyarena_cached_user');
     if (cachedUserRaw) {
       try {
-        const cachedUser = JSON.parse(cachedUserRaw);
-        setUser(cachedUser);
-        setIsAuthenticated(true);
-        setIsLoading(false);
+        cachedUser = JSON.parse(cachedUserRaw);
+        if (cachedUser && (cachedUser._id || cachedUser.id)) {
+          setUser(cachedUser);
+          setIsAuthenticated(true);
+          setIsLoading(false);
+        }
       } catch (_) {}
     }
 
@@ -66,13 +74,14 @@ export function AuthProvider({ children }) {
         setUser(data.data);
         setIsAuthenticated(true);
         localStorage.setItem('studyarena_cached_user', JSON.stringify(data.data));
-        recordDailyActivity();
+        recordDailyActivity(data.data);
       }
     } catch (error) {
       if (error.response?.status === 401) {
         console.warn('[Web AuthContext] Explicit 401 on /auth/me: token expired or invalid.');
         localStorage.removeItem('studyarena_token');
         localStorage.removeItem('studyarena_cached_user');
+        localStorage.removeItem('studyarena_last_activity_date');
         delete apiClient.defaults.headers.common['Authorization'];
         setUser(null);
         setIsAuthenticated(false);

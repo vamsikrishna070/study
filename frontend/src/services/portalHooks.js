@@ -31,7 +31,7 @@ export const useVerifyPortal = (options) =>
   useQuery({
     queryKey: getPortalVerifyQueryKey(),
     queryFn: verifyPortalSession,
-    staleTime: 60 * 1000,
+    staleTime: 5 * 60 * 1000,
     ...options,
   });
 

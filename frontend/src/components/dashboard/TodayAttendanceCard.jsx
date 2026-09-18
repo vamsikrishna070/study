@@ -22,18 +22,19 @@ import { cx } from '../shared.jsx';
 
 export default function TodayAttendanceCard() {
   const statusQuery = useGetPortalStatus({ retry: 1, refetchOnWindowFocus: false });
-  const isConnected = Boolean(statusQuery.data?.isConnected);
-  const statusKnown = statusQuery.isSuccess;
+  const statusData = statusQuery.data;
+  const isConnected = Boolean(statusData?.isConnected);
+  const isVerifiedFromStatus = Boolean(statusData?.isVerified);
 
   const verifyQuery = useVerifyPortal({
     retry: 1,
     refetchOnWindowFocus: false,
-    enabled: !statusKnown || isConnected,
+    enabled: isConnected && !isVerifiedFromStatus,
   });
   const attendanceQuery = useGetTodayAttendance({
     retry: 1,
     refetchOnWindowFocus: false,
-    enabled: !statusKnown || isConnected,
+    enabled: statusQuery.isLoading || isConnected,
   });
   const markMutation = useMarkAttendanceCode();
 
@@ -41,16 +42,13 @@ export default function TodayAttendanceCard() {
   const [sessionExpiredLocal, setSessionExpiredLocal] = useState(false);
   const [feedback, setFeedback] = useState(null);
 
-  const statusData = statusQuery.data;
   const verifyData = verifyQuery.data;
   const attendanceData = attendanceQuery.data;
   const isVerifyLoading = verifyQuery.isLoading && verifyQuery.fetchStatus !== 'idle';
 
-
   const isSessionActive = Boolean(
     !sessionExpiredLocal &&
-    !isVerifyLoading &&
-    verifyData?.status === 'verified'
+    (verifyData?.status === 'verified' || (isVerifiedFromStatus && !isVerifyLoading))
   );
 
   const handleMarkCode = async (e) => {
