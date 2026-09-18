@@ -22,8 +22,19 @@ import { cx } from '../shared.jsx';
 
 export default function TodayAttendanceCard() {
   const statusQuery = useGetPortalStatus({ retry: 1, refetchOnWindowFocus: false });
-  const verifyQuery = useVerifyPortal({ retry: 1, refetchOnWindowFocus: false });
-  const attendanceQuery = useGetTodayAttendance({ retry: 1, refetchOnWindowFocus: false });
+  const isConnected = Boolean(statusQuery.data?.isConnected);
+  const statusKnown = statusQuery.isSuccess;
+
+  const verifyQuery = useVerifyPortal({
+    retry: 1,
+    refetchOnWindowFocus: false,
+    enabled: !statusKnown || isConnected,
+  });
+  const attendanceQuery = useGetTodayAttendance({
+    retry: 1,
+    refetchOnWindowFocus: false,
+    enabled: !statusKnown || isConnected,
+  });
   const markMutation = useMarkAttendanceCode();
 
   const [code, setCode] = useState('');
@@ -33,9 +44,7 @@ export default function TodayAttendanceCard() {
   const statusData = statusQuery.data;
   const verifyData = verifyQuery.data;
   const attendanceData = attendanceQuery.data;
-
-  const isConnected = Boolean(statusData?.isConnected);
-  const isVerifyLoading = verifyQuery.isLoading;
+  const isVerifyLoading = verifyQuery.isLoading && verifyQuery.fetchStatus !== 'idle';
 
 
   const isSessionActive = Boolean(

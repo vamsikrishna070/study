@@ -923,30 +923,47 @@ export async function deleteResource(req, res) {
 }
 
 export async function getDashboard(req, res) {
-  const [user, subjects, exams, tasks, notes, resources, sessions] =
-    await Promise.all([
-      req.user.constructor.findById(req.user._id),
-      Subject.find({ user: req.user._id }).sort({ createdAt: -1 }),
-      Exam.find({ user: req.user._id })
-        .populate("subject", "name progress")
-        .sort({ date: 1 }),
-      Task.find({ user: req.user._id })
-        .populate("subject", "name")
-        .sort({ dueDate: 1 }),
-      Note.find({ user: req.user._id })
-        .populate("subject", "name")
-        .sort({ updatedAt: -1 })
-        .limit(5),
-      Resource.find({ user: req.user._id })
-        .populate("subject", "name")
-        .sort({ createdAt: -1 })
-        .limit(5),
-      StudySession.find({
-        user: req.user._id,
-        startedAt: { $gte: dayStart(new Date(Date.now() - 7 * 86400000)) },
-      }),
-    ]);
-  const allTopics = await Topic.find({ user: req.user._id });
+  const [
+    user,
+    subjects,
+    exams,
+    tasks,
+    notes,
+    resources,
+    sessions,
+    allTopics,
+    allSessions,
+  ] = await Promise.all([
+    req.user.constructor.findById(req.user._id).lean(),
+    Subject.find({ user: req.user._id }).sort({ createdAt: -1 }).lean(),
+    Exam.find({ user: req.user._id })
+      .populate("subject", "name progress")
+      .sort({ date: 1 })
+      .lean(),
+    Task.find({ user: req.user._id })
+      .populate("subject", "name")
+      .sort({ dueDate: 1 })
+      .lean(),
+    Note.find({ user: req.user._id })
+      .populate("subject", "name")
+      .sort({ updatedAt: -1 })
+      .limit(5)
+      .lean(),
+    Resource.find({ user: req.user._id })
+      .populate("subject", "name")
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .lean(),
+    StudySession.find({
+      user: req.user._id,
+      startedAt: { $gte: dayStart(new Date(Date.now() - 7 * 86400000)) },
+    }).lean(),
+    Topic.find({ user: req.user._id }).lean(),
+    StudySession.find({ user: req.user._id }).sort({
+      startedAt: -1,
+    }).lean(),
+  ]);
+
   const subjectsWithProgress = subjects.map((sub) => {
     const subTopics = allTopics.filter(
       (t) => String(t.subject) === String(sub._id),
@@ -956,7 +973,7 @@ export async function getDashboard(req, res) {
       subTopics.length > 0
         ? Math.round((completed / subTopics.length) * 100)
         : 0;
-    return { ...sub.toObject(), progress };
+    return { ...sub, progress };
   });
 
   const overallProgress = subjectsWithProgress.length
@@ -970,9 +987,6 @@ export async function getDashboard(req, res) {
     today,
   );
 
-  const allSessions = await StudySession.find({ user: req.user._id }).sort({
-    startedAt: -1,
-  });
   let streak = 0;
   let current = today;
   for (const session of allSessions) {

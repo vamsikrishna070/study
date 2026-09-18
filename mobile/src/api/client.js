@@ -2,7 +2,7 @@ import axios from 'axios';
 import { getToken, removeToken } from '../storage/token';
 import { removeCachedUser } from '../storage/user';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL;
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://study-o20l.onrender.com/api';
 
 const client = axios.create({
   baseURL: API_URL,

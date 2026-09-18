@@ -72,9 +72,6 @@ export function getUserFriendlyError(error, context = '') {
       return 'Too many attempts. Please wait a moment and try again.';
 
     case 500:
-    case 502:
-    case 503:
-    case 504:
       if (context === 'portal_sync' || context === 'portal_connect') {
         return 'The SRM Portal is temporarily unavailable. Please try again later.';
       }
@@ -82,6 +79,11 @@ export function getUserFriendlyError(error, context = '') {
         return 'We couldn\'t send the verification email. Please try again shortly.';
       }
       return 'Something went wrong on our side. Please try again shortly.';
+
+    case 502:
+    case 503:
+    case 504:
+      return 'The backend service is currently unavailable. Please try again later.';
 
     default:
       break;

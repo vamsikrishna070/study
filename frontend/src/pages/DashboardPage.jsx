@@ -32,17 +32,13 @@ export function DashboardPage() {
   const [imgError, setImgError] = useState(false);
   const query = useGetDashboard();
   const data = query.data;
-  if (query.isLoading)
-    return (
-      <Shell>
-        <LoadingBlock lines={7} />
-      </Shell>
-    );
-  if (query.error || !data)
+  const isLoading = query.isLoading && !data;
+
+  if (query.error && !data)
     return (
       <Shell>
         <QueryState
-          error={query.error || "empty"}
+          error={query.error}
           onRetry={() => query.refetch()}
           label="Dashboard"
         />
@@ -120,18 +116,20 @@ export function DashboardPage() {
             </Link>
           </div>
         </section>
+
+        {/* Top Metric Cards with Independent Skeleton Loading */}
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {[
             {
               label: "Semester progress",
-              value: `${stats.overallProgress}%`,
+              value: `${stats.overallProgress ?? 0}%`,
               icon: TrendingUp,
               note: "across all subjects",
               color: "text-accent",
             },
             {
               label: "Study hours",
-              value: `${stats.studyHours}h`,
+              value: `${stats.studyHours ?? 0}h`,
               icon: Clock3,
               note: "logged this week",
               color: "text-[#b58a4a]",
@@ -145,9 +143,9 @@ export function DashboardPage() {
             },
             {
               label: "Credits in play",
-              value: stats.totalCredits,
+              value: stats.totalCredits ?? 0,
               icon: GraduationCap,
-              note: `${stats.totalSubjects} subjects`,
+              note: `${stats.totalSubjects ?? 0} subjects`,
               color: "text-[#7382a5]",
             },
           ].map(({ label, value, icon: Icon, note, color }, i) => (
@@ -162,16 +160,23 @@ export function DashboardPage() {
                 </span>
                 <Icon size={17} className={color} />
               </div>
-              <div className="mt-4 font-display text-4xl">{value}</div>
+              {isLoading ? (
+                <div className="mt-4 h-9 w-24 animate-pulse rounded-lg bg-muted" />
+              ) : (
+                <div className="mt-4 font-display text-4xl">{value}</div>
+              )}
               <p className="mt-1 text-xs text-muted-foreground">{note}</p>
             </div>
           ))}
         </section>
 
+        {/* Live Attendance and Timetable Cards Mount Concurrently at t=0 */}
         <section className="grid gap-6 lg:grid-cols-2">
           <TodayAttendanceCard />
           <TodayTimetableCard />
         </section>
+
+        {/* Landscape and Exam Watch */}
         <div className="grid gap-6 xl:grid-cols-[1.35fr_.9fr]">
           <section className="rounded-2xl border border-card-border bg-card p-6 sm:p-7">
             <div className="mb-6 flex items-end justify-between">
@@ -189,40 +194,57 @@ export function DashboardPage() {
                 View all <ArrowUpRight size={13} className="inline" />
               </Link>
             </div>
-            <div className="space-y-5">
-              {subjects.slice(0, 5).map((subject) => (
-                <div
-                  key={subject.id}
-                  className="group"
-                  data-testid={`subject-progress-${subject.id}`}
-                >
-                  <div className="mb-2 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <span
-                        className="h-2.5 w-2.5 rounded-full"
-                        style={{ backgroundColor: subject.color }}
-                      />
-                      <span className="text-sm font-bold">{subject.name}</span>
-                      <span className="font-mono text-[10px] text-muted-foreground">
-                        {subject.code}
+            {isLoading ? (
+              <div className="space-y-4">
+                {[1, 2, 3, 4].map((n) => (
+                  <div key={n} className="space-y-2 animate-pulse">
+                    <div className="flex justify-between">
+                      <div className="h-4 w-32 rounded bg-muted" />
+                      <div className="h-4 w-10 rounded bg-muted" />
+                    </div>
+                    <div className="h-2 w-full rounded-full bg-muted" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-5">
+                {subjects.slice(0, 5).map((subject) => (
+                  <div
+                    key={subject.id}
+                    className="group"
+                    data-testid={`subject-progress-${subject.id}`}
+                  >
+                    <div className="mb-2 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <span
+                          className="h-2.5 w-2.5 rounded-full"
+                          style={{ backgroundColor: subject.color }}
+                        />
+                        <span className="text-sm font-bold">{subject.name}</span>
+                        <span className="font-mono text-[10px] text-muted-foreground">
+                          {subject.code}
+                        </span>
+                      </div>
+                      <span className="font-mono text-xs text-muted-foreground">
+                        {subject.progress}%
                       </span>
                     </div>
-                    <span className="font-mono text-xs text-muted-foreground">
-                      {subject.progress}%
-                    </span>
+                    <div className="progress-track">
+                      <div
+                        className="progress-fill"
+                        style={{
+                          width: `${subject.progress}%`,
+                          backgroundColor: subject.color,
+                        }}
+                      />
+                    </div>
                   </div>
-                  <div className="progress-track">
-                    <div
-                      className="progress-fill"
-                      style={{
-                        width: `${subject.progress}%`,
-                        backgroundColor: subject.color,
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+                {subjects.length === 0 && (
+                  <p className="text-sm text-muted-foreground">No subjects added yet.</p>
+                )}
+              </div>
+            )}
           </section>
           <section className="rounded-2xl border border-card-border bg-primary p-6 text-primary-foreground sm:p-7">
             <div className="flex items-center gap-2 text-sidebar-primary">
@@ -232,32 +254,40 @@ export function DashboardPage() {
               </span>
             </div>
             <h2 className="mt-2 font-display text-3xl">Exam watch</h2>
-            <div className="mt-6 space-y-4">
-              {upcomingExams.slice(0, 3).map((exam) => (
-                <div
-                  key={exam.id}
-                  className="border-b border-primary-foreground/15 pb-4 last:border-0"
-                  data-testid={`exam-watch-${exam.id}`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-bold">{exam.name}</p>
-                      <p className="mt-1 text-xs text-primary-foreground/60">
-                        {exam.subject} · {fmtDate(exam.date)}
-                      </p>
+            {isLoading ? (
+              <div className="mt-6 space-y-4">
+                {[1, 2, 3].map((n) => (
+                  <div key={n} className="h-12 w-full animate-pulse rounded-lg bg-primary-foreground/10" />
+                ))}
+              </div>
+            ) : (
+              <div className="mt-6 space-y-4">
+                {upcomingExams.slice(0, 3).map((exam) => (
+                  <div
+                    key={exam.id}
+                    className="border-b border-primary-foreground/15 pb-4 last:border-0"
+                    data-testid={`exam-watch-${exam.id}`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-bold">{exam.name}</p>
+                        <p className="mt-1 text-xs text-primary-foreground/60">
+                          {exam.subject} · {fmtDate(exam.date)}
+                        </p>
+                      </div>
+                      <span className="rounded-full bg-accent px-2 py-1 font-mono text-[10px] font-bold text-accent-foreground">
+                        {exam.daysLeft}d
+                      </span>
                     </div>
-                    <span className="rounded-full bg-accent px-2 py-1 font-mono text-[10px] font-bold text-accent-foreground">
-                      {exam.daysLeft}d
-                    </span>
                   </div>
-                </div>
-              ))}
-              {upcomingExams.length === 0 && (
-                <p className="text-sm text-primary-foreground/60">
-                  No exams on the horizon. Nice.
-                </p>
-              )}
-            </div>
+                ))}
+                {upcomingExams.length === 0 && (
+                  <p className="text-sm text-primary-foreground/60">
+                    No exams on the horizon. Nice.
+                  </p>
+                )}
+              </div>
+            )}
             <Link
               to="/exams"
               className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-sidebar-primary"
@@ -267,6 +297,8 @@ export function DashboardPage() {
             </Link>
           </section>
         </div>
+
+        {/* Study Queue, Recent Activity, and Quick Capture */}
         <div className="grid gap-6 lg:grid-cols-[1fr_1fr_.8fr]">
           <section className="rounded-2xl border border-card-border bg-card p-6">
             <div className="mb-5 flex items-center justify-between">
@@ -284,45 +316,53 @@ export function DashboardPage() {
                 <ArrowUpRight size={16} />
               </Link>
             </div>
-            <div className="space-y-3">
-              {todayTasks.slice(0, 4).map((task) => (
-                <div
-                  key={task.id}
-                  className="flex items-start gap-3 rounded-xl bg-background p-3"
-                  data-testid={`today-task-${task.id}`}
-                >
+            {isLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((n) => (
+                  <div key={n} className="h-12 w-full animate-pulse rounded-xl bg-muted/60" />
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {todayTasks.slice(0, 4).map((task) => (
                   <div
-                    className={cx(
-                      "mt-0.5 flex h-4 w-4 items-center justify-center rounded-full border",
-                      task.status === "completed"
-                        ? "border-accent bg-accent text-accent-foreground"
-                        : "border-muted-foreground/40",
-                    )}
+                    key={task.id}
+                    className="flex items-start gap-3 rounded-xl bg-background p-3"
+                    data-testid={`today-task-${task.id}`}
                   >
-                    {task.status === "completed" && <Check size={11} />}
-                  </div>
-                  <div className="min-w-0">
-                    <p
+                    <div
                       className={cx(
-                        "text-sm font-semibold",
-                        task.status === "completed" &&
-                          "text-muted-foreground line-through",
+                        "mt-0.5 flex h-4 w-4 items-center justify-center rounded-full border",
+                        task.status === "completed"
+                          ? "border-accent bg-accent text-accent-foreground"
+                          : "border-muted-foreground/40",
                       )}
                     >
-                      {task.title}
-                    </p>
-                    <p className="mt-1 text-[11px] text-muted-foreground">
-                      {task.subject} · {task.duration} min
-                    </p>
+                      {task.status === "completed" && <Check size={11} />}
+                    </div>
+                    <div className="min-w-0">
+                      <p
+                        className={cx(
+                          "text-sm font-semibold",
+                          task.status === "completed" &&
+                            "text-muted-foreground line-through",
+                        )}
+                      >
+                        {task.title}
+                      </p>
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        {task.subject} · {task.duration} min
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))}
-              {todayTasks.length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  Your queue is clear. Add something meaningful.
-                </p>
-              )}
-            </div>
+                ))}
+                {todayTasks.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    Your queue is clear. Add something meaningful.
+                  </p>
+                )}
+              </div>
+            )}
           </section>
           <section className="rounded-2xl border border-card-border bg-card p-6">
             <div className="mb-5 flex items-center justify-between">
@@ -334,28 +374,36 @@ export function DashboardPage() {
               </div>
               <Activity size={17} className="text-muted-foreground" />
             </div>
-            <div className="space-y-4">
-              {recentActivity.slice(0, 5).map((item) => (
-                <div
-                  key={item.id}
-                  className="flex gap-3"
-                  data-testid={`activity-${item.id}`}
-                >
-                  <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-accent/70" />
-                  <div>
-                    <p className="text-sm font-semibold">{item.title}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {item.detail} · {item.time}
-                    </p>
+            {isLoading ? (
+              <div className="space-y-4">
+                {[1, 2, 3].map((n) => (
+                  <div key={n} className="h-10 w-full animate-pulse rounded-lg bg-muted/60" />
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {recentActivity.slice(0, 5).map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex gap-3"
+                    data-testid={`activity-${item.id}`}
+                  >
+                    <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-accent/70" />
+                    <div>
+                      <p className="text-sm font-semibold">{item.title}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {item.detail} · {item.time}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))}
-              {recentActivity.length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  Your study story starts here.
-                </p>
-              )}
-            </div>
+                ))}
+                {recentActivity.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    Your study story starts here.
+                  </p>
+                )}
+              </div>
+            )}
           </section>
           <section className="rounded-2xl border border-accent/20 bg-accent/10 p-6">
             <Zap size={19} className="text-accent" />
