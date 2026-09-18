@@ -20,21 +20,25 @@ import {
 import { getUserFriendlyError } from '../../utils/errorUtils.js';
 import { cx } from '../shared.jsx';
 
-export default function TodayAttendanceCard() {
-  const statusQuery = useGetPortalStatus({ retry: 1, refetchOnWindowFocus: false });
-  const statusData = statusQuery.data;
+export default function TodayAttendanceCard({ initialData, isLoading }) {
+  const statusQuery = useGetPortalStatus({
+    retry: 1,
+    refetchOnWindowFocus: false,
+    enabled: !initialData,
+  });
+  const statusData = statusQuery.data || initialData;
   const isConnected = Boolean(statusData?.isConnected);
   const isVerifiedFromStatus = Boolean(statusData?.isVerified);
 
   const verifyQuery = useVerifyPortal({
     retry: 1,
     refetchOnWindowFocus: false,
-    enabled: isConnected && !isVerifiedFromStatus,
+    enabled: isConnected && !isVerifiedFromStatus && !initialData,
   });
   const attendanceQuery = useGetTodayAttendance({
     retry: 1,
     refetchOnWindowFocus: false,
-    enabled: statusQuery.isLoading || isConnected,
+    enabled: !initialData && (statusQuery.isLoading || isConnected),
   });
   const markMutation = useMarkAttendanceCode();
 
@@ -43,7 +47,7 @@ export default function TodayAttendanceCard() {
   const [feedback, setFeedback] = useState(null);
 
   const verifyData = verifyQuery.data;
-  const attendanceData = attendanceQuery.data;
+  const attendanceData = attendanceQuery.data || initialData;
   const isVerifyLoading = verifyQuery.isLoading && verifyQuery.fetchStatus !== 'idle';
 
   const isSessionActive = Boolean(
@@ -98,7 +102,20 @@ export default function TodayAttendanceCard() {
     verifyQuery.refetch();
   };
 
-  if (statusQuery.isSuccess && !isConnected) {
+  if (isLoading && !initialData) {
+    return (
+      <div className="rounded-2xl border border-card-border bg-card p-6 shadow-sm space-y-4 animate-pulse">
+        <div className="flex justify-between items-center pb-4 border-b border-border/50">
+          <div className="h-5 w-36 bg-muted rounded" />
+          <div className="h-7 w-20 bg-muted rounded" />
+        </div>
+        <div className="h-16 w-full bg-muted/60 rounded-xl" />
+        <div className="h-24 w-full bg-muted/40 rounded-xl" />
+      </div>
+    );
+  }
+
+  if (statusData && !isConnected) {
     return (
       <div className="rounded-2xl border border-card-border bg-card p-6 shadow-sm flex flex-col justify-between">
         <div>

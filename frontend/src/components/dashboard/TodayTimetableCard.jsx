@@ -3,14 +3,15 @@ import { CalendarDays, Clock, MapPin, User, ChevronRight } from 'lucide-react';
 import { useGetTimetable } from '../../services/portalHooks.js';
 import { cx } from '../shared.jsx';
 
-export default function TodayTimetableCard() {
+export default function TodayTimetableCard({ initialData, isLoading }) {
   const timetableQuery = useGetTimetable({
     retry: 1,
     refetchOnWindowFocus: false,
+    enabled: !initialData,
   });
-  const data = timetableQuery.data;
+  const data = timetableQuery.data || initialData;
 
-  if (timetableQuery.isLoading) {
+  if (isLoading && !initialData) {
     return (
       <div className="rounded-2xl border border-card-border bg-card p-6 animate-pulse space-y-3">
         <div className="h-4 w-32 bg-muted rounded" />

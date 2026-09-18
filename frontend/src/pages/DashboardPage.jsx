@@ -170,10 +170,10 @@ export function DashboardPage() {
           ))}
         </section>
 
-        {/* Live Attendance and Timetable Cards Mount Concurrently at t=0 */}
+        {/* Live Attendance and Timetable Cards Powered by Batched Dashboard Query */}
         <section className="grid gap-6 lg:grid-cols-2">
-          <TodayAttendanceCard />
-          <TodayTimetableCard />
+          <TodayAttendanceCard initialData={data?.todayAttendance} isLoading={isLoading} />
+          <TodayTimetableCard initialData={data?.todayTimetable} isLoading={isLoading} />
         </section>
 
         {/* Landscape and Exam Watch */}

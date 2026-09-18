@@ -10,6 +10,9 @@ import Subject from "../models/Subject.js";
 import Task from "../models/Task.js";
 import Topic from "../models/Topic.js";
 import Unit from "../models/Unit.js";
+import User from "../models/User.js";
+import SrmPortalAccount from "../models/SrmPortalAccount.js";
+import { buildTodayClassesFromCache } from "../utils/srmPortalHelpers.js";
 
 const dayStart = (value = new Date()) => {
   const date = new Date(value);
@@ -933,6 +936,7 @@ export async function getDashboard(req, res) {
     sessions,
     allTopics,
     allSessions,
+    portalAccount,
   ] = await Promise.all([
     req.user.constructor.findById(req.user._id).lean(),
     Subject.find({ user: req.user._id }).sort({ createdAt: -1 }).lean(),
@@ -962,6 +966,7 @@ export async function getDashboard(req, res) {
     StudySession.find({ user: req.user._id }).sort({
       startedAt: -1,
     }).lean(),
+    SrmPortalAccount.findOne({ userId: req.user._id }).lean(),
   ]);
 
   const subjectsWithProgress = subjects.map((sub) => {
@@ -1004,6 +1009,58 @@ export async function getDashboard(req, res) {
     allSessions.some((s) => dayStart(s.startedAt).getTime() === today.getTime())
   )
     streak = Math.max(1, streak + 1);
+
+  // Auto-record daily activity & streak in background if new day
+  const todayStr = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+
+  if (user && user.lastActiveDate !== todayStr) {
+    const finalStreak = Math.max(user.currentStreak || 0, streak);
+    const finalLongest = Math.max(user.longestStreak || 0, finalStreak);
+    User.updateOne(
+      { _id: req.user._id },
+      {
+        $set: {
+          lastActiveDate: todayStr,
+          currentStreak: finalStreak,
+          longestStreak: finalLongest,
+        },
+      }
+    ).catch((err) => console.error("[Dashboard] Auto activity update error:", err.message));
+  }
+
+  // Compile SRM Portal cached data in memory without extra network roundtrips
+  const isPortalConnected = portalAccount?.connectionStatus === "connected";
+  const todayAttendance = {
+    isConnected: isPortalConnected,
+    isVerified: isPortalConnected,
+    connectionStatus: portalAccount?.connectionStatus || "disconnected",
+    dayOrder: portalAccount?.profileCache?.dayOrder || null,
+    attendance: buildTodayClassesFromCache(portalAccount),
+  };
+
+  let timetableMap = {};
+  if (portalAccount) {
+    const rawTimetable = portalAccount.timetableCache;
+    if (rawTimetable && typeof rawTimetable === "object" && !Array.isArray(rawTimetable)) {
+      timetableMap = rawTimetable;
+    } else if (Array.isArray(rawTimetable)) {
+      rawTimetable.forEach((item) => {
+        if (item?.day) {
+          timetableMap[item.day.toLowerCase()] = item.subjects || item.slots || [];
+        }
+      });
+    }
+  }
+
+  const todayTimetable = {
+    isConnected: Boolean(portalAccount),
+    timetable: timetableMap,
+  };
 
   res.json({
     success: true,
@@ -1061,6 +1118,8 @@ export async function getDashboard(req, res) {
           time: item.createdAt,
         })),
       ].slice(0, 5),
+      todayAttendance,
+      todayTimetable,
       dayName,
     },
   });
