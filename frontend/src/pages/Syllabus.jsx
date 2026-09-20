@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Sparkles,
   Layers,
@@ -14,22 +15,28 @@ import {
 } from 'lucide-react';
 import { formatSemester } from '../utils/semester.js';
 import apiClient from '../services/apiClient.js';
-import { uploadFile } from '../services/apiHooks.js';
+import {
+  uploadFile,
+  useGetSubjects,
+  useGetUnits,
+  useGetTopics,
+  getGetSubjectsQueryKey,
+  getGetUnitsQueryKey,
+  getGetTopicsQueryKey,
+  getGetDashboardQueryKey,
+} from '../services/apiHooks.js';
 import Shell from '../components/Shell.jsx';
 import { PageHeading, Button, LoadingBlock, QueryState, cx } from '../components/shared.jsx';
 import { DocumentPreviewCard } from '../components/shared/DocumentPreviewCard.jsx';
 import SyllabusReviewModal from '../components/subjects/SyllabusReviewModal.jsx';
+import { getUserFriendlyError } from '../utils/errorUtils.js';
 
 export default function Syllabus() {
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialSubjectId = searchParams.get('subject') || '';
 
   const [subjectId, setSubjectId] = useState(initialSubjectId);
-  const [allSubjects, setAllSubjects] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [units, setUnits] = useState([]);
-  const [topics, setTopics] = useState([]);
-  const [error, setError] = useState(null);
   const [expandedUnits, setExpandedUnits] = useState({});
 
   const [uploadingPdf, setUploadingPdf] = useState(false);
@@ -41,51 +48,38 @@ export default function Syllabus() {
 
   const fileInputRef = useRef(null);
 
-  const loadData = useCallback(async (targetSubjId = subjectId) => {
-    try {
-      setError(null);
-      const subsRes = await apiClient.get('/subjects');
-      const subsData = subsRes.data?.data || subsRes.data || [];
-      setAllSubjects(subsData);
+  const subjectsQuery = useGetSubjects();
+  const allSubjects = subjectsQuery.data || [];
 
-      const activeId = targetSubjId || (subsData.length > 0 ? (subsData[0]._id || subsData[0].id) : '');
-      if (!subjectId && activeId) {
-        setSubjectId(activeId);
-      }
+  const effectiveSubjectId =
+    subjectId || (allSubjects.length > 0 ? allSubjects[0]._id || allSubjects[0].id : '');
 
-      if (!activeId) {
-        setLoading(false);
-        return;
-      }
+  const unitsQuery = useGetUnits(effectiveSubjectId, {
+    enabled: Boolean(effectiveSubjectId),
+  });
+  const topicsQuery = useGetTopics(effectiveSubjectId, {
+    enabled: Boolean(effectiveSubjectId),
+  });
 
-      const [unitsRes, topicsRes] = await Promise.all([
-        apiClient.get(`/units?subjectId=${activeId}`),
-        apiClient.get(`/topics?subjectId=${activeId}`),
-      ]);
-
-      const unitsData = unitsRes.data?.data || unitsRes.data || [];
-      const topicsData = topicsRes.data?.data || topicsRes.data || [];
-      setUnits(unitsData);
-      setTopics(topicsData);
-
-      if (unitsData.length > 0) {
-
-        const firstId = unitsData[0]._id || unitsData[0].id;
-        setExpandedUnits(prev => ({ [firstId]: true, ...prev }));
-      }
-    } catch (e) {
-      setError('Failed to load syllabus data.');
-    } finally {
-      setLoading(false);
-    }
-  }, [subjectId]);
+  const units = unitsQuery.data || [];
+  const topics = topicsQuery.data || [];
 
   useEffect(() => {
-    loadData(subjectId);
-  }, [subjectId, loadData]);
+    if (units.length > 0) {
+      const firstId = units[0]._id || units[0].id;
+      setExpandedUnits((prev) => ({ [firstId]: true, ...prev }));
+    }
+  }, [units]);
 
-  const currentSubject = allSubjects.find((s) => (s._id || s.id) === subjectId);
+  const currentSubject = allSubjects.find(
+    (s) => (s._id || s.id) === effectiveSubjectId
+  );
   const subjectColor = currentSubject?.color || 'var(--accent, #d97706)';
+
+  const loading =
+    subjectsQuery.isLoading ||
+    (Boolean(effectiveSubjectId) && (unitsQuery.isLoading || topicsQuery.isLoading));
+  const queryError = subjectsQuery.error || unitsQuery.error || topicsQuery.error;
 
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
@@ -103,7 +97,7 @@ export default function Syllabus() {
       return;
     }
 
-    if (!subjectId) {
+    if (!effectiveSubjectId) {
       alert('Please select a subject before uploading a syllabus.');
       return;
     }
@@ -119,7 +113,7 @@ export default function Syllabus() {
       }
 
       setExtractionStep('Attaching to subject...');
-      await apiClient.patch(`/subjects/${subjectId}`, {
+      await apiClient.patch(`/subjects/${effectiveSubjectId}`, {
         syllabusFile: {
           url: uploaded.url,
           publicId: uploaded.publicId || '',
@@ -129,19 +123,22 @@ export default function Syllabus() {
         },
       });
 
+      queryClient.invalidateQueries({ queryKey: getGetSubjectsQueryKey() });
+
       setExtractionStep('Extracting units & topics from syllabus...');
       setExtracting(true);
 
-      const res = await apiClient.post(`/subjects/${subjectId}/syllabus/extract`);
+      const res = await apiClient.post(`/subjects/${effectiveSubjectId}/syllabus/extract`);
       const extracted = res.data?.data?.units || res.data?.units || [];
 
       if (extracted.length > 0) {
         setParsedUnits(extracted);
         setReviewVisible(true);
       } else {
-        alert('Syllabus PDF was uploaded successfully. Text extraction could not automatically detect structured units, but your document is safely attached.');
+        alert(
+          'Syllabus PDF was uploaded successfully. Text extraction could not automatically detect structured units, but your document is safely attached.'
+        );
       }
-
     } catch (err) {
       const msg = getUserFriendlyError(err, 'syllabus_upload');
       setExtractionError(msg);
@@ -153,13 +150,13 @@ export default function Syllabus() {
   };
 
   const handleExtractExisting = async () => {
-    if (!currentSubject?.syllabusFile?.url) return;
+    if (!currentSubject?.syllabusFile?.url || !effectiveSubjectId) return;
     setExtracting(true);
     setExtractionError(null);
     setExtractionStep('Extracting units & topics...');
 
     try {
-      const res = await apiClient.post(`/subjects/${subjectId}/syllabus/extract`);
+      const res = await apiClient.post(`/subjects/${effectiveSubjectId}/syllabus/extract`);
       const extracted = res.data?.data?.units || res.data?.units || [];
 
       if (extracted.length > 0) {
@@ -169,7 +166,9 @@ export default function Syllabus() {
         alert('Could not detect structured units from this PDF. You can add units manually.');
       }
     } catch (err) {
-      const msg = err.response?.data?.message || 'Could not extract the syllabus. Please make sure the PDF contains readable syllabus text.';
+      const msg =
+        err.response?.data?.message ||
+        'Could not extract the syllabus. Please make sure the PDF contains readable syllabus text.';
       setExtractionError(msg);
       alert(msg);
     } finally {
@@ -179,12 +178,12 @@ export default function Syllabus() {
   };
 
   const handleRemoveSyllabus = async () => {
-    if (!subjectId) return;
+    if (!effectiveSubjectId) return;
     try {
-      await apiClient.patch(`/subjects/${subjectId}`, {
+      await apiClient.patch(`/subjects/${effectiveSubjectId}`, {
         syllabusFile: { url: '', publicId: '', originalName: '', mimeType: '', size: 0 },
       });
-      loadData(subjectId);
+      queryClient.invalidateQueries({ queryKey: getGetSubjectsQueryKey() });
     } catch (err) {
       alert('Failed to remove syllabus PDF.');
     }
@@ -195,31 +194,25 @@ export default function Syllabus() {
     const newStatus = isCompleted ? 'not-started' : 'completed';
     const topicId = topic._id || topic.id;
 
-    setTopics((prev) =>
-      prev.map((t) =>
+    // Optimistically update React Query cache
+    queryClient.setQueryData(getGetTopicsQueryKey(effectiveSubjectId), (oldTopics) => {
+      if (!Array.isArray(oldTopics)) return oldTopics;
+      return oldTopics.map((t) =>
         (t._id || t.id) === topicId
           ? { ...t, status: newStatus, completed: !isCompleted }
           : t
-      )
-    );
+      );
+    });
 
     try {
       await apiClient.patch(`/topics/${topicId}`, {
         status: newStatus,
-        completed: !isCompleted
+        completed: !isCompleted,
       });
-      const subsRes = await apiClient.get('/subjects');
-      const subsData = subsRes.data?.data || subsRes.data || [];
-      setAllSubjects(subsData);
+      queryClient.invalidateQueries({ queryKey: getGetSubjectsQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
     } catch (e) {
-
-      setTopics((prev) =>
-        prev.map((t) =>
-          (t._id || t.id) === topicId
-            ? { ...t, status: topic.status, completed: topic.completed }
-            : t
-        )
-      );
+      queryClient.invalidateQueries({ queryKey: getGetTopicsQueryKey(effectiveSubjectId) });
       alert('Failed to update topic status. Please try again.');
     }
   };
@@ -229,12 +222,22 @@ export default function Syllabus() {
   };
 
   const totalTopics = topics.length;
-  const completedTopics = topics.filter((t) => t.status === 'completed' || t.completed).length;
-  const progressPercent = totalTopics > 0 ? Math.round((completedTopics / totalTopics) * 100) : 0;
+  const completedTopics = topics.filter(
+    (t) => t.status === 'completed' || t.completed
+  ).length;
+  const progressPercent =
+    totalTopics > 0 ? Math.round((completedTopics / totalTopics) * 100) : 0;
+
+  const handleRetry = () => {
+    subjectsQuery.refetch();
+    if (effectiveSubjectId) {
+      unitsQuery.refetch();
+      topicsQuery.refetch();
+    }
+  };
 
   return (
     <Shell>
-
       <input
         type="file"
         ref={fileInputRef}
@@ -252,7 +255,7 @@ export default function Syllabus() {
             : 'Select a subject and upload a PDF syllabus.'
         }
         action={
-          subjectId && (
+          effectiveSubjectId && (
             <Button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadingPdf || extracting}
@@ -274,18 +277,19 @@ export default function Syllabus() {
       {allSubjects.length > 0 && (
         <div className="mt-6 mb-8 flex flex-col gap-3 rounded-2xl border border-card-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between shadow-sm">
           <div className="flex flex-1 items-center gap-3">
-            <label htmlFor="subject-select" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground shrink-0">
+            <label
+              htmlFor="subject-select"
+              className="text-xs font-semibold uppercase tracking-wider text-muted-foreground shrink-0"
+            >
               Subject:
             </label>
             <select
               id="subject-select"
-              value={subjectId}
+              value={effectiveSubjectId}
               onChange={(e) => {
                 const newId = e.target.value;
                 setSubjectId(newId);
                 setSearchParams(newId ? { subject: newId } : {});
-                setUnits([]);
-                setTopics([]);
               }}
               className="h-11 min-w-0 flex-1 rounded-xl border border-card-border bg-background px-4 text-sm font-medium outline-none focus:border-primary sm:max-w-md"
             >
@@ -302,7 +306,10 @@ export default function Syllabus() {
 
           {currentSubject && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: subjectColor }} />
+              <span
+                className="inline-block h-2.5 w-2.5 rounded-full"
+                style={{ backgroundColor: subjectColor }}
+              />
               <span className="font-semibold text-foreground">{currentSubject.code}</span>
               <span>·</span>
               <span>{formatSemester(currentSubject.semester)}</span>
@@ -311,10 +318,10 @@ export default function Syllabus() {
         </div>
       )}
 
-      {loading ? (
+      {loading && !units.length && !allSubjects.length ? (
         <LoadingBlock lines={8} />
-      ) : error ? (
-        <QueryState error={error} onRetry={() => loadData(subjectId)} label="Syllabus" />
+      ) : queryError && !allSubjects.length ? (
+        <QueryState error={queryError} onRetry={handleRetry} label="Syllabus" />
       ) : !allSubjects.length ? (
         <div className="rounded-3xl border border-dashed border-border bg-card/60 p-12 text-center">
           <BookOpen size={48} className="mx-auto text-muted-foreground opacity-50 mb-4" />
@@ -325,7 +332,6 @@ export default function Syllabus() {
         </div>
       ) : (
         <div className="space-y-6">
-
           {(uploadingPdf || extracting) && (
             <div className="flex items-center gap-3 rounded-2xl border border-primary/25 bg-primary/10 p-5 text-sm font-semibold text-primary animate-pulse">
               <Loader2 size={20} className="animate-spin shrink-0" />
@@ -427,13 +433,20 @@ export default function Syllabus() {
                 const uId = unit._id || unit.id || String(index);
                 const isExpanded = !!expandedUnits[uId];
                 const unitTopics = topics.filter(
-                  (t) => (t.unit?._id || t.unit?.id || t.unit) === uId || t.unit === unit.title || t.unit === unit.name
+                  (t) =>
+                    (t.unit?._id || t.unit?.id || t.unit) === uId ||
+                    t.unit === unit.title ||
+                    t.unit === unit.name
                 );
-                const completedInUnit = unitTopics.filter((t) => t.status === 'completed' || t.completed).length;
+                const completedInUnit = unitTopics.filter(
+                  (t) => t.status === 'completed' || t.completed
+                ).length;
 
                 return (
-                  <div key={uId} className="rounded-2xl border border-card-border bg-card overflow-hidden shadow-sm transition-all">
-
+                  <div
+                    key={uId}
+                    className="rounded-2xl border border-card-border bg-card overflow-hidden shadow-sm transition-all"
+                  >
                     <button
                       type="button"
                       onClick={() => toggleUnit(uId)}
@@ -487,7 +500,10 @@ export default function Syllabus() {
                                     {isDone ? (
                                       <CheckCircle2 size={18} style={{ color: subjectColor }} />
                                     ) : (
-                                      <Circle size={18} className="text-muted-foreground opacity-60 group-hover:opacity-100" />
+                                      <Circle
+                                        size={18}
+                                        className="text-muted-foreground opacity-60 group-hover:opacity-100"
+                                      />
                                     )}
                                   </button>
                                   <span
@@ -515,9 +531,9 @@ export default function Syllabus() {
         </div>
       )}
 
-      {reviewVisible && subjectId && (
+      {reviewVisible && effectiveSubjectId && (
         <SyllabusReviewModal
-          subjectId={subjectId}
+          subjectId={effectiveSubjectId}
           parsedData={{ units: parsedUnits }}
           onClose={() => {
             setReviewVisible(false);
@@ -526,7 +542,10 @@ export default function Syllabus() {
           onSuccess={() => {
             setReviewVisible(false);
             setParsedUnits([]);
-            loadData(subjectId);
+            queryClient.invalidateQueries({ queryKey: getGetUnitsQueryKey(effectiveSubjectId) });
+            queryClient.invalidateQueries({ queryKey: getGetTopicsQueryKey(effectiveSubjectId) });
+            queryClient.invalidateQueries({ queryKey: getGetSubjectsQueryKey() });
+            queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
           }}
         />
       )}

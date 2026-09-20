@@ -161,6 +161,7 @@ export async function findPortalAccountForUser(userOrId) {
 }
 
 async function fetchSrmSession() {
+  const fetchStart = performance.now();
   const loginPageRes = await fetch(`${BASE_URL}/StudentLoginPage`, {
     method: 'GET',
     headers: DEFAULT_HEADERS,
@@ -192,10 +193,13 @@ async function fetchSrmSession() {
 
   const arrayBuffer = await captchaRes.arrayBuffer();
   const captchaBuffer = Buffer.from(arrayBuffer);
+  const durationMs = (performance.now() - fetchStart).toFixed(1);
+  console.log(`[SRM TIMING] Session & CAPTCHA fetched in ${durationMs}ms`);
   return { jsessionId, captchaBuffer };
 }
 
 async function solveCaptchaOcr(imageBuffer) {
+  const ocrStart = performance.now();
   const worker = await createWorker('eng', 1, {
     logger: () => {},
     errorHandler: () => {},
@@ -206,18 +210,23 @@ async function solveCaptchaOcr(imageBuffer) {
       tessedit_pageseg_mode: '8',
     });
     const { data } = await worker.recognize(imageBuffer);
-    return safeString(data.text).replace(/\s+/g, '');
+    const text = safeString(data.text).replace(/\s+/g, '');
+    const ocrMs = (performance.now() - ocrStart).toFixed(1);
+    console.log(`[SRM TIMING] OCR processed in ${ocrMs}ms (recognized: "${text}")`);
+    return text;
   } finally {
     await worker.terminate();
   }
 }
 
 export async function attemptSrmLogin(username, password) {
-  console.log(`[SRM LOGIN] SRM Portal login started`);
+  const loginStart = performance.now();
+  console.log(`[SRM LOGIN] SRM Portal login sequence initiated for user: ${username}`);
   const MAX_RETRIES = 3;
   let lastErrorReason = null;
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    const attemptStart = performance.now();
     let jsessionId;
     let captchaBuffer;
     try {
@@ -279,7 +288,9 @@ export async function attemptSrmLogin(username, password) {
     const isLoginPage = html.includes('txtUserName') || html.includes('txtAuthKey');
     const isSuccess = !isLoginPage && (Boolean(nameMatch) || /HRDSystem|tblSubjectWiseAttendance|Welcome|Logout|profile_pic/i.test(html));
     if (isSuccess) {
-      console.log(`[SRM LOGIN] SRM Portal login succeeded`);
+      const attemptMs = (performance.now() - attemptStart).toFixed(1);
+      const totalLoginMs = (performance.now() - loginStart).toFixed(1);
+      console.log(`[SRM TIMING] Attempt ${attempt} succeeded in ${attemptMs}ms. Total login duration: ${totalLoginMs}ms`);
       return finalSessionId;
     }
 
@@ -305,16 +316,19 @@ export async function attemptSrmLogin(username, password) {
       throw credErr;
     }
 
+    const attemptMs = (performance.now() - attemptStart).toFixed(1);
     if (isCaptchaError) {
-      console.warn(`[PortalService] Attempt ${attempt}: CAPTCHA misread by OCR. Retrying...`);
+      console.warn(`[PortalService] Attempt ${attempt} failed in ${attemptMs}ms: CAPTCHA misread by OCR. Retrying...`);
       lastErrorReason = 'CAPTCHA_MISMATCH';
       continue;
     }
 
-    console.warn(`[PortalService] Attempt ${attempt}: Login response unrecognized. Retrying...`);
+    console.warn(`[PortalService] Attempt ${attempt} failed in ${attemptMs}ms: Login response unrecognized. Retrying...`);
     lastErrorReason = 'UNRECOGNIZED_RESPONSE';
   }
 
+  const totalLoginMs = (performance.now() - loginStart).toFixed(1);
+  console.warn(`[SRM TIMING] All login attempts failed. Total duration: ${totalLoginMs}ms`);
   const err = new Error(
     lastErrorReason === 'CAPTCHA_MISMATCH'
       ? 'SRM Portal verification could not be completed after 3 attempts. Please try again.'
@@ -1038,6 +1052,7 @@ export async function getPortalAccountData(userId) {
 }
 
 export async function verifyPortalConnection(userId, { autoRelogin = true } = {}) {
+  const verifyStart = performance.now();
   if (!userId) {
     return {
       status: 'disconnected',
@@ -1071,6 +1086,7 @@ export async function verifyPortalConnection(userId, { autoRelogin = true } = {}
 
   const existingSession = decryptPortalSecret(account.encryptedSessionId);
   if (existingSession) {
+    const probeStart = performance.now();
     try {
       const checkRes = await fetch(`${BASE_URL}/HRDSystem`, {
         method: 'POST',
@@ -1080,6 +1096,7 @@ export async function verifyPortalConnection(userId, { autoRelogin = true } = {}
         },
       });
 
+      const probeMs = (performance.now() - probeStart).toFixed(1);
       if (checkRes.ok) {
         const text = await checkRes.text();
         const isLoginPage =
@@ -1089,6 +1106,8 @@ export async function verifyPortalConnection(userId, { autoRelogin = true } = {}
           text.includes('StudentLoginPage');
 
         if (text && text.length > 200 && !isLoginPage) {
+          const totalVerifyMs = (performance.now() - verifyStart).toFixed(1);
+          console.log(`[VERIFY TIMING] Session probe valid (${probeMs}ms). Total verify: ${totalVerifyMs}ms`);
           if (account.connectionStatus !== 'connected') {
             account.connectionStatus = 'connected';
             await account.save();
@@ -1104,9 +1123,11 @@ export async function verifyPortalConnection(userId, { autoRelogin = true } = {}
             lastSuccessfulSync: account.lastSuccessfulSync || null,
           };
         }
+        console.log(`[VERIFY TIMING] Session probe expired (${probeMs}ms). Proceeding to live re-login.`);
       }
     } catch (networkErr) {
-      console.warn('[verifyPortalConnection] Network probe warning:', networkErr.message);
+      const probeMs = (performance.now() - probeStart).toFixed(1);
+      console.warn(`[VERIFY TIMING] Session probe network error (${probeMs}ms):`, networkErr.message);
       return {
         status: 'failed',
         message: 'Unable to connect to portal',
@@ -1127,6 +1148,8 @@ export async function verifyPortalConnection(userId, { autoRelogin = true } = {}
       account.connectionStatus = 'expired';
       await account.save();
     }
+    const totalVerifyMs = (performance.now() - verifyStart).toFixed(1);
+    console.log(`[VERIFY TIMING] No credentials stored or autoRelogin=false. Verify completed as expired in ${totalVerifyMs}ms`);
     return {
       status: 'expired',
       message: 'Connection expired. Please reconnect.',
@@ -1146,6 +1169,9 @@ export async function verifyPortalConnection(userId, { autoRelogin = true } = {}
     account.connectionStatus = 'connected';
     await account.save();
 
+    const totalVerifyMs = (performance.now() - verifyStart).toFixed(1);
+    console.log(`[VERIFY TIMING] Live re-authentication succeeded. Total verify duration: ${totalVerifyMs}ms`);
+
     return {
       status: 'verified',
       message: 'Connected and verified',
@@ -1157,7 +1183,8 @@ export async function verifyPortalConnection(userId, { autoRelogin = true } = {}
       lastSuccessfulSync: account.lastSuccessfulSync || null,
     };
   } catch (reLoginErr) {
-    console.warn(`[verifyPortalConnection] Re-authentication failed:`, reLoginErr.message);
+    const totalVerifyMs = (performance.now() - verifyStart).toFixed(1);
+    console.warn(`[VERIFY TIMING] Re-authentication failed after ${totalVerifyMs}ms:`, reLoginErr.message);
     const isCreds = reLoginErr.code === 'INVALID_CREDENTIALS' || reLoginErr.message?.toLowerCase().includes('credential') || reLoginErr.message?.toLowerCase().includes('password');
     const isUnreachable = reLoginErr.code === 'PORTAL_UNAVAILABLE' || reLoginErr.message?.toLowerCase().includes('unreachable') || reLoginErr.message?.toLowerCase().includes('network');
 

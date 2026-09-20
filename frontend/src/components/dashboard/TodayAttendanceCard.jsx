@@ -24,21 +24,20 @@ export default function TodayAttendanceCard({ initialData, isLoading }) {
   const statusQuery = useGetPortalStatus({
     retry: 1,
     refetchOnWindowFocus: false,
-    enabled: !initialData,
+    enabled: !initialData && !isLoading,
   });
   const statusData = statusQuery.data || initialData;
   const isConnected = Boolean(statusData?.isConnected);
   const isVerifiedFromStatus = Boolean(statusData?.isVerified);
 
   const verifyQuery = useVerifyPortal({
-    retry: 1,
     refetchOnWindowFocus: false,
-    enabled: isConnected && !isVerifiedFromStatus && !initialData,
+    enabled: isConnected && !isVerifiedFromStatus && !initialData && !isLoading,
   });
   const attendanceQuery = useGetTodayAttendance({
     retry: 1,
     refetchOnWindowFocus: false,
-    enabled: !initialData && (statusQuery.isLoading || isConnected),
+    enabled: !initialData && !isLoading && (statusQuery.isLoading || isConnected),
   });
   const markMutation = useMarkAttendanceCode();
 

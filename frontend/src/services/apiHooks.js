@@ -18,6 +18,8 @@ export const getGetExamsQueryKey = () => ['exams'];
 export const getGetResourcesQueryKey = () => ['resources'];
 export const getGetProgressQueryKey = () => ['progress'];
 export const getGetSyllabiQueryKey = () => ['syllabi'];
+export const getGetUnitsQueryKey = (subjectId) => ['units', { subjectId }];
+export const getGetTopicsQueryKey = (subjectId) => ['topics', { subjectId }];
 
 export const useGetDashboard = (options) =>
   query(getGetDashboardQueryKey(), () => apiClient.get('/dashboard'), {
@@ -28,6 +30,16 @@ export const useGetSubjects = (options) =>
   query(getGetSubjectsQueryKey(), () => apiClient.get('/subjects'), options);
 export const useGetSyllabi = (options) =>
   query(getGetSyllabiQueryKey(), () => apiClient.get('/syllabus'), options);
+export const useGetUnits = (subjectId, options) =>
+  query(getGetUnitsQueryKey(subjectId), () => apiClient.get('/units', { params: { subjectId } }), {
+    enabled: Boolean(subjectId),
+    ...options,
+  });
+export const useGetTopics = (subjectId, options) =>
+  query(getGetTopicsQueryKey(subjectId), () => apiClient.get('/topics', { params: { subjectId } }), {
+    enabled: Boolean(subjectId),
+    ...options,
+  });
 export const useGetNotes = (params, options) =>
   query(getGetNotesQueryKey(params), () => apiClient.get('/notes', { params }), options);
 export const useGetTasks = (options) =>

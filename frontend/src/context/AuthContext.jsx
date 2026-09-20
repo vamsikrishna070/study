@@ -63,6 +63,9 @@ export function AuthProvider({ children }) {
           setUser(cachedUser);
           setIsAuthenticated(true);
           setIsLoading(false);
+          if (cachedUser.lastActiveDate) {
+            localStorage.setItem('studyarena_last_activity_date', cachedUser.lastActiveDate);
+          }
         }
       } catch (_) {}
     }

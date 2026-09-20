@@ -7,7 +7,7 @@ export default function TodayTimetableCard({ initialData, isLoading }) {
   const timetableQuery = useGetTimetable({
     retry: 1,
     refetchOnWindowFocus: false,
-    enabled: !initialData,
+    enabled: !initialData && !isLoading,
   });
   const data = timetableQuery.data || initialData;
 
