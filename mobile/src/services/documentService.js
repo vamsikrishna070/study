@@ -89,50 +89,47 @@ export async function downloadPdf(remoteUrl, originalName = 'document.pdf', onPr
     };
   }
 
-  const effectiveUrl = getCloudinaryDownloadUrl(remoteUrl);
+  const urlsToTry = [remoteUrl];
+  if (remoteUrl.includes('cloudinary.com')) {
+    const attUrl = getCloudinaryDownloadUrl(remoteUrl);
+    if (!urlsToTry.includes(attUrl)) urlsToTry.unshift(attUrl); // Prioritize attachment URL
 
-  try {
-    const downloadedFile = await File.downloadFileAsync(effectiveUrl, targetFile, {
-      idempotent: true,
-    });
-
-    if (!downloadedFile.exists || downloadedFile.size === 0) {
-      throw new Error('Downloaded document is empty.');
+    if (remoteUrl.includes('/image/upload/')) {
+      const rawUrl = remoteUrl.replace('/image/upload/', '/raw/upload/');
+      const rawAtt = rawUrl.replace('/upload/', '/upload/fl_attachment/');
+      if (!urlsToTry.includes(rawAtt)) urlsToTry.push(rawAtt);
+      if (!urlsToTry.includes(rawUrl)) urlsToTry.push(rawUrl);
+    } else if (remoteUrl.includes('/raw/upload/')) {
+      const imgAtt = remoteUrl.replace('/raw/upload/', '/image/upload/fl_attachment/');
+      if (!urlsToTry.includes(imgAtt)) urlsToTry.push(imgAtt);
     }
-
-    if (typeof onProgress === 'function') onProgress(100);
-
-    return {
-      uri: downloadedFile.uri,
-      filename: safeName,
-      size: downloadedFile.size,
-      fromCache: false,
-    };
-  } catch (error) {
-    if (effectiveUrl !== remoteUrl) {
-      try {
-        const retryFile = await File.downloadFileAsync(remoteUrl, targetFile, {
-          idempotent: true,
-        });
-        if (retryFile.exists && retryFile.size > 0) {
-          if (typeof onProgress === 'function') onProgress(100);
-          return {
-            uri: retryFile.uri,
-            filename: safeName,
-            size: retryFile.size,
-            fromCache: false,
-          };
-        }
-      } catch (retryErr) {
-        // Fall through to error
-      }
-    }
-
-    if (__DEV__) {
-      console.warn('[DocumentService] Download error:', error);
-    }
-    throw new Error('Could not download the document. Please check your network connection.');
   }
+
+  let lastError = null;
+  for (const fetchUrl of urlsToTry) {
+    try {
+      const downloadedFile = await File.downloadFileAsync(fetchUrl, targetFile, {
+        idempotent: true,
+      });
+
+      if (downloadedFile.exists && downloadedFile.size > 0) {
+        if (typeof onProgress === 'function') onProgress(100);
+        return {
+          uri: downloadedFile.uri,
+          filename: safeName,
+          size: downloadedFile.size,
+          fromCache: false,
+        };
+      }
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  if (__DEV__) {
+    console.warn('[DocumentService] Download error across candidate URLs:', lastError);
+  }
+  throw new Error('Could not download the document. Please check your network connection.');
 }
 
 export async function viewPdf(urlOrUri, originalName = 'document.pdf') {
@@ -148,14 +145,15 @@ export async function viewPdf(urlOrUri, originalName = 'document.pdf') {
       const res = await downloadPdf(urlOrUri, safeName);
       localFile = new File(res.uri);
     } catch (dlErr) {
-      if (__DEV__) console.warn('[DocumentService] Download error, falling back to direct URL browser:', dlErr);
+      if (__DEV__) console.warn('[DocumentService] Download error, falling back to browser:', dlErr);
       try {
-        await WebBrowser.openBrowserAsync(urlOrUri, {
+        const browserUrl = getCloudinaryDownloadUrl(urlOrUri);
+        await WebBrowser.openBrowserAsync(browserUrl, {
           presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
           showTitle: true,
           enableBarCollapsing: true,
         });
-        return { success: true, uri: urlOrUri };
+        return { success: true, uri: browserUrl };
       } catch (wbErr) {
         throw new Error('Could not open remote document.');
       }

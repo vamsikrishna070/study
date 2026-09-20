@@ -1,6 +1,6 @@
 import { Platform, Linking } from 'react-native';
 import { openNativeDocument } from '../services/AlarmModule';
-import { downloadPdf, getSafeFilename } from '../services/documentService';
+import { downloadPdf, getSafeFilename, getCloudinaryDownloadUrl } from '../services/documentService';
 import * as WebBrowser from 'expo-web-browser';
 
 export function extractFilenameFromUrl(url) {
@@ -275,12 +275,13 @@ export async function openAttachment(attachment) {
     }
 
     try {
-      await WebBrowser.openBrowserAsync(rawUrl, {
+      const browserUrl = getCloudinaryDownloadUrl(rawUrl);
+      await WebBrowser.openBrowserAsync(browserUrl, {
         presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
         showTitle: true,
         enableBarCollapsing: true,
       });
-      return { success: true, method: 'browser', uri: rawUrl };
+      return { success: true, method: 'browser', uri: browserUrl };
     } catch (e) {
       throw new Error('Could not open this file.');
     }
