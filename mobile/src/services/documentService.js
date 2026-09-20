@@ -65,6 +65,16 @@ export function getCachedPdfFile(remoteUrl, originalName = 'document.pdf') {
   return new File(cacheDir, cacheFilename);
 }
 
+export function getPreviewUrl(url, filename = 'document.pdf') {
+  if (!url || typeof url !== 'string') return url;
+  if (url.includes('cloudinary.com')) {
+    const apiBase = process.env.EXPO_PUBLIC_API_URL || 'https://study-o20l.onrender.com/api';
+    const safeName = getSafeFilename(filename, 'document.pdf');
+    return `${apiBase}/upload/preview?url=${encodeURIComponent(url.trim())}&filename=${encodeURIComponent(safeName)}`;
+  }
+  return url;
+}
+
 export function getCloudinaryDownloadUrl(url) {
   if (!url || typeof url !== 'string' || !url.includes('cloudinary.com')) return url;
   if (url.includes('/fl_attachment')) return url;
@@ -89,10 +99,13 @@ export async function downloadPdf(remoteUrl, originalName = 'document.pdf', onPr
     };
   }
 
-  const urlsToTry = [remoteUrl];
+  const urlsToTry = [];
   if (remoteUrl.includes('cloudinary.com')) {
+    const proxyUrl = getPreviewUrl(remoteUrl, safeName);
+    urlsToTry.push(proxyUrl);
+
     const attUrl = getCloudinaryDownloadUrl(remoteUrl);
-    if (!urlsToTry.includes(attUrl)) urlsToTry.unshift(attUrl); // Prioritize attachment URL
+    if (!urlsToTry.includes(attUrl)) urlsToTry.push(attUrl);
 
     if (remoteUrl.includes('/image/upload/')) {
       const rawUrl = remoteUrl.replace('/image/upload/', '/raw/upload/');
@@ -103,6 +116,9 @@ export async function downloadPdf(remoteUrl, originalName = 'document.pdf', onPr
       const imgAtt = remoteUrl.replace('/raw/upload/', '/image/upload/fl_attachment/');
       if (!urlsToTry.includes(imgAtt)) urlsToTry.push(imgAtt);
     }
+  }
+  if (!urlsToTry.includes(remoteUrl)) {
+    urlsToTry.push(remoteUrl);
   }
 
   let lastError = null;
@@ -147,7 +163,7 @@ export async function viewPdf(urlOrUri, originalName = 'document.pdf') {
     } catch (dlErr) {
       if (__DEV__) console.warn('[DocumentService] Download error, falling back to browser:', dlErr);
       try {
-        const browserUrl = getCloudinaryDownloadUrl(urlOrUri);
+        const browserUrl = getPreviewUrl(urlOrUri, safeName);
         await WebBrowser.openBrowserAsync(browserUrl, {
           presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
           showTitle: true,

@@ -1,7 +1,4 @@
-/**
- * Robust remote document fetcher with automatic fallbacks for Cloudinary
- * delivery policies, fl_attachment flags, and resource type matching.
- */
+import { cloudinary } from '../config/cloudinary.js';
 
 export function getCloudinaryCandidateUrls(fileUrl) {
   if (!fileUrl || typeof fileUrl !== 'string' || !fileUrl.includes('cloudinary.com')) {
@@ -19,6 +16,7 @@ export function getCloudinaryCandidateUrls(fileUrl) {
 
     if (uploadIndex !== -1 && uploadIndex >= 1) {
       const cloudName = pathParts[0];
+      const detectedRt = pathParts[uploadIndex - 1] || 'image';
       const afterUpload = pathParts.slice(uploadIndex + 1);
 
       let version = '';
@@ -26,7 +24,7 @@ export function getCloudinaryCandidateUrls(fileUrl) {
       for (const part of afterUpload) {
         if (/^v\d+$/.test(part)) {
           version = part;
-        } else if (!part.startsWith('fl_') && !part.startsWith('f_')) {
+        } else if (!part.startsWith('fl_') && !part.startsWith('f_') && !part.startsWith('s--')) {
           remainingParts.push(part);
         }
       }
@@ -36,9 +34,39 @@ export function getCloudinaryCandidateUrls(fileUrl) {
       const pathWithoutExt = hasExt ? resourcePath.substring(0, resourcePath.lastIndexOf('.')) : resourcePath;
       const pathWithPdf = hasExt ? resourcePath : `${resourcePath}.pdf`;
 
-      const resourceTypes = ['raw', 'image'];
+      // 1. Authenticated signed private download URLs via Cloudinary SDK
+      const authCandidates = [
+        { pid: pathWithoutExt, fmt: 'pdf', rt: 'image' },
+        { pid: resourcePath, fmt: '', rt: 'raw' },
+        { pid: pathWithoutExt, fmt: '', rt: 'raw' },
+        { pid: resourcePath, fmt: 'pdf', rt: 'image' },
+        { pid: pathWithPdf, fmt: '', rt: 'raw' },
+      ];
+
+      // Prioritize detected resource type
+      if (detectedRt === 'raw') {
+        authCandidates.sort((a, b) => (a.rt === 'raw' ? -1 : b.rt === 'raw' ? 1 : 0));
+      }
+
+      for (const item of authCandidates) {
+        try {
+          const authUrl = cloudinary.utils.private_download_url(item.pid, item.fmt, {
+            resource_type: item.rt,
+            type: 'upload',
+            expires_at: Math.floor(Date.now() / 1000) + 7200
+          });
+          if (authUrl) {
+            candidates.add(authUrl);
+          }
+        } catch {
+          // Ignore URL generation errors
+        }
+      }
+
+      // 2. Direct public candidate variants
+      const resourceTypes = [detectedRt, detectedRt === 'image' ? 'raw' : 'image'];
       const versionOptions = version ? [version, ''] : [''];
-      const pathOptions = Array.from(new Set([resourcePath, pathWithPdf, pathWithoutExt, `${pathWithPdf}.pdf`]));
+      const pathOptions = Array.from(new Set([resourcePath, pathWithPdf, pathWithoutExt]));
       const flagOptions = ['', 'fl_attachment'];
 
       for (const rt of resourceTypes) {
@@ -59,13 +87,6 @@ export function getCloudinaryCandidateUrls(fileUrl) {
   } catch {
     if (!cleanUrl.includes('fl_attachment')) {
       candidates.add(cleanUrl.replace('/upload/', '/upload/fl_attachment/'));
-    }
-    if (cleanUrl.includes('/image/upload/')) {
-      candidates.add(cleanUrl.replace('/image/upload/', '/raw/upload/'));
-      candidates.add(cleanUrl.replace('/image/upload/', '/raw/upload/fl_attachment/'));
-    } else if (cleanUrl.includes('/raw/upload/')) {
-      candidates.add(cleanUrl.replace('/raw/upload/', '/image/upload/'));
-      candidates.add(cleanUrl.replace('/raw/upload/', '/image/upload/fl_attachment/'));
     }
   }
 

@@ -1,6 +1,6 @@
 import { Platform, Linking } from 'react-native';
 import { openNativeDocument } from '../services/AlarmModule';
-import { downloadPdf, getSafeFilename, getCloudinaryDownloadUrl } from '../services/documentService';
+import { downloadPdf, getSafeFilename, getCloudinaryDownloadUrl, getPreviewUrl } from '../services/documentService';
 import * as WebBrowser from 'expo-web-browser';
 
 export function extractFilenameFromUrl(url) {
@@ -275,7 +275,7 @@ export async function openAttachment(attachment) {
     }
 
     try {
-      const browserUrl = getCloudinaryDownloadUrl(rawUrl);
+      const browserUrl = getPreviewUrl(rawUrl, fileName);
       await WebBrowser.openBrowserAsync(browserUrl, {
         presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
         showTitle: true,
