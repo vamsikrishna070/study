@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
-    "test": "node tests/syllabusExtractor.test.js"
+    "test": "node tests/uploadPreview.test.js && node tests/syllabusExtractor.test.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",

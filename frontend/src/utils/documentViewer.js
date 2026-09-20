@@ -37,7 +37,6 @@ export function getAttachmentKind(attachment) {
   const rawMime = String(attachment.mimeType || attachment.fileData?.mimeType || '').toLowerCase();
   const name = String(attachment.originalName || attachment.name || attachment.filename || attachment.title || '').trim();
 
-  // 1. External Social / Video Provider URLs take highest precedence
   if (url) {
     if (/instagram\.com\/(?:reel|reels)\//i.test(url)) {
       return 'instagram_reel';
@@ -65,12 +64,13 @@ export function getAttachmentKind(attachment) {
   const extFromName = _getExtension(name);
   const ext = extFromName || extFromUrl;
 
-  // 2. Explicit link type, or external web link with no file extension & no Cloudinary storage
+
+  
   if (explicitType === 'link' || (isHttpWebUrl && !isCloudinary && !ext && !attachment.publicId)) {
     return 'link';
   }
 
-  // 3. Audio / Recording
+
   if (
     explicitType === 'recording' ||
     explicitType === 'audio' ||
@@ -80,7 +80,7 @@ export function getAttachmentKind(attachment) {
     return 'audio';
   }
 
-  // 4. Image
+
   if (
     explicitType === 'image' ||
     rawMime.startsWith('image/') ||
@@ -89,7 +89,7 @@ export function getAttachmentKind(attachment) {
     return 'image';
   }
 
-  // 5. Video
+
   if (
     explicitType === 'video' ||
     rawMime.startsWith('video/') ||
@@ -98,7 +98,7 @@ export function getAttachmentKind(attachment) {
     return 'video';
   }
 
-  // 6. Presentation
+
   if (
     rawMime.includes('presentation') ||
     rawMime.includes('powerpoint') ||
@@ -107,7 +107,7 @@ export function getAttachmentKind(attachment) {
     return 'presentation';
   }
 
-  // 7. PDF (ensure it is genuinely a PDF, avoiding legacy false MIME on external links)
+
   if (
     (rawMime === 'application/pdf' || rawMime.includes('/pdf') || ext === '.pdf') &&
     (!isHttpWebUrl || isCloudinary || ext === '.pdf')
@@ -115,7 +115,7 @@ export function getAttachmentKind(attachment) {
     return 'pdf';
   }
 
-  // 8. Document
+
   if (
     rawMime.includes('msword') ||
     rawMime.includes('wordprocessingml') ||
@@ -125,7 +125,7 @@ export function getAttachmentKind(attachment) {
     return 'document';
   }
 
-  // 9. If it's a web URL without recognized file characteristics, default to link
+
   if (isHttpWebUrl && !isCloudinary && !attachment.publicId) {
     return 'link';
   }
@@ -221,12 +221,9 @@ export function getPreviewUrl(url, filename = '') {
   let previewUrl = url.trim();
 
   if (previewUrl.includes('cloudinary.com')) {
-    previewUrl = previewUrl.replace(/\/fl_attachment[^/]*\//, '/');
-    if (previewUrl.includes('/raw/upload/')) {
-      const apiBase = import.meta.env?.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api';
-      const safeFilename = filename || extractFilenameFromUrl(previewUrl) || 'document.pdf';
-      return `${apiBase}/upload/preview?url=${encodeURIComponent(previewUrl)}&filename=${encodeURIComponent(safeFilename)}`;
-    }
+    const apiBase = `${import.meta.env.VITE_API_URL || ''}/api`;
+    const safeFilename = filename || extractFilenameFromUrl(previewUrl) || 'document.pdf';
+    return `${apiBase}/upload/preview?url=${encodeURIComponent(previewUrl)}&filename=${encodeURIComponent(safeFilename)}`;
   }
 
   return previewUrl;

@@ -2,6 +2,7 @@ import express from 'express';
 import { Readable } from 'node:stream';
 import { upload } from '../config/cloudinary.js';
 import { protect } from '../middleware/authMiddleware.js';
+import { fetchRemoteDocument } from '../utils/documentFetchHelper.js';
 
 const router = express.Router();
 
@@ -25,7 +26,7 @@ router.post('/', protect, upload.single('file'), (req, res) => {
 router.get('/preview', async (req, res) => {
   try {
     const fileUrl = req.query.url;
-    const filename = String(req.query.filename || 'document.pdf');
+    const rawFilename = String(req.query.filename || 'document.pdf');
 
     if (!fileUrl || typeof fileUrl !== 'string') {
       return res.status(400).send('Missing file URL');
@@ -42,14 +43,15 @@ router.get('/preview', async (req, res) => {
       return res.status(400).send('Invalid protocol');
     }
 
-    const response = await fetch(fileUrl);
-    if (!response.ok) {
-      return res.status(response.status).send(`Failed to fetch file: ${response.statusText}`);
+    const { response } = await fetchRemoteDocument(fileUrl);
+    if (!response || !response.ok) {
+      return res.status(response?.status || 502).send(`Failed to fetch file: ${response?.statusText || 'Fetch failed'}`);
     }
 
     const rawContentType = response.headers.get('content-type') || '';
-    const isPdf = filename.toLowerCase().endsWith('.pdf') || fileUrl.toLowerCase().includes('.pdf') || rawContentType.includes('pdf');
-    const isImage = rawContentType.startsWith('image/') || /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(filename);
+    const cleanName = rawFilename.replace(/["\r\n]/g, '').trim() || 'document.pdf';
+    const isPdf = cleanName.toLowerCase().endsWith('.pdf') || fileUrl.toLowerCase().includes('.pdf') || rawContentType.includes('pdf');
+    const isImage = rawContentType.startsWith('image/') || /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(cleanName);
 
     let contentType = rawContentType;
     if (isPdf) {
@@ -60,10 +62,12 @@ router.get('/preview', async (req, res) => {
       contentType = isPdf ? 'application/pdf' : 'application/octet-stream';
     }
 
-    const cleanFilename = filename.replace(/["\r\n]/g, '');
+    const safeAsciiFilename = cleanName.replace(/[^\w.-]/g, '_');
+    const encodedFilename = encodeURIComponent(cleanName);
 
     res.setHeader('Content-Type', contentType);
-    res.setHeader('Content-Disposition', `inline; filename="${cleanFilename}"`);
+    res.setHeader('Content-Disposition', `inline; filename="${safeAsciiFilename}"; filename*=UTF-8''${encodedFilename}`);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Cache-Control', 'public, max-age=86400');
 
     if (response.body) {

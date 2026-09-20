@@ -65,6 +65,12 @@ export function getCachedPdfFile(remoteUrl, originalName = 'document.pdf') {
   return new File(cacheDir, cacheFilename);
 }
 
+export function getCloudinaryDownloadUrl(url) {
+  if (!url || typeof url !== 'string' || !url.includes('cloudinary.com')) return url;
+  if (url.includes('/fl_attachment')) return url;
+  return url.replace('/upload/', '/upload/fl_attachment/');
+}
+
 export async function downloadPdf(remoteUrl, originalName = 'document.pdf', onProgress) {
   if (!remoteUrl || typeof remoteUrl !== 'string') {
     throw new Error('Download URL is required.');
@@ -83,8 +89,10 @@ export async function downloadPdf(remoteUrl, originalName = 'document.pdf', onPr
     };
   }
 
+  const effectiveUrl = getCloudinaryDownloadUrl(remoteUrl);
+
   try {
-    const downloadedFile = await File.downloadFileAsync(remoteUrl, targetFile, {
+    const downloadedFile = await File.downloadFileAsync(effectiveUrl, targetFile, {
       idempotent: true,
     });
 
@@ -101,6 +109,25 @@ export async function downloadPdf(remoteUrl, originalName = 'document.pdf', onPr
       fromCache: false,
     };
   } catch (error) {
+    if (effectiveUrl !== remoteUrl) {
+      try {
+        const retryFile = await File.downloadFileAsync(remoteUrl, targetFile, {
+          idempotent: true,
+        });
+        if (retryFile.exists && retryFile.size > 0) {
+          if (typeof onProgress === 'function') onProgress(100);
+          return {
+            uri: retryFile.uri,
+            filename: safeName,
+            size: retryFile.size,
+            fromCache: false,
+          };
+        }
+      } catch (retryErr) {
+        // Fall through to error
+      }
+    }
+
     if (__DEV__) {
       console.warn('[DocumentService] Download error:', error);
     }

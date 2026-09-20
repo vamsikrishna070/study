@@ -6,6 +6,7 @@ import {
   extractSyllabusFromBuffer,
   sanitizeDocumentUrl,
 } from '../services/syllabusExtractorService.js';
+import { fetchRemoteDocument } from '../utils/documentFetchHelper.js';
 
 class HttpError extends Error {
   constructor(statusCode, message) {
@@ -41,7 +42,8 @@ export async function extractSyllabus(req, res) {
 
     let response;
     try {
-      response = await fetch(cleanDownloadUrl);
+      const fetchResult = await fetchRemoteDocument(cleanDownloadUrl);
+      response = fetchResult.response;
     } catch (error) {
       console.error('[SyllabusExtract] Document fetch request failed', {
         subjectId,
@@ -51,10 +53,10 @@ export async function extractSyllabus(req, res) {
       throw new HttpError(502, 'Could not download syllabus document from storage.');
     }
 
-    if (!response.ok) {
+    if (!response || !response.ok) {
       throw new HttpError(
         502,
-        `Could not download syllabus document from storage (${response.status} ${response.statusText}).`
+        `Could not download syllabus document from storage (${response?.status || 502} ${response?.statusText || 'Fetch failed'}).`
       );
     }
 
