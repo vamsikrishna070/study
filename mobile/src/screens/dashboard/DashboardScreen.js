@@ -166,29 +166,41 @@ const DashboardScreen = ({ navigation }) => {
         getTasks(),
         getSubjects(),
         getStudyStats(),
-        getTodayAttendance(),
       ]);
 
-      const [remRes, exRes, taskRes, subRes, statsRes, attRes] = results;
+      const [remRes, exRes, taskRes, subRes, statsRes] = results;
 
       const reminders = remRes.status === 'fulfilled' ? (remRes.value.data || remRes.value || []) : [];
       const exams = exRes.status === 'fulfilled' ? (exRes.value.data || exRes.value || []) : [];
       const tasks = taskRes.status === 'fulfilled' ? (taskRes.value.data || taskRes.value || []) : [];
       const subjects = subRes.status === 'fulfilled' ? (subRes.value.data || subRes.value || []) : [];
       const studyStats = statsRes.status === 'fulfilled' ? (statsRes.value || null) : null;
-      const todayAttendance = attRes.status === 'fulfilled' ? (attRes.value || null) : null;
 
-      const freshData = {
-        reminders,
-        exams,
-        tasks,
-        subjects,
-        studyStats,
-        todayAttendance,
-      };
+      setData((prev) => {
+        const freshData = {
+          ...prev,
+          reminders,
+          exams,
+          tasks,
+          subjects,
+          studyStats,
+        };
+        setCachedDashboard(freshData);
+        return freshData;
+      });
 
-      setData(freshData);
-      setCachedDashboard(freshData);
+      // Lazy-load today attendance non-blockingly
+      getTodayAttendance()
+        .then((att) => {
+          if (att) {
+            setData((prev) => {
+              const updated = { ...prev, todayAttendance: att };
+              setCachedDashboard(updated);
+              return updated;
+            });
+          }
+        })
+        .catch(() => {});
     } catch (e) {
       if (e.response && e.response.status === 401) {
         setError('Session expired. Please log in again.');

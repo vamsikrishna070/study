@@ -200,10 +200,6 @@ export async function getCurrentAttendance(userId) {
   const lastSyncTime = account.lastSuccessfulSync ? new Date(account.lastSuccessfulSync).getTime() : 0;
   const isStale = (Date.now() - lastSyncTime > 15 * 60 * 1000) || cachedStats.length === 0;
 
-  if (isStale && isConnected) {
-    triggerBackgroundSync(targetUserId);
-  }
-
   return {
     isConnected: isConnected,
     isLinked: isLinked,

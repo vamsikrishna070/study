@@ -3,7 +3,6 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as cheerio from 'cheerio';
 import { DateTime } from 'luxon';
-import { createWorker } from 'tesseract.js';
 import mongoose from 'mongoose';
 import SrmPortalAccount from '../../models/SrmPortalAccount.js';
 import User from '../../models/User.js';
@@ -198,24 +197,41 @@ async function fetchSrmSession() {
   return { jsessionId, captchaBuffer };
 }
 
+let ocrWorkerPromise = null;
+
+async function getOcrWorker() {
+  if (!ocrWorkerPromise) {
+    ocrWorkerPromise = (async () => {
+      const worker = await createWorker('eng', 1, {
+        logger: () => {},
+        errorHandler: () => {},
+      });
+      await worker.setParameters({
+        tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
+        tessedit_pageseg_mode: '8',
+      });
+      return worker;
+    })().catch((err) => {
+      ocrWorkerPromise = null;
+      throw err;
+    });
+  }
+  return ocrWorkerPromise;
+}
+
 async function solveCaptchaOcr(imageBuffer) {
   const ocrStart = performance.now();
-  const worker = await createWorker('eng', 1, {
-    logger: () => {},
-    errorHandler: () => {},
-  });
   try {
-    await worker.setParameters({
-      tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
-      tessedit_pageseg_mode: '8',
-    });
+    const worker = await getOcrWorker();
     const { data } = await worker.recognize(imageBuffer);
     const text = safeString(data.text).replace(/\s+/g, '');
     const ocrMs = (performance.now() - ocrStart).toFixed(1);
     console.log(`[SRM TIMING] OCR processed in ${ocrMs}ms (recognized: "${text}")`);
     return text;
-  } finally {
-    await worker.terminate();
+  } catch (err) {
+    console.warn('[PortalService] OCR worker error, resetting worker:', err.message);
+    ocrWorkerPromise = null;
+    throw err;
   }
 }
 
@@ -1045,10 +1061,6 @@ export async function getPortalAccountData(userId) {
   const isConnected = isLinked;
   const isSessionExpired = account.connectionStatus === 'expired';
   const isVerified = isLinked && account.connectionStatus === 'connected';
-
-  if (isStale && isConnected && !isSyncing) {
-    triggerBackgroundSync(targetUserId);
-  }
 
   return {
     isConnected: isConnected,

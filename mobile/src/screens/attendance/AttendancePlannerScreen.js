@@ -27,7 +27,7 @@ import { ScreenHeader } from '../../components/ui/ScreenHeader';
 import { PageHeading } from '../../components/ui/PageHeading';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
-import { getAttendancePlanner, verifyPortalSession, syncPortalData } from '../../api/portal';
+import { getAttendancePlanner, syncPortalData } from '../../api/portal';
 import { calculateSimulation, getRiskColor } from '../../utils/attendancePlannerUtils';
 import { getUserFriendlyError } from '../../utils/errorUtils';
 import { typography, spacing, radii, useAppTheme, useStyles } from '../../theme/theme';
@@ -46,9 +46,6 @@ export default function AttendancePlannerScreen({ navigation, route }) {
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState(null);
 
-  const [portalStatus, setPortalStatus] = useState('checking');
-  const [portalMessage, setPortalMessage] = useState('Checking portal connection...');
-
   // Selected subject for detailed interactive simulation
   const [selectedCode, setSelectedCode] = useState(initialSubjectCode);
 
@@ -65,41 +62,21 @@ export default function AttendancePlannerScreen({ navigation, route }) {
       if (!isRefresh) setLoading(true);
       setError(null);
 
-      const [plannerRes, verifyRes] = await Promise.allSettled([
-        getAttendancePlanner(),
-        verifyPortalSession(),
-      ]);
+      const plannerRes = await getAttendancePlanner();
+      const payload = (plannerRes && plannerRes.data) ? plannerRes.data : (plannerRes || {});
+      setData(payload);
 
-      if (plannerRes.status === 'fulfilled') {
-        const val = plannerRes.value;
-        const payload = (val && val.data) ? val.data : (val || {});
-        setData(payload);
-
-        if (Array.isArray(payload.subjects) && payload.subjects.length > 0) {
-          setSelectedCode((prev) => {
-            if (prev && payload.subjects.some((s) => s.subjectCode === prev)) {
-              return prev;
-            }
-            return payload.subjects[0].subjectCode;
-          });
-        }
-      } else {
-        console.error('[AttendancePlannerScreen] Load error:', plannerRes.reason);
-        setError(getUserFriendlyError(plannerRes.reason, 'portal_sync'));
-      }
-
-      if (verifyRes.status === 'fulfilled') {
-        const v = verifyRes.value;
-        const status = (v && v.status) ? v.status : (v && v.isConnected ? 'verified' : 'disconnected');
-        setPortalStatus(status);
-        setPortalMessage((v && v.message) ? v.message : '');
-      } else {
-        setPortalStatus('failed');
-        setPortalMessage('Unable to connect to portal');
+      if (Array.isArray(payload.subjects) && payload.subjects.length > 0) {
+        setSelectedCode((prev) => {
+          if (prev && payload.subjects.some((s) => s.subjectCode === prev)) {
+            return prev;
+          }
+          return payload.subjects[0].subjectCode;
+        });
       }
     } catch (err) {
-      console.error('[AttendancePlannerScreen] Unexpected error:', err);
-      setError('Unable to load attendance planning data.');
+      console.error('[AttendancePlannerScreen] Load error:', err);
+      setError(getUserFriendlyError(err, 'portal_sync'));
     } finally {
       setLoading(false);
       setRefreshing(false);
