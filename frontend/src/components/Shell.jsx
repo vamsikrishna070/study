@@ -8,8 +8,6 @@ import { isSrmApStudent } from '../utils/srmAp.js';
 const navItems = [
   { href: '/', label: 'Overview', icon: LayoutDashboard },
   { href: '/portal', label: 'SRM Portal', icon: GraduationCap },
-  { href: '/portal/attendance', label: 'Subject Attendance', icon: ClipboardList, parent: '/portal' },
-  { href: '/portal/attendance-planner', label: 'Attendance Planner', icon: Calculator, parent: '/portal' },
   { href: '/subjects', label: 'Subjects', icon: BookOpen },
   { href: '/study-log', label: 'Study Log', icon: History },
   { href: '/syllabus', label: 'Syllabus', icon: FileStack },
@@ -29,9 +27,8 @@ export default function Shell({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user } = useAuth();
 
-  const visibleNavItems = navItems.filter(
-    (item) => (item.href !== '/portal' && !item.parent?.startsWith('/portal')) || isSrmApStudent(user)
-  );
+  const isSrm = isSrmApStudent(user);
+  const visibleNavItems = navItems.filter(item => item.href !== '/portal' || isSrm);
 
   if (!user) return children;
 
