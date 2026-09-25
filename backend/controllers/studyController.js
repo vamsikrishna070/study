@@ -1034,11 +1034,13 @@ export async function getDashboard(req, res) {
   }
 
   // Compile SRM Portal cached data in memory without extra network roundtrips
-  const isPortalConnected = portalAccount?.connectionStatus === "connected";
+  const isPortalConnected = Boolean(portalAccount && portalAccount.connectionStatus !== "disconnected");
+  const isPortalVerified = Boolean(portalAccount && portalAccount.connectionStatus === "connected");
   const todayAttendance = {
     isConnected: isPortalConnected,
-    isVerified: isPortalConnected,
+    isVerified: isPortalVerified,
     connectionStatus: portalAccount?.connectionStatus || "disconnected",
+    isSessionExpired: portalAccount?.connectionStatus === "expired",
     dayOrder: portalAccount?.profileCache?.dayOrder || null,
     attendance: buildTodayClassesFromCache(portalAccount),
   };

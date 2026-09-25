@@ -95,6 +95,7 @@ export async function getActiveSession(account) {
   console.log(`[PortalSession] Session expired or invalid. Attempting background re-login...`);
   const freshSession = await attemptSrmLogin(account.srmUsername, rawPassword);
   account.encryptedSessionId = encryptPortalSecret(freshSession);
+  account.sessionTime = DateTime.now().setZone('Asia/Kolkata').toFormat('yyyy-MM-dd, HH:mm:ss');
   account.connectionStatus = 'connected';
   await account.save();
 
@@ -187,8 +188,10 @@ export async function getCurrentAttendance(userId) {
     };
   }
 
-  const isConnected = account.connectionStatus === 'connected';
+  const isLinked = Boolean(account.srmUsername && account.connectionStatus !== 'disconnected');
+  const isConnected = isLinked;
   const isSessionExpired = account.connectionStatus === 'expired';
+  const isVerified = isLinked && account.connectionStatus === 'connected';
 
   const cachedStats = buildSubjectStats(account.attendanceCache || []);
   const overall = computeOverall(cachedStats);
@@ -203,12 +206,14 @@ export async function getCurrentAttendance(userId) {
 
   return {
     isConnected: isConnected,
-    isVerified: isConnected,
+    isLinked: isLinked,
+    hasStoredCredentials: Boolean(account.encryptedPassword),
+    isVerified: isVerified,
     connectionStatus: account.connectionStatus || 'disconnected',
     isSessionExpired: isSessionExpired,
-    connectionMessage: isConnected
+    connectionMessage: isVerified
       ? 'Connected and verified'
-      : (isSessionExpired ? 'Connection expired. Please reconnect.' : 'Portal connection required'),
+      : (isSessionExpired ? 'Live portal session expired. Showing last synced data.' : (isConnected ? 'Connected and verified' : 'Portal connection required')),
     cached: true,
     dayOrder: account.profileCache?.dayOrder || null,
     date: DateTime.now().setZone('Asia/Kolkata').toFormat('yyyy-MM-dd'),
@@ -229,7 +234,7 @@ export async function submitAttendanceCode(userId, attendanceCode) {
     return { success: false, code: 'INVALID_CODE', message: 'The attendance code is invalid or has expired.' };
   }
 
-  const account = await SrmPortalAccount.findOne({ userId }).select('+encryptedPassword +encryptedSessionId');
+  const account = await findPortalAccountForUser(userId);
 
   if (!account || account.connectionStatus === 'disconnected') {
     return {
@@ -244,12 +249,20 @@ export async function submitAttendanceCode(userId, attendanceCode) {
     sessionId = await getActiveSession(account);
   } catch (sessionErr) {
     console.error(`[submitAttendanceCode] Session error: ${sessionErr.message}`);
-    account.connectionStatus = 'expired';
-    await account.save().catch(() => {});
+    const isCreds = sessionErr.message === 'PORTAL_SESSION_EXPIRED' || sessionErr.code === 'INVALID_CREDENTIALS';
+    if (isCreds) {
+      account.connectionStatus = 'expired';
+      await account.save().catch(() => {});
+      return {
+        success: false,
+        code: 'PORTAL_SESSION_EXPIRED',
+        message: 'Your SRM session could not be refreshed. Please update your portal password.',
+      };
+    }
     return {
       success: false,
-      code: 'PORTAL_SESSION_EXPIRED',
-      message: 'Your portal session expired. Please reconnect.',
+      code: 'PORTAL_UNAVAILABLE',
+      message: 'SRM portal is currently unreachable. Please try again.',
     };
   }
 

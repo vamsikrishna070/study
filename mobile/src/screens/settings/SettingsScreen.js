@@ -72,10 +72,11 @@ const SettingsScreen = ({ navigation }) => {
   React.useEffect(() => {
     getPortalStatus()
       .then((res) => {
-        if (res && res.isConnected) {
+        if (res && (res.isConnected || res.hasStoredPortalData || res.srmUsername || res.data?.isConnected || res.data?.hasStoredPortalData)) {
           setIsSynced(true);
-          if (res.lastSuccessfulSync) {
-            setLastSyncDate(new Date(res.lastSuccessfulSync).toLocaleString());
+          const syncDate = res.lastSuccessfulSync || res.data?.lastSuccessfulSync;
+          if (syncDate) {
+            setLastSyncDate(new Date(syncDate).toLocaleString());
           }
         }
       })

@@ -33,9 +33,10 @@ export function PortalConnectionBadge({
           onAction: null,
         };
       case 'connecting':
+      case 'reconnecting':
         return {
           icon: <ActivityIndicator size="small" color={colors.accent} style={{ marginRight: 6 }} />,
-          defaultText: 'Establishing connection...',
+          defaultText: 'Reconnecting to SRM portal…',
           bg: `${colors.accent}15`,
           border: `${colors.accent}35`,
           text: colors.accent,
@@ -43,6 +44,7 @@ export function PortalConnectionBadge({
           onAction: null,
         };
       case 'verified':
+      case 'connected':
         return {
           icon: <CheckCircle2 size={14} color="#10B981" style={{ marginRight: 6 }} />,
           defaultText: 'Connected and verified',
@@ -53,25 +55,28 @@ export function PortalConnectionBadge({
           onAction: null,
         };
       case 'expired':
+      case 'session_expired':
         return {
           icon: <AlertTriangle size={14} color="#F59E0B" style={{ marginRight: 6 }} />,
-          defaultText: 'Session expired. Please reconnect.',
+          defaultText: 'Live session expired. Tap to reconnect.',
           bg: '#F59E0B15',
           border: '#F59E0B40',
           text: '#D97706',
           actionText: handleReconnect ? 'Reconnect' : null,
           onAction: handleReconnect,
         };
+      case 'temporary_error':
       case 'failed':
         return {
           icon: <AlertCircle size={14} color="#EF4444" style={{ marginRight: 6 }} />,
-          defaultText: 'Unable to connect to portal',
+          defaultText: 'SRM Portal temporarily unreachable',
           bg: '#EF444415',
           border: '#EF444440',
           text: '#EF4444',
           actionText: handleReconnect ? 'Retry' : null,
           onAction: handleReconnect,
         };
+      case 'not_connected':
       case 'disconnected':
       default:
         return {

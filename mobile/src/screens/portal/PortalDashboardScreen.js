@@ -61,33 +61,36 @@ const PortalDashboardScreen = ({ navigation }) => {
   const fetchStatus = async (isManualSync = false) => {
     try {
       if (isManualSync) setSyncing(true);
-      const [res, verifyRes] = await Promise.allSettled([
-        getPortalStatus(),
-        verifyPortalSession(),
-      ]);
+      const res = await getPortalStatus();
+      const payload = (res && res.data) ? res.data : (res || {});
+      setData(payload);
 
-      if (res.status === 'fulfilled') {
-        const val = res.value;
-        const payload = (val && val.data) ? val.data : (val || {});
-        setData(payload);
-        if (payload && (payload.syncing || payload.isSyncing)) {
-          setSyncing(true);
-        } else if (!isManualSync) {
-          setSyncing(false);
-        }
-      }
+      const isConn = Boolean(payload.isConnected || payload.hasStoredPortalData || payload.srmUsername);
+      const isExpired = payload.connectionStatus === 'expired' || payload.isSessionExpired;
 
-      if (verifyRes.status === 'fulfilled') {
-        const v = verifyRes.value;
-        const status = (v && v.status) ? v.status : (v && v.isConnected ? 'verified' : 'disconnected');
-        setPortalStatus(status);
-        setPortalMessage((v && v.message) ? v.message : '');
+      if (payload.syncing || payload.isSyncing) {
+        setSyncing(true);
+        setPortalStatus('connecting');
+        setPortalMessage('Reconnecting to SRM portal…');
+      } else if (isExpired) {
+        if (!isManualSync) setSyncing(false);
+        setPortalStatus('expired');
+        setPortalMessage('Session expired. Reconnecting available.');
+      } else if (isConn) {
+        if (!isManualSync) setSyncing(false);
+        setPortalStatus('verified');
+        setPortalMessage('Connected and verified');
       } else {
-        setPortalStatus('failed');
-        setPortalMessage('Unable to connect to portal');
+        if (!isManualSync) setSyncing(false);
+        setPortalStatus('disconnected');
+        setPortalMessage('Portal connection required');
       }
     } catch (err) {
       console.warn('[PortalDashboardScreen] Background status fetch warning:', err.message);
+      if (!data) {
+        setPortalStatus('failed');
+        setPortalMessage('Unable to connect to portal');
+      }
     } finally {
       if (isManualSync) setSyncing(false);
     }
@@ -150,7 +153,7 @@ const PortalDashboardScreen = ({ navigation }) => {
     try {
       setSyncing(true);
       setPortalStatus('connecting');
-      setPortalMessage('Establishing connection...');
+      setPortalMessage('Reconnecting to SRM portal…');
       const res = await syncPortalData();
       const resData = res && res.data ? res.data : res;
       const attendanceCount = (resData && resData.attendance && resData.attendance.length) || 0;
@@ -164,19 +167,20 @@ const PortalDashboardScreen = ({ navigation }) => {
       Alert.alert('Synced', msg);
       await fetchStatus();
     } catch (err) {
-      const isExpired =
-        (err && err.response && err.response.status === 401) ||
-        (err && err.response && err.response.data && err.response.data.code === 'PORTAL_SESSION_EXPIRED') ||
-        (err && err.message && err.message.includes('expired'));
+      const isExplicitCredError =
+        err?.response?.data?.code === 'INVALID_CREDENTIALS' ||
+        err?.message?.toLowerCase().includes('password') ||
+        err?.message?.toLowerCase().includes('credential');
 
-      if (isExpired) {
+      if (isExplicitCredError) {
         setPortalStatus('expired');
-        setPortalMessage('Session expired. Please reconnect.');
+        setPortalMessage('Invalid credentials. Please update password.');
+        Alert.alert('Authentication Failed', 'Your SRM credentials appear to be incorrect or have changed. Please reconnect.');
       } else {
-        setPortalStatus('failed');
-        setPortalMessage('Unable to connect to portal');
+        setPortalStatus('expired');
+        setPortalMessage('Live portal session expired. Showing last synced data.');
+        Alert.alert('Sync Temporary Issue', getUserFriendlyError(err, 'portal_sync'));
       }
-      Alert.alert('Sync Failed', getUserFriendlyError(err, 'portal_sync'));
     } finally {
       setSyncing(false);
     }
@@ -204,10 +208,10 @@ const PortalDashboardScreen = ({ navigation }) => {
 
   const displayRegNumber = (data && (data.srmUsername || data.registrationNumber)) || (user && (user.srmUsername || user.registrationNumber)) || srmUsername || '';
   const hasStoredPortalData = Boolean(
-    data && data.isConnected &&
-    (data.hasStoredPortalData || data.srmUsername || (data.profile && data.profile.studentName))
+    data &&
+    (data.hasStoredPortalData || data.srmUsername || data.registrationNumber || (data.profile && data.profile.studentName) || data.isConnected)
   );
-  const isSessionExpired = (data && data.connectionStatus === 'expired') || (data && data.isSessionExpired);
+  const isSessionExpired = Boolean((data && data.connectionStatus === 'expired') || (data && data.isSessionExpired) || portalStatus === 'expired');
   const profile = (data && data.profile) || {};
   const studentDisplayName = profile.studentName || (user && (user.officialName || user.displayName || user.name)) || 'Student';
   const cgpa = (data && data.cgpa && data.cgpa.cgpa && data.cgpa.cgpa !== '0.00') ? data.cgpa.cgpa : ((user && user.cgpa) || '9.05');
@@ -294,10 +298,10 @@ const PortalDashboardScreen = ({ navigation }) => {
                   {syncing ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                       <ActivityIndicator size="small" color="#000000" />
-                      <Text style={styles.bannerSyncText}>Syncing...</Text>
+                      <Text style={styles.bannerSyncText}>Reconnecting...</Text>
                     </View>
                   ) : (
-                    <Text style={styles.bannerSyncText}>Sync Now</Text>
+                    <Text style={styles.bannerSyncText}>Reconnect</Text>
                   )}
                 </TouchableOpacity>
               </View>

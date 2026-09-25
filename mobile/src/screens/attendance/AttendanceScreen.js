@@ -90,37 +90,36 @@ export default function AttendanceScreen({ navigation }) {
   const loadData = useCallback(async () => {
     try {
       setError(null);
+      const res = await getTodayAttendance();
+      const payload = (res && res.data) ? res.data : (res || {});
+      setData(payload);
 
-      const [res, verifyRes] = await Promise.allSettled([
-        getTodayAttendance(),
-        verifyPortalSession(),
-      ]);
+      const isConn = Boolean(payload.isConnected || payload.hasStoredPortalData || payload.srmUsername);
+      const isExpired = payload.connectionStatus === 'expired' || payload.isSessionExpired;
 
-      if (res.status === 'fulfilled') {
-        const val = res.value;
-        const payload = (val && val.data) ? val.data : (val || {});
-        setData(payload);
+      if (payload.syncing || payload.isSyncing) {
+        setPortalStatus('connecting');
+        setPortalMessage('Reconnecting to SRM portal…');
+      } else if (isExpired) {
+        setPortalStatus('expired');
+        setPortalMessage('Live session expired. Auto-reconnecting on action.');
+      } else if (isConn) {
+        setPortalStatus('verified');
+        setPortalMessage('Connected and verified');
       } else {
-        console.error('[AttendanceScreen] Error loading attendance:', res.reason);
-        setError(getUserFriendlyError(res.reason, 'portal_connect'));
-      }
-
-      if (verifyRes.status === 'fulfilled') {
-        const v = verifyRes.value;
-        const status = (v && v.status) ? v.status : (v && v.isConnected ? 'verified' : 'disconnected');
-        setPortalStatus(status);
-        setPortalMessage((v && v.message) ? v.message : '');
-      } else {
-        setPortalStatus('failed');
-        setPortalMessage('Unable to connect to portal');
+        setPortalStatus('disconnected');
+        setPortalMessage('Portal connection required');
       }
     } catch (err) {
-      console.error('[AttendanceScreen] Unexpected load error:', err);
+      console.error('[AttendanceScreen] Error loading attendance:', err);
+      if (!data) {
+        setError(getUserFriendlyError(err, 'portal_connect'));
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [data]);
 
   useEffect(() => {
     loadData();
@@ -152,12 +151,12 @@ export default function AttendanceScreen({ navigation }) {
       setSrmPassword('');
       setFeedback({
         type: 'success',
-        text: 'Session initiated successfully!',
+        text: 'Session connected successfully!',
       });
       await loadData();
     } catch (err) {
       Alert.alert(
-        'Session Initiation Failed',
+        'Session Connection Failed',
         getUserFriendlyError(err, 'portal_connect')
       );
     } finally {
@@ -171,7 +170,8 @@ export default function AttendanceScreen({ navigation }) {
     try {
       const { syncPortalData } = require('../../api/portal');
       await syncPortalData();
-      await checkConnection(true);
+      setPortalStatus('verified');
+      setPortalMessage('Connected and verified');
     } catch (_) {
     } finally {
       await loadData();
@@ -195,10 +195,10 @@ export default function AttendanceScreen({ navigation }) {
     const trimmed = code.trim().toUpperCase();
     if (!trimmed || submitting) return;
 
-    if (portalStatus !== 'verified') {
+    if (portalStatus === 'disconnected') {
       setFeedback({
         type: 'error',
-        text: 'Portal session not active. Please initiate a new session.',
+        text: 'Portal connection required. Please connect your SRM AP account first.',
       });
       return;
     }
@@ -216,6 +216,8 @@ export default function AttendanceScreen({ navigation }) {
     try {
       const res = await markAttendanceCode(trimmed);
       if (res.success) {
+        setPortalStatus('verified');
+        setPortalMessage('Connected and verified');
         setFeedback({
           type: 'success',
           text: res.message || '✓ Attendance Captured Successfully!',
@@ -225,7 +227,7 @@ export default function AttendanceScreen({ navigation }) {
       } else {
         if (res.code === 'PORTAL_SESSION_EXPIRED') {
           setPortalStatus('expired');
-          setPortalMessage('Session expired. Please reconnect.');
+          setPortalMessage('Invalid credentials. Please reconnect.');
         }
         setFeedback({
           type: 'error',
@@ -237,16 +239,16 @@ export default function AttendanceScreen({ navigation }) {
       const isExpired =
         (err && err.response && err.response.status === 401) ||
         (err && err.response && err.response.data && err.response.data.code === 'PORTAL_SESSION_EXPIRED') ||
-        (serverMsg && serverMsg.includes('expired'));
+        (serverMsg && serverMsg.includes('credentials'));
 
       if (isExpired) {
         setPortalStatus('expired');
-        setPortalMessage('Session expired. Please reconnect.');
+        setPortalMessage('Invalid credentials. Please reconnect.');
       }
 
       setFeedback({
         type: 'error',
-        text: isExpired ? 'Portal session expired. Please initiate a new session.' : (serverMsg || getUserFriendlyError(err, 'portal_sync')),
+        text: isExpired ? 'Your SRM credentials appear to be incorrect or have changed. Please reconnect.' : (serverMsg || getUserFriendlyError(err, 'portal_sync')),
       });
     } finally {
       setSubmitting(false);
@@ -496,40 +498,32 @@ export default function AttendanceScreen({ navigation }) {
         ) : (
           <View style={{ flex: 1 }}>
 
-            {/* Session Inactive State: Show Initiate Session Card, Hide Code Form */}
-            {portalStatus !== 'verified' ? (
+            {/* Disconnected State: Show Connect Card. Connected/Expired/Reconnecting: Show Code Form with auto-reconnect */}
+            {portalStatus === 'disconnected' ? (
               <Card style={styles.compactCard}>
                 <View style={styles.inactiveCardContent}>
                   <View style={styles.inactiveIconWrap}>
-                    {portalStatus === 'checking' ? (
-                      <ActivityIndicator size="small" color={colors.accent} />
-                    ) : (
-                      <Radio size={20} color={colors.accent} />
-                    )}
+                    <Radio size={20} color={colors.accent} />
                   </View>
                   <View style={{ flex: 1, marginLeft: 12 }}>
                     <Text style={styles.inactiveTitle}>
-                      {portalStatus === 'checking' ? 'Checking session...' : 'Portal session not active'}
+                      Portal connection required
                     </Text>
                     <Text style={styles.inactiveDesc}>
-                      {portalStatus === 'checking'
-                        ? 'Verifying your SRM portal session status.'
-                        : 'Please initiate a new session to submit attendance codes.'}
+                      Connect your SRM AP student account to submit attendance codes and view conduct hours.
                     </Text>
                   </View>
                 </View>
 
-                {portalStatus !== 'checking' && (
-                  <View style={{ marginTop: 12 }}>
-                    <Button
-                      onPress={handleOpenInitiate}
-                      style={styles.initiateBtn}
-                      accessibilityLabel="Initiate Portal Session"
-                    >
-                      Initiate Session
-                    </Button>
-                  </View>
-                )}
+                <View style={{ marginTop: 12 }}>
+                  <Button
+                    onPress={handleOpenInitiate}
+                    style={styles.initiateBtn}
+                    accessibilityLabel="Connect SRM Portal"
+                  >
+                    Connect SRM Portal
+                  </Button>
+                </View>
 
                 {feedback && (
                   <View
@@ -555,7 +549,7 @@ export default function AttendanceScreen({ navigation }) {
                 )}
               </Card>
             ) : (
-              /* Active Portal Session: Show Mark Attendance Code Form */
+              /* Connected / Auto-reauthenticating: Show Mark Attendance Code Form */
               <Card style={styles.compactCard}>
                 <View style={styles.cardHeader}>
                   <View style={styles.cardHeaderLeft}>
@@ -568,6 +562,14 @@ export default function AttendanceScreen({ navigation }) {
                     </View>
                   )}
                 </View>
+
+                {portalStatus === 'expired' && (
+                  <View style={styles.sessionExpiredBanner}>
+                    <Text style={styles.sessionExpiredText}>
+                      Live session will automatically re-authenticate on submission.
+                    </Text>
+                  </View>
+                )}
 
                 <View style={styles.codeForm}>
                   <TextInput

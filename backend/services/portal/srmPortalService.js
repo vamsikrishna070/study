@@ -948,7 +948,7 @@ export async function triggerBackgroundSync(userId) {
   if (!userId) return null;
   const user = await User.findById(userId);
   const account = await findPortalAccountForUser(user || userId);
-  if (!account || account.connectionStatus !== 'connected') return null;
+  if (!account || account.connectionStatus === 'disconnected') return null;
 
   const accountKey = String(account._id);
   const usernameKey = account.srmUsername;
@@ -986,8 +986,32 @@ export async function getPortalAccountData(userId) {
 
   const account = await findPortalAccountForUser(user || targetUserId);
 
-  if (!account) {
-    return { isConnected: false, hasStoredPortalData: false };
+  if (!account || account.connectionStatus === 'disconnected') {
+    return {
+      isConnected: false,
+      isLinked: false,
+      hasStoredPortalData: false,
+      hasStoredCredentials: false,
+      connectionStatus: 'disconnected',
+      isSessionExpired: false,
+      isVerified: false,
+      verificationMessage: 'Portal connection required',
+      isSyncing: false,
+      srmUsername: null,
+      registrationNumber: null,
+      lastSuccessfulSync: null,
+      source: 'srm_portal',
+      profile: {},
+      cgpa: { cgpa: '0' },
+      attendance: [],
+      subjectStats: [],
+      overallAttendance: { conducted: 0, present: 0, absent: 0, odMl: 0, percentage: 0, status: 'NOT_CONNECTED' },
+      timetable: [],
+      subjects: [],
+      enrolledSubjectsCount: 0,
+      exams: [],
+      results: [],
+    };
   }
 
   let userSubjectsCount = 0;
@@ -1017,22 +1041,26 @@ export async function getPortalAccountData(userId) {
   const lastSyncTime = account.lastSuccessfulSync ? new Date(account.lastSuccessfulSync).getTime() : 0;
   const isStale = (Date.now() - lastSyncTime > 15 * 60 * 1000) || cachedSubjectsCount === 0 || attendanceCount === 0;
 
-  if (isStale && account.connectionStatus === 'connected' && !isSyncing) {
+  const isLinked = Boolean(account.srmUsername && account.connectionStatus !== 'disconnected');
+  const isConnected = isLinked;
+  const isSessionExpired = account.connectionStatus === 'expired';
+  const isVerified = isLinked && account.connectionStatus === 'connected';
+
+  if (isStale && isConnected && !isSyncing) {
     triggerBackgroundSync(targetUserId);
   }
 
-  const isConnected = account.connectionStatus === 'connected';
-  const isSessionExpired = account.connectionStatus === 'expired';
-
   return {
     isConnected: isConnected,
+    isLinked: isLinked,
     hasStoredPortalData: hasStoredData,
+    hasStoredCredentials: Boolean(account.encryptedPassword),
     connectionStatus: account.connectionStatus || 'disconnected',
     isSessionExpired: isSessionExpired,
-    isVerified: isConnected && !isSessionExpired,
-    verificationMessage: isConnected
+    isVerified: isVerified,
+    verificationMessage: isVerified
       ? 'Connected and verified'
-      : (isSessionExpired ? 'Connection expired. Please reconnect.' : 'Portal connection required'),
+      : (isSessionExpired ? 'Live portal session expired. Showing last synced data.' : (isConnected ? 'Connected and verified' : 'Portal connection required')),
     isSyncing: Boolean(isSyncing),
     srmUsername: account.srmUsername,
     registrationNumber: account.srmUsername,
@@ -1083,7 +1111,6 @@ export async function verifyPortalConnection(userId, { autoRelogin = true } = {}
     };
   }
 
-
   const existingSession = decryptPortalSecret(account.encryptedSessionId);
   if (existingSession) {
     const probeStart = performance.now();
@@ -1129,9 +1156,9 @@ export async function verifyPortalConnection(userId, { autoRelogin = true } = {}
       const probeMs = (performance.now() - probeStart).toFixed(1);
       console.warn(`[VERIFY TIMING] Session probe network error (${probeMs}ms):`, networkErr.message);
       return {
-        status: 'failed',
-        message: 'Unable to connect to portal',
-        isConnected: false,
+        status: 'temporary_error',
+        message: 'Unable to reach SRM portal. Showing cached data.',
+        isConnected: true,
         isVerified: false,
         isSessionExpired: false,
         registrationNumber: account.srmUsername,
@@ -1140,7 +1167,6 @@ export async function verifyPortalConnection(userId, { autoRelogin = true } = {}
       };
     }
   }
-
 
   const rawPassword = decryptPortalSecret(account.encryptedPassword);
   if (!rawPassword || !autoRelogin) {
@@ -1153,7 +1179,7 @@ export async function verifyPortalConnection(userId, { autoRelogin = true } = {}
     return {
       status: 'expired',
       message: 'Connection expired. Please reconnect.',
-      isConnected: false,
+      isConnected: true,
       isVerified: false,
       isSessionExpired: true,
       registrationNumber: account.srmUsername,
@@ -1166,6 +1192,7 @@ export async function verifyPortalConnection(userId, { autoRelogin = true } = {}
     console.log(`[verifyPortalConnection] Attempting re-authentication for ${account.srmUsername}...`);
     const freshSession = await attemptSrmLogin(account.srmUsername, rawPassword);
     account.encryptedSessionId = encryptPortalSecret(freshSession);
+    account.sessionTime = DateTime.now().setZone('Asia/Kolkata').toFormat('yyyy-MM-dd, HH:mm:ss');
     account.connectionStatus = 'connected';
     await account.save();
 
@@ -1193,8 +1220,8 @@ export async function verifyPortalConnection(userId, { autoRelogin = true } = {}
       await account.save();
       return {
         status: 'expired',
-        message: 'Connection expired. Please reconnect.',
-        isConnected: false,
+        message: 'Registration number or portal password is incorrect.',
+        isConnected: true,
         isVerified: false,
         isSessionExpired: true,
         registrationNumber: account.srmUsername,
@@ -1205,9 +1232,9 @@ export async function verifyPortalConnection(userId, { autoRelogin = true } = {}
 
     if (isUnreachable) {
       return {
-        status: 'failed',
-        message: 'Unable to connect to portal',
-        isConnected: false,
+        status: 'temporary_error',
+        message: 'SRM AP portal is temporarily unreachable. Showing cached data.',
+        isConnected: true,
         isVerified: false,
         isSessionExpired: false,
         registrationNumber: account.srmUsername,
@@ -1216,14 +1243,12 @@ export async function verifyPortalConnection(userId, { autoRelogin = true } = {}
       };
     }
 
-    account.connectionStatus = 'expired';
-    await account.save();
     return {
-      status: 'expired',
-      message: 'Connection expired. Please reconnect.',
-      isConnected: false,
+      status: 'temporary_error',
+      message: 'SRM portal verification could not be completed. Showing cached data.',
+      isConnected: true,
       isVerified: false,
-      isSessionExpired: true,
+      isSessionExpired: false,
       registrationNumber: account.srmUsername,
       lastVerifiedAt: new Date().toISOString(),
       lastSuccessfulSync: account.lastSuccessfulSync || null,
@@ -1236,7 +1261,7 @@ export async function reSyncPortalData(userId) {
   const user = await User.findById(userId);
   const account = await findPortalAccountForUser(user || userId);
 
-  if (!account) {
+  if (!account || account.connectionStatus === 'disconnected') {
     console.warn(`[PORTAL SYNC] Sync failed: Account not connected`);
     const err = new Error('SRM Portal account is not connected.');
     err.code = 'NOT_CONNECTED';
@@ -1260,8 +1285,6 @@ export async function reSyncPortalData(userId) {
       await account.save().catch(() => {});
       throw err;
     }
-    account.connectionStatus = 'expired';
-    await account.save().catch(() => {});
     const data = await getPortalAccountData(userId);
     data.syncWarning = 'Live SRM session could not be refreshed. Showing your last synced data.';
     return data;
