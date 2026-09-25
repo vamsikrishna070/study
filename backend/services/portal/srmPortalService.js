@@ -161,35 +161,60 @@ export async function findPortalAccountForUser(userOrId) {
 
 async function fetchSrmSession() {
   const fetchStart = performance.now();
-  const loginPageRes = await fetch(`${BASE_URL}/StudentLoginPage`, {
-    method: 'GET',
-    headers: DEFAULT_HEADERS,
-    signal: AbortSignal.timeout(6000),
-  });
+  let loginPageRes;
+  try {
+    loginPageRes = await fetch(`${BASE_URL}/StudentLoginPage`, {
+      method: 'GET',
+      headers: DEFAULT_HEADERS,
+      signal: AbortSignal.timeout(8000),
+    });
+  } catch (err) {
+    console.warn(`[SRM DIAGNOSTIC] StudentLoginPage fetch failed (${err.name || 'NetworkError'}):`, err.message);
+    const networkError = new Error('SRM Student Portal is currently unreachable. Please try again later.');
+    networkError.code = 'PORTAL_UNAVAILABLE';
+    throw networkError;
+  }
 
   if (!loginPageRes.ok) {
-    throw new Error('SRM Student Portal is currently unreachable. Please try again later.');
+    console.warn(`[SRM DIAGNOSTIC] StudentLoginPage returned HTTP ${loginPageRes.status} ${loginPageRes.statusText}`);
+    const networkError = new Error('SRM Student Portal is currently unreachable. Please try again later.');
+    networkError.code = 'PORTAL_UNAVAILABLE';
+    throw networkError;
   }
 
   const setCookie = loginPageRes.headers.get('set-cookie') || '';
   const jsessionIdMatch = setCookie.match(/JSESSIONID=([^;]+)/);
   if (!jsessionIdMatch) {
-    throw new Error('Could not establish session with SRM Portal.');
+    console.warn('[SRM DIAGNOSTIC] StudentLoginPage response missing JSESSIONID cookie');
+    const sessErr = new Error('Could not establish session with SRM Portal.');
+    sessErr.code = 'PORTAL_UNAVAILABLE';
+    throw sessErr;
   }
   const jsessionId = jsessionIdMatch[1];
 
-  const captchaRes = await fetch(`${BASE_URL}/captchas`, {
-    method: 'GET',
-    headers: {
-      ...DEFAULT_HEADERS,
-      'Cookie': `JSESSIONID=${jsessionId}`,
-      'Referer': `${BASE_URL}/StudentLoginPage`,
-    },
-    signal: AbortSignal.timeout(6000),
-  });
+  let captchaRes;
+  try {
+    captchaRes = await fetch(`${BASE_URL}/captchas`, {
+      method: 'GET',
+      headers: {
+        ...DEFAULT_HEADERS,
+        'Cookie': `JSESSIONID=${jsessionId}`,
+        'Referer': `${BASE_URL}/StudentLoginPage`,
+      },
+      signal: AbortSignal.timeout(8000),
+    });
+  } catch (err) {
+    console.warn(`[SRM DIAGNOSTIC] /captchas fetch failed (${err.name || 'NetworkError'}):`, err.message);
+    const captchaErr = new Error('Failed to fetch CAPTCHA from SRM portal.');
+    captchaErr.code = 'PORTAL_UNAVAILABLE';
+    throw captchaErr;
+  }
 
   if (!captchaRes.ok) {
-    throw new Error('Failed to fetch CAPTCHA from SRM portal.');
+    console.warn(`[SRM DIAGNOSTIC] /captchas returned HTTP ${captchaRes.status} ${captchaRes.statusText}`);
+    const captchaErr = new Error('Failed to fetch CAPTCHA from SRM portal.');
+    captchaErr.code = 'PORTAL_UNAVAILABLE';
+    throw captchaErr;
   }
 
   const arrayBuffer = await captchaRes.arrayBuffer();
@@ -228,7 +253,7 @@ async function solveCaptchaOcr(imageBuffer) {
     const { data } = await worker.recognize(imageBuffer);
     const text = safeString(data.text).replace(/\s+/g, '');
     const ocrMs = (performance.now() - ocrStart).toFixed(1);
-    console.log(`[SRM TIMING] OCR processed in ${ocrMs}ms (recognized: "${text}")`);
+    console.log(`[SRM TIMING] OCR processed in ${ocrMs}ms (length: ${text.length} chars)`);
     return text;
   } catch (err) {
     console.warn('[PortalService] OCR worker error, resetting worker:', err.message);
@@ -250,7 +275,12 @@ export async function attemptSrmLogin(username, password) {
     try {
       ({ jsessionId, captchaBuffer } = await fetchSrmSession());
     } catch (err) {
-      console.warn(`[PortalService] Attempt ${attempt}: Unable to fetch SRM session/captcha:`, err.message);
+      console.warn(`[SRM DIAGNOSTIC] Attempt ${attempt}: Unable to fetch SRM session/captcha:`, err.message);
+      if (attempt < MAX_RETRIES) {
+        lastErrorReason = 'PORTAL_UNREACHABLE';
+        await new Promise(r => setTimeout(r, 600));
+        continue;
+      }
       const networkError = new Error('SRM Student Portal is currently unreachable. Please try again later.');
       networkError.code = 'PORTAL_UNAVAILABLE';
       throw networkError;
@@ -260,12 +290,14 @@ export async function attemptSrmLogin(username, password) {
     try {
       captchaText = await solveCaptchaOcr(captchaBuffer);
     } catch (ocrErr) {
-      console.warn(`[PortalService] Attempt ${attempt}: OCR recognition error. Retrying...`);
+      console.warn(`[SRM DIAGNOSTIC] Attempt ${attempt}: OCR recognition error. Retrying...`);
+      lastErrorReason = 'CAPTCHA_MISMATCH';
       continue;
     }
 
     if (!captchaText || captchaText.length < 3) {
-      console.warn(`[PortalService] Attempt ${attempt}: OCR returned short text (${captchaText}). Retrying...`);
+      console.warn(`[SRM DIAGNOSTIC] Attempt ${attempt}: OCR returned short text (length ${captchaText.length}). Retrying...`);
+      lastErrorReason = 'CAPTCHA_MISMATCH';
       continue;
     }
 
@@ -289,10 +321,15 @@ export async function attemptSrmLogin(username, password) {
           'Referer': `${BASE_URL}/StudentLoginPage`,
         },
         body: payload.toString(),
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(10000),
       });
     } catch (networkErr) {
-      console.warn(`[PortalService] Attempt ${attempt}: Network failure during login POST:`, networkErr.message);
+      console.warn(`[SRM DIAGNOSTIC] Attempt ${attempt}: Network failure during login POST (${networkErr.name || 'NetworkError'}):`, networkErr.message);
+      if (attempt < MAX_RETRIES) {
+        lastErrorReason = 'PORTAL_UNREACHABLE';
+        await new Promise(r => setTimeout(r, 600));
+        continue;
+      }
       const netErr = new Error('Unable to reach the SRM AP portal. Please check your internet connection.');
       netErr.code = 'PORTAL_UNAVAILABLE';
       throw netErr;
@@ -335,7 +372,7 @@ export async function attemptSrmLogin(username, password) {
       lowerHtml.includes('enter valid verification');
 
     if (isExplicitCredentialError) {
-      console.warn(`[PortalService] Attempt ${attempt}: Credentials explicitly rejected by SRM AP portal.`);
+      console.warn(`[SRM DIAGNOSTIC] Attempt ${attempt}: Credentials explicitly rejected by SRM AP portal.`);
       const credErr = new Error('Registration number or portal password is incorrect.');
       credErr.code = 'INVALID_CREDENTIALS';
       throw credErr;
@@ -343,12 +380,12 @@ export async function attemptSrmLogin(username, password) {
 
     const attemptMs = (performance.now() - attemptStart).toFixed(1);
     if (isCaptchaError || isLoginPage) {
-      console.warn(`[PortalService] Attempt ${attempt} failed in ${attemptMs}ms: CAPTCHA misread or login page reloaded. Retrying...`);
+      console.warn(`[SRM DIAGNOSTIC] Attempt ${attempt} failed in ${attemptMs}ms: CAPTCHA mismatch or login page reloaded. Retrying...`);
       lastErrorReason = 'CAPTCHA_MISMATCH';
       continue;
     }
 
-    console.warn(`[PortalService] Attempt ${attempt} failed in ${attemptMs}ms: Login response unrecognized. Retrying...`);
+    console.warn(`[SRM DIAGNOSTIC] Attempt ${attempt} failed in ${attemptMs}ms: Login response unrecognized (status: ${loginRes.status}). Retrying...`);
     lastErrorReason = 'UNRECOGNIZED_RESPONSE';
   }
 
