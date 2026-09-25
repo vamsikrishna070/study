@@ -167,6 +167,20 @@ export async function confirmSyllabus(req, res) {
         .json({ success: false, message: 'Units array is required' });
     }
 
+    const existingTopics = await Topic.find({ subject: subject._id, user: req.user._id });
+    const topicStatusMap = new Map();
+    for (const t of existingTopics) {
+      const norm = (t.title || '').toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
+      if (norm) {
+        topicStatusMap.set(norm, {
+          status: t.status || 'not-started',
+          completed: Boolean(t.completed || t.status === 'completed'),
+          progress: t.progress || 0,
+          importance: t.importance || 'medium',
+        });
+      }
+    }
+
     await Unit.deleteMany({ subject: subject._id, user: req.user._id });
     await Topic.deleteMany({ subject: subject._id, user: req.user._id });
 
@@ -186,13 +200,18 @@ export async function confirmSyllabus(req, res) {
         for (const t of u.topics) {
           topicOrder++;
           const topicTitle = t.name || t.title || `Topic ${topicOrder}`;
+          const norm = topicTitle.toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
+          const prev = topicStatusMap.get(norm);
+
           await Topic.create({
             user: req.user._id,
             subject: subject._id,
             unit: unitDoc._id,
             title: topicTitle,
-            status: 'not-started',
-            importance: 'medium',
+            status: prev ? prev.status : 'not-started',
+            completed: prev ? prev.completed : false,
+            progress: prev ? prev.progress : 0,
+            importance: prev ? prev.importance : 'medium',
             order: topicOrder,
           });
         }

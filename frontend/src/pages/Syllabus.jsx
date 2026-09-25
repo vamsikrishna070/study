@@ -11,7 +11,8 @@ import {
   Circle,
   Loader2,
   BookOpen,
-  Upload
+  Upload,
+  RefreshCw
 } from 'lucide-react';
 import { formatSemester } from '../utils/semester.js';
 import apiClient from '../services/apiClient.js';
@@ -43,6 +44,7 @@ export default function Syllabus() {
   const [extracting, setExtracting] = useState(false);
   const [extractionStep, setExtractionStep] = useState('');
   const [reviewVisible, setReviewVisible] = useState(false);
+  const [confirmReExtractOpen, setConfirmReExtractOpen] = useState(false);
   const [parsedUnits, setParsedUnits] = useState([]);
   const [extractionError, setExtractionError] = useState(null);
 
@@ -257,17 +259,25 @@ export default function Syllabus() {
         action={
           effectiveSubjectId && (
             <Button
-              onClick={() => fileInputRef.current?.click()}
+              onClick={units.length > 0 ? () => setConfirmReExtractOpen(true) : () => fileInputRef.current?.click()}
               disabled={uploadingPdf || extracting}
               className="gap-2 shadow-sm"
             >
               {uploadingPdf || extracting ? (
                 <Loader2 size={16} className="animate-spin" />
+              ) : units.length > 0 ? (
+                <RefreshCw size={16} />
               ) : (
                 <Sparkles size={16} />
               )}
               <span>
-                {uploadingPdf ? 'Uploading…' : extracting ? 'Extracting…' : 'Upload PDF'}
+                {uploadingPdf
+                  ? 'Uploading…'
+                  : extracting
+                  ? 'Extracting…'
+                  : units.length > 0
+                  ? 'Re-extract Syllabus'
+                  : 'Upload PDF'}
               </span>
             </Button>
           )
@@ -355,6 +365,7 @@ export default function Syllabus() {
               onReplace={() => fileInputRef.current?.click()}
               onRemove={handleRemoveSyllabus}
               onExtract={units.length === 0 ? handleExtractExisting : null}
+              onReExtract={units.length > 0 ? () => setConfirmReExtractOpen(true) : null}
               accentColor={subjectColor}
             />
           ) : (
@@ -548,6 +559,67 @@ export default function Syllabus() {
             queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
           }}
         />
+      )}
+
+      {confirmReExtractOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-md rounded-2xl border border-card-border bg-card p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div
+                className="flex h-10 w-10 items-center justify-center rounded-xl shrink-0"
+                style={{ backgroundColor: `${subjectColor}1A`, color: subjectColor }}
+              >
+                <RefreshCw size={20} />
+              </div>
+              <div>
+                <h3 className="font-display text-lg font-bold text-foreground">Re-extract Syllabus?</h3>
+                <p className="text-xs text-muted-foreground">{currentSubject?.name || 'Current Subject'}</p>
+              </div>
+            </div>
+
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              This will extract the syllabus again from the selected PDF. Your subject, notes, resources, tasks, and progress will remain unchanged.
+            </p>
+
+            <div className="flex flex-col gap-2.5 pt-2">
+              {currentSubject?.syllabusFile?.url && (
+                <Button
+                  variant="default"
+                  onClick={() => {
+                    setConfirmReExtractOpen(false);
+                    handleExtractExisting();
+                  }}
+                  disabled={extracting}
+                  className="w-full gap-2 justify-center shadow-sm"
+                >
+                  <Sparkles size={16} />
+                  <span>Re-extract from current PDF</span>
+                </Button>
+              )}
+
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setConfirmReExtractOpen(false);
+                  fileInputRef.current?.click();
+                }}
+                disabled={uploadingPdf || extracting}
+                className="w-full gap-2 justify-center"
+              >
+                <Upload size={16} />
+                <span>Choose a different PDF</span>
+              </Button>
+
+              <Button
+                variant="ghost"
+                onClick={() => setConfirmReExtractOpen(false)}
+                className="w-full justify-center text-muted-foreground"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </Shell>
   );

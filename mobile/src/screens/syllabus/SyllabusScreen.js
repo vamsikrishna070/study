@@ -20,6 +20,7 @@ import {
   Layers,
   CloudUpload,
   Edit3,
+  RefreshCw,
 } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import {
@@ -227,6 +228,26 @@ const SyllabusScreen = ({ route, navigation }) => {
     }
   };
 
+  const handleReExtractSyllabus = () => {
+    if (!subjectId) return;
+
+    showDialog({
+      type: 'confirm',
+      title: 'Re-extract Syllabus?',
+      message:
+        'This will extract the syllabus again from the selected PDF. Your subject, notes, resources, tasks, and progress will remain unchanged.',
+      confirmText: currentSubject?.syllabusFile?.url ? 'Re-extract PDF' : 'Choose PDF',
+      cancelText: 'Cancel',
+      onConfirm: () => {
+        if (currentSubject?.syllabusFile?.url) {
+          handleExtractExisting();
+        } else {
+          handleUploadAndExtract();
+        }
+      },
+    });
+  };
+
   const handleRemoveSyllabus = async () => {
     if (!subjectId) return;
     try {
@@ -379,6 +400,7 @@ const SyllabusScreen = ({ route, navigation }) => {
                 onReplace={handleUploadAndExtract}
                 onRemove={handleRemoveSyllabus}
                 onExtract={units.length === 0 ? handleExtractExisting : null}
+                onReExtract={units.length > 0 ? handleReExtractSyllabus : null}
                 onEditSyllabus={() => setEditorVisible(true)}
                 accentColor={subjectColor}
               />

@@ -454,6 +454,11 @@ export default function SubjectDetail() {
                   topicCount={totalTopics}
                   isExtracting={extracting}
                   onExtract={units.length === 0 ? extractSyllabusFromPDF : null}
+                  onReExtract={units.length > 0 ? () => {
+                    if (window.confirm("This will extract the syllabus again from the selected PDF. Your subject, notes, resources, tasks, and progress will remain unchanged. Continue?")) {
+                      extractSyllabusFromPDF();
+                    }
+                  } : null}
                   accentColor={subject.color || 'var(--accent, #d97706)'}
                 />
               )}

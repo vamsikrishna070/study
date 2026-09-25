@@ -35,6 +35,7 @@ export const DocumentPreviewCard = ({
   onReplace,
   onRemove,
   onExtract,
+  onReExtract,
   onEditSyllabus,
   accentColor,
   style,
@@ -189,6 +190,24 @@ export const DocumentPreviewCard = ({
           )}
           <Text style={styles.primaryActionText}>{viewing ? 'Opening...' : 'View PDF'}</Text>
         </TouchableOpacity>
+
+        {unitCount > 0 && onReExtract && (
+          <TouchableOpacity
+            style={[styles.secondaryActionBtn, { borderColor: themeAccent }]}
+            onPress={onReExtract}
+            disabled={isExtracting}
+            activeOpacity={0.8}
+          >
+            {isExtracting ? (
+              <ActivityIndicator size="small" color={themeAccent} style={{ marginRight: 6 }} />
+            ) : (
+              <RefreshCw size={16} color={themeAccent} style={{ marginRight: 6 }} />
+            )}
+            <Text style={[styles.secondaryActionText, { color: themeAccent }]}>
+              {isExtracting ? 'Extracting...' : 'Re-extract Syllabus'}
+            </Text>
+          </TouchableOpacity>
+        )}
 
         {unitCount > 0 && onEditSyllabus && (
           <TouchableOpacity

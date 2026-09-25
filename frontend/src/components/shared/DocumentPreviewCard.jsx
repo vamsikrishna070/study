@@ -33,6 +33,7 @@ export function DocumentPreviewCard({
   onReplace,
   onRemove,
   onExtract,
+  onReExtract,
   accentColor = 'var(--accent, #d97706)',
   className = '',
 }) {
@@ -204,6 +205,19 @@ export function DocumentPreviewCard({
           >
             {isExtracting ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
             <span>{isExtracting ? 'Extracting…' : 'Extract Topics'}</span>
+          </button>
+        )}
+
+        {unitCount > 0 && onReExtract && (
+          <button
+            type="button"
+            onClick={onReExtract}
+            disabled={isExtracting}
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl border-2 px-4 py-2.5 text-sm font-bold transition-colors hover:bg-secondary disabled:opacity-60"
+            style={{ borderColor: accentColor, color: accentColor }}
+          >
+            {isExtracting ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+            <span>{isExtracting ? 'Extracting…' : 'Re-extract Syllabus'}</span>
           </button>
         )}
       </div>

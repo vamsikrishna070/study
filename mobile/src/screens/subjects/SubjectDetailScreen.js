@@ -241,6 +241,26 @@ const SubjectDetailScreen = ({ route, navigation }) => {
     }
   };
 
+  const handleReExtractSyllabus = () => {
+    if (!subjectId) return;
+
+    showDialog({
+      type: 'confirm',
+      title: 'Re-extract Syllabus?',
+      message:
+        'This will extract the syllabus again from the selected PDF. Your subject, notes, resources, tasks, and progress will remain unchanged.',
+      confirmText: subject?.syllabusFile?.url ? 'Re-extract PDF' : 'Choose PDF',
+      cancelText: 'Cancel',
+      onConfirm: () => {
+        if (subject?.syllabusFile?.url) {
+          handleExtractExisting();
+        } else {
+          handleUploadOrReplaceSyllabus();
+        }
+      },
+    });
+  };
+
   const handleRemoveSyllabus = async () => {
     try {
       await updateSubject(subjectId, {
@@ -373,6 +393,7 @@ const SubjectDetailScreen = ({ route, navigation }) => {
               onReplace={handleUploadOrReplaceSyllabus}
               onRemove={handleRemoveSyllabus}
               onExtract={units.length === 0 ? handleExtractExisting : null}
+              onReExtract={units.length > 0 ? handleReExtractSyllabus : null}
               accentColor={accentColor}
             />
           ) : (
