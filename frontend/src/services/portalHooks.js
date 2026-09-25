@@ -58,8 +58,15 @@ export const useSyncPortal = () => {
     mutationFn: syncPortalData,
     retry: 0,
     onSuccess: (res) => {
-      if (res && res.data && typeof res.data === 'object') {
-        queryClient.setQueryData(getPortalStatusQueryKey(), res.data);
+      // res = { success, data, cached, lastSyncedAt, message }
+      // The portal status cache expects the inner data object (same shape as getPortalStatus returns)
+      const innerData = res?.data;
+      if (innerData && typeof innerData === 'object') {
+        // Ensure lastSuccessfulSync is set from the authoritative lastSyncedAt if not on inner data
+        if (res.lastSyncedAt && !innerData.lastSuccessfulSync) {
+          innerData.lastSuccessfulSync = res.lastSyncedAt;
+        }
+        queryClient.setQueryData(getPortalStatusQueryKey(), innerData);
       }
       queryClient.invalidateQueries({ queryKey: getPortalStatusQueryKey() });
       queryClient.invalidateQueries({ queryKey: getTodayAttendanceQueryKey() });
