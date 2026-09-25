@@ -19,6 +19,8 @@ import {
   buildSubjectStats,
   computeOverall,
   buildTodayClassesFromCache,
+  normalizeCode,
+  normalizeSubjectName,
 } from '../../utils/srmPortalHelpers.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -430,9 +432,8 @@ export async function connectPortalAccount(userId, srmUsername, srmPassword) {
   if (!account) {
     const oldUserAccount = await SrmPortalAccount.findOne({ userId, srmUsername: { $ne: cleanUsername } });
     if (oldUserAccount) {
-      console.log(`[PORTAL CONNECT] Unlinking old SRM account`);
+      console.log(`[PORTAL CONNECT] Unlinking old SRM account credentials`);
       await SrmPortalAccount.deleteOne({ _id: oldUserAccount._id });
-      await Subject.deleteMany({ user: userId, isSrmManaged: true });
     }
 
     account = new SrmPortalAccount({
@@ -932,38 +933,49 @@ async function scrapeAndStoreData(account, sessionId) {
 
     try {
       if (allScrapedSubjects.length > 0 && account.userId) {
+        const userExistingSubjects = await Subject.find({ user: account.userId });
+
         for (const sub of allScrapedSubjects) {
           if (!sub.code || !sub.name) continue;
 
-          const cleanCode = safeString(sub.code).toUpperCase();
-          const cleanName = safeString(sub.name);
+          const cleanCode = safeString(sub.code).toUpperCase().trim();
+          const cleanName = safeString(sub.name).trim();
+          const normalizedScrapedCode = normalizeCode(cleanCode);
+          const normalizedScrapedName = normalizeSubjectName(cleanName);
           const creditsNum = Math.min(Math.max(safeInt(sub.credit, 3), 1), 10);
           const semNum = Math.min(Math.max(safeInt(sub.semester, 1), 1), 12);
 
-          let existingSubject = await Subject.findOne({ user: account.userId, code: cleanCode });
-          if (!existingSubject) {
-            existingSubject = await Subject.findOne({ user: account.userId, code: sub.code });
+          // Find existing subject by:
+          // 1. Normalized code match
+          // 2. Normalized subject name fallback
+          let existingSubject = userExistingSubjects.find(
+            s => normalizeCode(s.code) === normalizedScrapedCode
+          );
+
+          if (!existingSubject && normalizedScrapedName) {
+            existingSubject = userExistingSubjects.find(
+              s => normalizeSubjectName(s.name) === normalizedScrapedName
+            );
           }
 
           if (existingSubject) {
             let subjectUpdated = false;
 
-            if (cleanName && existingSubject.name !== cleanName) {
-              existingSubject.name = cleanName;
-              subjectUpdated = true;
-            }
-            if (existingSubject.credits !== creditsNum) {
-              existingSubject.credits = creditsNum;
-              subjectUpdated = true;
-            }
+            // Non-destructive update: Only update SRM metadata, strictly preserving user-owned data (syllabus, notes, resources, tasks, progress)
             if (sub.faculty && existingSubject.faculty !== safeString(sub.faculty)) {
               existingSubject.faculty = safeString(sub.faculty);
               subjectUpdated = true;
             }
-            existingSubject.isSrmManaged = true;
-
-            if (activeCodesSet.size > 0 && existingSubject.isSrmActive !== sub.isSrmActive) {
-              existingSubject.isSrmActive = sub.isSrmActive;
+            if (!existingSubject.credits && creditsNum) {
+              existingSubject.credits = creditsNum;
+              subjectUpdated = true;
+            }
+            if (!existingSubject.isSrmManaged) {
+              existingSubject.isSrmManaged = true;
+              subjectUpdated = true;
+            }
+            if (existingSubject.isSrmActive === false) {
+              existingSubject.isSrmActive = true;
               subjectUpdated = true;
             }
 
@@ -971,7 +983,7 @@ async function scrapeAndStoreData(account, sessionId) {
               await existingSubject.save();
             }
           } else if (sub.isSrmActive !== false) {
-            await Subject.create({
+            const newSub = await Subject.create({
               user: account.userId,
               code: cleanCode,
               name: cleanName,
@@ -981,17 +993,7 @@ async function scrapeAndStoreData(account, sessionId) {
               isSrmManaged: true,
               isSrmActive: true,
             });
-          }
-        }
-
-        if (activeCodesSet.size > 0) {
-          const userSrmSubjects = await Subject.find({ user: account.userId, isSrmManaged: true });
-          for (const s of userSrmSubjects) {
-            const norm = normalizeCode(s.code);
-            if (!activeCodesSet.has(norm) && s.isSrmActive !== false) {
-              s.isSrmActive = false;
-              await s.save();
-            }
+            userExistingSubjects.push(newSub);
           }
         }
       }
@@ -1088,7 +1090,7 @@ export async function getPortalAccountData(userId) {
 
   let userSubjectsCount = 0;
   try {
-    userSubjectsCount = await Subject.countDocuments({ user: targetUserId, isSrmActive: { $ne: false } });
+    userSubjectsCount = await Subject.countDocuments({ user: targetUserId });
   } catch (cntErr) {
     console.warn('[PortalService] Unable to count user subjects:', cntErr.message);
   }
@@ -1360,9 +1362,8 @@ export async function reSyncPortalData(userId) {
 }
 
 export async function disconnectPortalAccount(userId) {
-  console.log(`[PORTAL DISCONNECT] Unlinking SRM portal and clearing caches...`);
+  console.log(`[PORTAL DISCONNECT] Unlinking SRM portal session and credentials...`);
   await SrmPortalAccount.deleteMany({ userId });
-  await Subject.deleteMany({ user: userId, isSrmManaged: true });
 
   const user = await User.findById(userId);
   if (user) {

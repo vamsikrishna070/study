@@ -193,3 +193,15 @@ export function buildTodayClassesFromCache(account) {
     };
   }).sort((a, b) => a.hour - b.hour);
 }
+
+export function normalizeCode(code) {
+  return safeString(code).toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+export function normalizeSubjectName(str) {
+  return safeString(str)
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
