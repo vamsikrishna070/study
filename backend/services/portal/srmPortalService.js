@@ -321,7 +321,8 @@ export async function attemptSrmLogin(username, password) {
       lowerHtml.includes('user name or password') ||
       lowerHtml.includes('wrong password') ||
       lowerHtml.includes('invalid registration') ||
-      lowerHtml.includes('incorrect') ||
+      lowerHtml.includes('incorrect password') ||
+      lowerHtml.includes('incorrect registration') ||
       lowerHtml.includes('mismatch') ||
       lowerHtml.includes('unauthorized') ||
       lowerHtml.includes('authentication failed');
@@ -330,9 +331,10 @@ export async function attemptSrmLogin(username, password) {
       lowerHtml.includes('invalid captcha') ||
       lowerHtml.includes('invalid verification') ||
       lowerHtml.includes('captcha code') ||
-      lowerHtml.includes('verification code');
+      lowerHtml.includes('verification code') ||
+      lowerHtml.includes('enter valid verification');
 
-    if (isExplicitCredentialError || (!isCaptchaError && isLoginPage)) {
+    if (isExplicitCredentialError) {
       console.warn(`[PortalService] Attempt ${attempt}: Credentials explicitly rejected by SRM AP portal.`);
       const credErr = new Error('Registration number or portal password is incorrect.');
       credErr.code = 'INVALID_CREDENTIALS';
@@ -340,8 +342,8 @@ export async function attemptSrmLogin(username, password) {
     }
 
     const attemptMs = (performance.now() - attemptStart).toFixed(1);
-    if (isCaptchaError) {
-      console.warn(`[PortalService] Attempt ${attempt} failed in ${attemptMs}ms: CAPTCHA misread by OCR. Retrying...`);
+    if (isCaptchaError || isLoginPage) {
+      console.warn(`[PortalService] Attempt ${attempt} failed in ${attemptMs}ms: CAPTCHA misread or login page reloaded. Retrying...`);
       lastErrorReason = 'CAPTCHA_MISMATCH';
       continue;
     }
@@ -355,9 +357,9 @@ export async function attemptSrmLogin(username, password) {
   const err = new Error(
     lastErrorReason === 'CAPTCHA_MISMATCH'
       ? 'SRM Portal verification could not be completed after 2 attempts. Please try again.'
-      : 'Unable to authenticate with SRM AP Portal. Please check your credentials and try again.'
+      : 'Unable to authenticate with SRM AP Portal. Please try again later.'
   );
-  err.code = lastErrorReason === 'CAPTCHA_MISMATCH' ? 'CAPTCHA_FAILED' : 'INVALID_CREDENTIALS';
+  err.code = lastErrorReason === 'CAPTCHA_MISMATCH' ? 'CAPTCHA_FAILED' : 'PORTAL_UNAVAILABLE';
   throw err;
 }
 
@@ -1298,14 +1300,14 @@ export async function reSyncPortalData(userId) {
     console.log(`[PORTAL SYNC] Sync completed successfully`);
     return await getPortalAccountData(userId);
   } catch (err) {
-    console.warn(`[PORTAL SYNC] Sync failed:`, err.message);
-    if (err.message === 'PORTAL_SESSION_EXPIRED' || err.code === 'INVALID_CREDENTIALS') {
+    console.warn(`[PORTAL SYNC] Sync failed [${err.code || 'UNKNOWN'}]:`, err.message);
+    if (err.code === 'INVALID_CREDENTIALS' || err.code === 'NO_STORED_CREDENTIALS' || err.message === 'PORTAL_SESSION_EXPIRED') {
       account.connectionStatus = 'expired';
       await account.save().catch(() => {});
       throw err;
     }
     const data = await getPortalAccountData(userId);
-    data.syncWarning = 'Live SRM session could not be refreshed. Showing your last synced data.';
+    data.syncWarning = err.message || 'Live SRM session could not be refreshed. Showing your last synced data.';
     return data;
   }
 }

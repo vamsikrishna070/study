@@ -41,6 +41,7 @@ export const useConnectPortal = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: connectPortal,
+    retry: 0,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: getPortalStatusQueryKey() });
       queryClient.invalidateQueries({ queryKey: getPortalVerifyQueryKey() });
@@ -55,6 +56,7 @@ export const useSyncPortal = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: syncPortalData,
+    retry: 0,
     onSuccess: (res) => {
       if (res && res.data && typeof res.data === 'object') {
         queryClient.setQueryData(getPortalStatusQueryKey(), res.data);

@@ -137,20 +137,25 @@ export async function syncPortal(req, res) {
       data,
       cached: Boolean(data.syncWarning),
       lastSyncedAt: data.lastSuccessfulSync || new Date().toISOString(),
-      message: 'Portal data refreshed successfully',
+      message: data.syncWarning ? data.syncWarning : 'Portal data refreshed successfully',
     });
   } catch (error) {
     console.error('[PortalController] syncPortal error:', error.message);
-    const isSessionErr =
-      error.message?.includes('session expired') ||
-      error.message?.includes('PORTAL_SESSION_EXPIRED') ||
-      error.code === 'INVALID_CREDENTIALS';
 
-    if (isSessionErr) {
+    if (error.code === 'NO_STORED_CREDENTIALS' || error.code === 'NOT_CONNECTED' || error.message === 'PORTAL_SESSION_EXPIRED') {
       return res.status(401).json({
         success: false,
-        code: 'PORTAL_SESSION_EXPIRED',
-        message: 'Your SRM Portal session has expired. Please re-enter your credentials.',
+        code: 'CREDENTIALS_REQUIRED',
+        message: 'SRM Portal credentials are required. Please re-enter your credentials.',
+        action: 'reconnect',
+      });
+    }
+
+    if (error.code === 'INVALID_CREDENTIALS') {
+      return res.status(400).json({
+        success: false,
+        code: 'INVALID_CREDENTIALS',
+        message: 'Registration number or portal password is incorrect.',
         action: 'reconnect',
       });
     }
