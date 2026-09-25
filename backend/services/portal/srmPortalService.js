@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import * as cheerio from 'cheerio';
 import { DateTime } from 'luxon';
 import mongoose from 'mongoose';
+import { createWorker } from 'tesseract.js';
 import SrmPortalAccount from '../../models/SrmPortalAccount.js';
 import User from '../../models/User.js';
 import Subject from '../../models/Subject.js';
@@ -226,8 +227,9 @@ async function fetchSrmSession() {
 
 let ocrWorkerPromise = null;
 
-async function getOcrWorker() {
+export async function getOcrWorker() {
   if (!ocrWorkerPromise) {
+    console.log('[PortalService] Initializing singleton Tesseract OCR worker...');
     ocrWorkerPromise = (async () => {
       const worker = await createWorker('eng', 1, {
         logger: () => {},
@@ -237,8 +239,10 @@ async function getOcrWorker() {
         tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
         tessedit_pageseg_mode: '8',
       });
+      console.log('[PortalService] Singleton Tesseract OCR worker ready.');
       return worker;
     })().catch((err) => {
+      console.error('[PortalService] OCR worker initialization failed:', err.message);
       ocrWorkerPromise = null;
       throw err;
     });
@@ -246,17 +250,23 @@ async function getOcrWorker() {
   return ocrWorkerPromise;
 }
 
-async function solveCaptchaOcr(imageBuffer) {
+export async function solveCaptchaOcr(imageBuffer) {
+  if (!imageBuffer || imageBuffer.length === 0) {
+    return '';
+  }
   const ocrStart = performance.now();
   try {
     const worker = await getOcrWorker();
     const { data } = await worker.recognize(imageBuffer);
-    const text = safeString(data.text).replace(/\s+/g, '');
+    const text = safeString(data?.text || '').replace(/\s+/g, '');
     const ocrMs = (performance.now() - ocrStart).toFixed(1);
     console.log(`[SRM TIMING] OCR processed in ${ocrMs}ms (length: ${text.length} chars)`);
     return text;
   } catch (err) {
     console.warn('[PortalService] OCR worker error, resetting worker:', err.message);
+    if (ocrWorkerPromise) {
+      ocrWorkerPromise.then(w => w?.terminate?.()).catch(() => {});
+    }
     ocrWorkerPromise = null;
     throw err;
   }
