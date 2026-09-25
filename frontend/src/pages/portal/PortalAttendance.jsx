@@ -15,7 +15,6 @@ import Shell from '../../components/Shell.jsx';
 import { LoadingBlock, QueryState, cx, Modal, Button } from '../../components/shared.jsx';
 import {
   useGetPortalStatus,
-  useVerifyPortal,
   useConnectPortal,
   useSyncPortal,
   useGetTodayAttendance,
@@ -30,7 +29,6 @@ export default function PortalAttendance() {
   const { refreshUser } = useAuth();
 
   const statusQuery = useGetPortalStatus();
-  const verifyQuery = useVerifyPortal();
   const todayAttendanceQuery = useGetTodayAttendance();
   const connectMutation = useConnectPortal();
   const syncMutation = useSyncPortal();
@@ -45,22 +43,11 @@ export default function PortalAttendance() {
   const [codeFeedback, setCodeFeedback] = useState(null);
 
   const statusData = statusQuery.data;
-  const verifyData = verifyQuery.data;
   const todayData = todayAttendanceQuery.data || {};
 
   const isLoading = statusQuery.isLoading;
-
-
-
-
-  const isVerifyLoading = verifyQuery.isLoading;
-  const isConnected = Boolean(statusData?.isConnected);
-
-  const isSessionActive = Boolean(
-    !sessionExpiredLocal &&
-    !isVerifyLoading &&
-    verifyData?.status === 'verified'
-  );
+  const isConnected = Boolean(statusData?.isConnected || statusData?.hasStoredPortalData || statusData?.srmUsername);
+  const isSessionActive = Boolean(isConnected && !sessionExpiredLocal);
 
   const handleOpenInitiate = () => {
     setSrmUsername(statusData?.registrationNumber || statusData?.data?.srmUsername || '');
@@ -284,42 +271,36 @@ export default function PortalAttendance() {
           <div className="rounded-2xl border border-card-border bg-card p-6 shadow-sm space-y-4">
             <div className="flex items-start gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
-                {isVerifyLoading ? (
-                  <RefreshCw size={20} className="animate-spin" />
-                ) : (
-                  <Radio size={20} />
-                )}
+                <Radio size={20} />
               </div>
               <div className="flex-1 min-w-0">
                 <h2 className="font-display text-lg font-bold text-foreground">
-                  {isVerifyLoading ? 'Checking session...' : 'Portal session not active'}
+                  {!isConnected ? 'SRM Portal Not Connected' : 'Portal session expired'}
                 </h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {isVerifyLoading
-                    ? 'Verifying your SRM portal session status.'
-                    : 'Please initiate a new session to submit attendance codes.'}
+                  {!isConnected
+                    ? 'Connect your SRM portal to submit live attendance codes and sync academic records.'
+                    : 'Your session has expired. Re-authenticate to submit live attendance codes.'}
                 </p>
               </div>
             </div>
 
-            {!isVerifyLoading && (
-              <div>
-                <button
-                  onClick={handleOpenInitiate}
-                  disabled={connectMutation.isPending}
-                  className="focus-ring inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-sm font-bold text-accent-foreground shadow-sm hover:opacity-90 disabled:opacity-50 transition-all"
-                >
-                  {connectMutation.isPending ? (
-                    <>
-                      <RefreshCw size={15} className="animate-spin" />
-                      <span>Initiating Session...</span>
-                    </>
-                  ) : (
-                    <span>Initiate Session</span>
-                  )}
-                </button>
-              </div>
-            )}
+            <div>
+              <button
+                onClick={handleOpenInitiate}
+                disabled={connectMutation.isPending}
+                className="focus-ring inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-sm font-bold text-accent-foreground shadow-sm hover:opacity-90 disabled:opacity-50 transition-all"
+              >
+                {connectMutation.isPending ? (
+                  <>
+                    <RefreshCw size={15} className="animate-spin" />
+                    <span>Connecting...</span>
+                  </>
+                ) : (
+                  <span>{!isConnected ? 'Connect Portal' : 'Reconnect Session'}</span>
+                )}
+              </button>
+            </div>
           </div>
         )}
 

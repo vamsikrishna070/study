@@ -15,7 +15,6 @@ import {
   useGetTodayAttendance,
   useMarkAttendanceCode,
   useGetPortalStatus,
-  useVerifyPortal,
 } from '../../services/portalHooks.js';
 import { getUserFriendlyError } from '../../utils/errorUtils.js';
 import { cx } from '../shared.jsx';
@@ -27,13 +26,8 @@ export default function TodayAttendanceCard({ initialData, isLoading }) {
     enabled: !initialData && !isLoading,
   });
   const statusData = statusQuery.data || initialData;
-  const isConnected = Boolean(statusData?.isConnected);
-  const isVerifiedFromStatus = Boolean(statusData?.isVerified);
+  const isConnected = Boolean(statusData?.isConnected || statusData?.hasStoredPortalData || initialData);
 
-  const verifyQuery = useVerifyPortal({
-    refetchOnWindowFocus: false,
-    enabled: isConnected && !isVerifiedFromStatus && !initialData && !isLoading,
-  });
   const attendanceQuery = useGetTodayAttendance({
     retry: 1,
     refetchOnWindowFocus: false,
@@ -45,14 +39,8 @@ export default function TodayAttendanceCard({ initialData, isLoading }) {
   const [sessionExpiredLocal, setSessionExpiredLocal] = useState(false);
   const [feedback, setFeedback] = useState(null);
 
-  const verifyData = verifyQuery.data;
   const attendanceData = attendanceQuery.data || initialData;
-  const isVerifyLoading = verifyQuery.isLoading && verifyQuery.fetchStatus !== 'idle';
-
-  const isSessionActive = Boolean(
-    !sessionExpiredLocal &&
-    (verifyData?.status === 'verified' || (isVerifiedFromStatus && !isVerifyLoading))
-  );
+  const isSessionActive = Boolean(isConnected && !sessionExpiredLocal);
 
   const handleMarkCode = async (e) => {
     e.preventDefault();
@@ -98,7 +86,6 @@ export default function TodayAttendanceCard({ initialData, isLoading }) {
     setFeedback(null);
     attendanceQuery.refetch();
     statusQuery.refetch();
-    verifyQuery.refetch();
   };
 
   if (isLoading && !initialData) {

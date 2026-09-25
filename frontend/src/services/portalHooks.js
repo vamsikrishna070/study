@@ -27,12 +27,13 @@ export const useGetPortalStatus = (options) =>
     ...options,
   });
 
-export const useVerifyPortal = (options) =>
+export const useVerifyPortal = (options = {}) =>
   useQuery({
     queryKey: getPortalVerifyQueryKey(),
     queryFn: verifyPortalSession,
     staleTime: 5 * 60 * 1000,
     retry: 0,
+    enabled: false,
     ...options,
   });
 

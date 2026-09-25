@@ -164,6 +164,7 @@ async function fetchSrmSession() {
   const loginPageRes = await fetch(`${BASE_URL}/StudentLoginPage`, {
     method: 'GET',
     headers: DEFAULT_HEADERS,
+    signal: AbortSignal.timeout(6000),
   });
 
   if (!loginPageRes.ok) {
@@ -184,6 +185,7 @@ async function fetchSrmSession() {
       'Cookie': `JSESSIONID=${jsessionId}`,
       'Referer': `${BASE_URL}/StudentLoginPage`,
     },
+    signal: AbortSignal.timeout(6000),
   });
 
   if (!captchaRes.ok) {
@@ -238,7 +240,7 @@ async function solveCaptchaOcr(imageBuffer) {
 export async function attemptSrmLogin(username, password) {
   const loginStart = performance.now();
   console.log(`[SRM LOGIN] SRM Portal login sequence initiated for user: ${username}`);
-  const MAX_RETRIES = 3;
+  const MAX_RETRIES = 2;
   let lastErrorReason = null;
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
@@ -287,6 +289,7 @@ export async function attemptSrmLogin(username, password) {
           'Referer': `${BASE_URL}/StudentLoginPage`,
         },
         body: payload.toString(),
+        signal: AbortSignal.timeout(8000),
       });
     } catch (networkErr) {
       console.warn(`[PortalService] Attempt ${attempt}: Network failure during login POST:`, networkErr.message);
@@ -317,7 +320,11 @@ export async function attemptSrmLogin(username, password) {
       lowerHtml.includes('invalid credentials') ||
       lowerHtml.includes('user name or password') ||
       lowerHtml.includes('wrong password') ||
-      lowerHtml.includes('invalid registration');
+      lowerHtml.includes('invalid registration') ||
+      lowerHtml.includes('incorrect') ||
+      lowerHtml.includes('mismatch') ||
+      lowerHtml.includes('unauthorized') ||
+      lowerHtml.includes('authentication failed');
 
     const isCaptchaError =
       lowerHtml.includes('invalid captcha') ||
@@ -325,7 +332,7 @@ export async function attemptSrmLogin(username, password) {
       lowerHtml.includes('captcha code') ||
       lowerHtml.includes('verification code');
 
-    if (isExplicitCredentialError) {
+    if (isExplicitCredentialError || (!isCaptchaError && isLoginPage)) {
       console.warn(`[PortalService] Attempt ${attempt}: Credentials explicitly rejected by SRM AP portal.`);
       const credErr = new Error('Registration number or portal password is incorrect.');
       credErr.code = 'INVALID_CREDENTIALS';
@@ -347,10 +354,10 @@ export async function attemptSrmLogin(username, password) {
   console.warn(`[SRM TIMING] All login attempts failed. Total duration: ${totalLoginMs}ms`);
   const err = new Error(
     lastErrorReason === 'CAPTCHA_MISMATCH'
-      ? 'SRM Portal verification could not be completed after 3 attempts. Please try again.'
-      : 'Unable to authenticate with SRM AP Portal after multiple attempts. Please try again.'
+      ? 'SRM Portal verification could not be completed after 2 attempts. Please try again.'
+      : 'Unable to authenticate with SRM AP Portal. Please check your credentials and try again.'
   );
-  err.code = lastErrorReason === 'CAPTCHA_MISMATCH' ? 'CAPTCHA_FAILED' : 'LOGIN_FAILED';
+  err.code = lastErrorReason === 'CAPTCHA_MISMATCH' ? 'CAPTCHA_FAILED' : 'INVALID_CREDENTIALS';
   throw err;
 }
 
