@@ -55,9 +55,11 @@ export const useSyncPortal = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: syncPortalData,
-    onSuccess: () => {
+    onSuccess: (res) => {
+      if (res && res.data && typeof res.data === 'object') {
+        queryClient.setQueryData(getPortalStatusQueryKey(), res.data);
+      }
       queryClient.invalidateQueries({ queryKey: getPortalStatusQueryKey() });
-      queryClient.invalidateQueries({ queryKey: getPortalVerifyQueryKey() });
       queryClient.invalidateQueries({ queryKey: getTodayAttendanceQueryKey() });
       queryClient.invalidateQueries({ queryKey: getTimetableQueryKey() });
       queryClient.invalidateQueries({ queryKey: getAttendancePlannerQueryKey() });

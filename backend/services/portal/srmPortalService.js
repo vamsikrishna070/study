@@ -950,7 +950,7 @@ async function scrapeAndStoreData(account, sessionId) {
       console.error('[SRM SYNC] Failed to reconcile subjects:', subjectErr.message);
     }
 
-    return true;
+    return await getPortalAccountData(account.userId);
   } catch (err) {
     console.error('[PortalService] Error scraping SRM portal data:', err.message);
     throw err;

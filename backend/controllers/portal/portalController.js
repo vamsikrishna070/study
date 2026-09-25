@@ -102,6 +102,10 @@ export async function verifyPortal(req, res) {
 
 export async function getStatus(req, res) {
   try {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+
     const userId = req.user._id;
     const data = await getPortalAccountData(userId);
     res.json({
@@ -123,6 +127,10 @@ export async function getStatus(req, res) {
 
 export async function syncPortal(req, res) {
   try {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+
     const data = await reSyncPortalData(req.user._id);
     return res.json({
       success: true,
