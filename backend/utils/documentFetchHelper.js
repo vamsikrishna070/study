@@ -36,6 +36,8 @@ export function getCloudinaryCandidateUrls(fileUrl) {
 
       // 1. Authenticated signed private download URLs via Cloudinary SDK
       const authCandidates = [
+        { pid: resourcePath, fmt: '', rt: detectedRt },
+        { pid: pathWithoutExt, fmt: '', rt: detectedRt },
         { pid: pathWithoutExt, fmt: 'pdf', rt: 'image' },
         { pid: resourcePath, fmt: '', rt: 'raw' },
         { pid: pathWithoutExt, fmt: '', rt: 'raw' },

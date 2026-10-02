@@ -3,6 +3,7 @@ import { Paths, File, Directory } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as WebBrowser from 'expo-web-browser';
 import { openNativeDocument } from './AlarmModule';
+import { getToken } from '../storage/token';
 
 const DOCUMENTS_CACHE_DIR_NAME = 'documents';
 const CUSTOM_SOUNDS_DIR_NAME = 'audio';
@@ -75,10 +76,18 @@ export function getPreviewUrl(url, filename = 'document.pdf') {
   return url;
 }
 
-export function getCloudinaryDownloadUrl(url) {
-  if (!url || typeof url !== 'string' || !url.includes('cloudinary.com')) return url;
-  if (url.includes('/fl_attachment')) return url;
-  return url.replace('/upload/', '/upload/fl_attachment/');
+export function getDownloadUrl(url, filename = 'document.pdf') {
+  if (!url || typeof url !== 'string') return url;
+  if (url.includes('cloudinary.com')) {
+    const apiBase = process.env.EXPO_PUBLIC_API_URL || 'https://study-o20l.onrender.com/api';
+    const safeName = getSafeFilename(filename, 'document.pdf');
+    return `${apiBase}/upload/download?url=${encodeURIComponent(url.trim())}&filename=${encodeURIComponent(safeName)}`;
+  }
+  return url;
+}
+
+export function getCloudinaryDownloadUrl(url, filename = 'document.pdf') {
+  return getDownloadUrl(url, filename);
 }
 
 export async function downloadPdf(remoteUrl, originalName = 'document.pdf', onProgress) {
@@ -99,23 +108,19 @@ export async function downloadPdf(remoteUrl, originalName = 'document.pdf', onPr
     };
   }
 
+  const token = await getToken();
   const urlsToTry = [];
   if (remoteUrl.includes('cloudinary.com')) {
-    const proxyUrl = getPreviewUrl(remoteUrl, safeName);
-    urlsToTry.push(proxyUrl);
-
-    const attUrl = getCloudinaryDownloadUrl(remoteUrl);
-    if (!urlsToTry.includes(attUrl)) urlsToTry.push(attUrl);
-
-    if (remoteUrl.includes('/image/upload/')) {
-      const rawUrl = remoteUrl.replace('/image/upload/', '/raw/upload/');
-      const rawAtt = rawUrl.replace('/upload/', '/upload/fl_attachment/');
-      if (!urlsToTry.includes(rawAtt)) urlsToTry.push(rawAtt);
-      if (!urlsToTry.includes(rawUrl)) urlsToTry.push(rawUrl);
-    } else if (remoteUrl.includes('/raw/upload/')) {
-      const imgAtt = remoteUrl.replace('/raw/upload/', '/image/upload/fl_attachment/');
-      if (!urlsToTry.includes(imgAtt)) urlsToTry.push(imgAtt);
+    let dlUrl = getDownloadUrl(remoteUrl, safeName);
+    let prevUrl = getPreviewUrl(remoteUrl, safeName);
+    if (token) {
+      const sepDl = dlUrl.includes('?') ? '&' : '?';
+      dlUrl = `${dlUrl}${sepDl}token=${encodeURIComponent(token)}`;
+      const sepPrev = prevUrl.includes('?') ? '&' : '?';
+      prevUrl = `${prevUrl}${sepPrev}token=${encodeURIComponent(token)}`;
     }
+    urlsToTry.push(dlUrl);
+    urlsToTry.push(prevUrl);
   }
   if (!urlsToTry.includes(remoteUrl)) {
     urlsToTry.push(remoteUrl);
@@ -125,6 +130,7 @@ export async function downloadPdf(remoteUrl, originalName = 'document.pdf', onPr
   for (const fetchUrl of urlsToTry) {
     try {
       const downloadedFile = await File.downloadFileAsync(fetchUrl, targetFile, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
         idempotent: true,
       });
 

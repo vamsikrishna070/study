@@ -169,17 +169,28 @@ export function AuthProvider({ children }) {
   const resetPassword = async (email, otp, newPassword) => {
     try {
       const { data } = await apiClient.post('/auth/reset-password', { email, otp, newPassword });
-      if (data.success) {
-        localStorage.setItem('studyarena_token', data.data.token);
-        localStorage.setItem('studyarena_cached_user', JSON.stringify(data.data.user));
-        apiClient.defaults.headers.common['Authorization'] = `Bearer ${data.data.token}`;
-        setUser(data.data.user);
-        setIsAuthenticated(true);
-        return { success: true };
-      }
-      return { success: false, message: data.message || 'Failed to reset password. Please try again.' };
+      localStorage.removeItem('studyarena_token');
+      localStorage.removeItem('studyarena_cached_user');
+      delete apiClient.defaults.headers.common['Authorization'];
+      setUser(null);
+      setIsAuthenticated(false);
+      return { success: true, message: data.message };
     } catch (error) {
       return { success: false, message: getUserFriendlyError(error, 'auth_otp') };
+    }
+  };
+
+  const changePassword = async (currentPassword, newPassword) => {
+    try {
+      const { data } = await apiClient.post('/auth/change-password', { currentPassword, newPassword });
+      localStorage.removeItem('studyarena_token');
+      localStorage.removeItem('studyarena_cached_user');
+      delete apiClient.defaults.headers.common['Authorization'];
+      setUser(null);
+      setIsAuthenticated(false);
+      return { success: true, message: data.message };
+    } catch (error) {
+      return { success: false, message: getUserFriendlyError(error, 'auth_login') };
     }
   };
 
@@ -211,7 +222,10 @@ export function AuthProvider({ children }) {
 
   const getSessions = async () => {
     try {
-      const { data } = await apiClient.get('/auth/sessions');
+      const { data } = await apiClient.get('/auth/sessions', {
+        params: { _t: Date.now() },
+        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', Pragma: 'no-cache' },
+      });
       return data.success ? data.data : [];
     } catch (error) {
       console.error('[AuthContext] Failed to fetch active sessions:', error);
@@ -255,7 +269,7 @@ export function AuthProvider({ children }) {
   return (
     <AuthContext.Provider value={{
       user, isAuthenticated, isLoading,
-      login, register, verifyEmail, resendOtp, forgotPassword, resetPassword,
+      login, register, verifyEmail, resendOtp, forgotPassword, resetPassword, changePassword,
       logout, updateProfile, refreshUser: checkAuth,
       getSessions, revokeSession, revokeOtherSessions, revokeAllSessions
     }}>

@@ -229,13 +229,15 @@ export function getPreviewUrl(url, filename = '') {
   return previewUrl;
 }
 
-export function getDownloadUrl(url) {
+export function getDownloadUrl(url, filename = '') {
   if (!url || typeof url !== 'string') return url;
 
   let downloadUrl = url.trim();
 
-  if (downloadUrl.includes('cloudinary.com') && !downloadUrl.includes('fl_attachment')) {
-    downloadUrl = downloadUrl.replace('/upload/', '/upload/fl_attachment/');
+  if (downloadUrl.includes('cloudinary.com')) {
+    const apiBase = `${import.meta.env.VITE_API_URL || ''}/api`;
+    const safeFilename = filename || extractFilenameFromUrl(downloadUrl) || 'document.pdf';
+    return `${apiBase}/upload/download?url=${encodeURIComponent(downloadUrl)}&filename=${encodeURIComponent(safeFilename)}`;
   }
 
   return downloadUrl;
@@ -249,7 +251,14 @@ export function viewDocument(url, filename = '') {
     return;
   }
   const resolvedName = filename || extractFilenameFromUrl(url) || 'document.pdf';
-  const previewUrl = getPreviewUrl(url, resolvedName);
+  let previewUrl = getPreviewUrl(url, resolvedName);
+  const token = typeof localStorage !== 'undefined'
+    ? (localStorage.getItem('studyarena_token') || localStorage.getItem('token'))
+    : null;
+  if (token && previewUrl.includes('/api/upload/preview')) {
+    const separator = previewUrl.includes('?') ? '&' : '?';
+    previewUrl = `${previewUrl}${separator}token=${encodeURIComponent(token)}`;
+  }
   window.open(previewUrl, '_blank', 'noopener,noreferrer');
 }
 

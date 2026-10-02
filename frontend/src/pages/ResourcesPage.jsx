@@ -82,8 +82,13 @@ export default function ResourcesPage() {
   const handleDownload = async (url, filename) => {
     if (!url) return;
     try {
-      const downloadUrl = getDownloadUrl(url);
-      const response = await fetch(downloadUrl);
+      const downloadUrl = getDownloadUrl(url, filename);
+      const token = typeof localStorage !== 'undefined'
+        ? (localStorage.getItem('studyarena_token') || localStorage.getItem('token'))
+        : null;
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const response = await fetch(downloadUrl, { headers });
+      if (!response.ok) throw new Error('Download failed');
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -94,7 +99,15 @@ export default function ResourcesPage() {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
     } catch {
-      window.open(getDownloadUrl(url), '_blank');
+      const token = typeof localStorage !== 'undefined'
+        ? (localStorage.getItem('studyarena_token') || localStorage.getItem('token'))
+        : null;
+      let fallbackUrl = getDownloadUrl(url, filename);
+      if (token && fallbackUrl.includes('/api/upload/download')) {
+        const separator = fallbackUrl.includes('?') ? '&' : '?';
+        fallbackUrl = `${fallbackUrl}${separator}token=${encodeURIComponent(token)}`;
+      }
+      window.open(fallbackUrl, '_blank');
     }
   };
 

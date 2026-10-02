@@ -10,6 +10,7 @@ import {
   resetPassword,
   resendOtp,
   recordActivity,
+  changePassword,
   getSessions,
   revokeSession,
   revokeOtherSessions,
@@ -26,6 +27,7 @@ router.post('/resend-otp', otpLimiter, asyncHandler(resendOtp));
 router.post('/login', authLimiter, asyncHandler(login));
 router.post('/forgot-password', authLimiter, asyncHandler(forgotPassword));
 router.post('/reset-password', authLimiter, asyncHandler(resetPassword));
+router.post('/change-password', protect, authLimiter, asyncHandler(changePassword));
 router.get('/me', protect, asyncHandler(me));
 router.post('/activity', protect, asyncHandler(recordActivity));
 router.patch('/profile', protect, asyncHandler(updateProfile));

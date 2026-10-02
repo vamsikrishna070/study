@@ -7,13 +7,19 @@ const LAST_ACTIVE_THROTTLE_MS = 5 * 60 * 1000; // 5 minutes
 
 export async function protect(req, res, next) {
   try {
+    let rawToken;
     const header = req.headers.authorization;
-    if (!header?.startsWith('Bearer ')) {
+    if (header?.startsWith('Bearer ')) {
+      rawToken = header.slice(7);
+    } else if (req.query?.token && typeof req.query.token === 'string') {
+      rawToken = req.query.token;
+    }
+
+    if (!rawToken) {
       return res.status(401).json({ success: false, message: 'Authentication required' });
     }
     if (!env.JWT_SECRET) return res.status(500).json({ success: false, message: 'JWT_SECRET is not configured' });
 
-    const rawToken = header.slice(7);
     let decoded;
     try {
       decoded = jwt.verify(rawToken, env.JWT_SECRET);
@@ -39,10 +45,16 @@ export async function protect(req, res, next) {
       }
 
       if (session.isRevoked) {
+        const isPasswordChange = session.revokedReason === 'password_changed' || session.revokedReason === 'password_reset';
+        const message = isPasswordChange
+          ? 'Your session ended because your password was changed. Please log in again.'
+          : 'Your session has been revoked. Please log in again.';
+
         return res.status(401).json({
           success: false,
           code: 'SESSION_REVOKED',
-          message: 'Your session has been revoked. Please log in again.',
+          revokedReason: session.revokedReason || 'revoked',
+          message,
         });
       }
 

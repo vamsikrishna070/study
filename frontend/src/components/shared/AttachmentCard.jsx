@@ -118,8 +118,13 @@ export default function AttachmentCard({ attachment, onRemove, readonly }) {
     e.stopPropagation();
     if (!attachment.url || isLink) return;
     try {
-      const downloadUrl = getDownloadUrl(attachment.url);
-      const response = await fetch(downloadUrl);
+      const downloadUrl = getDownloadUrl(attachment.url, fileName);
+      const token = typeof localStorage !== 'undefined'
+        ? (localStorage.getItem('studyarena_token') || localStorage.getItem('token'))
+        : null;
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const response = await fetch(downloadUrl, { headers });
+      if (!response.ok) throw new Error('Download request failed');
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -130,7 +135,15 @@ export default function AttachmentCard({ attachment, onRemove, readonly }) {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
     } catch {
-      window.open(getDownloadUrl(attachment.url), '_blank');
+      const token = typeof localStorage !== 'undefined'
+        ? (localStorage.getItem('studyarena_token') || localStorage.getItem('token'))
+        : null;
+      let fallbackUrl = getDownloadUrl(attachment.url, fileName);
+      if (token && fallbackUrl.includes('/api/upload/download')) {
+        const separator = fallbackUrl.includes('?') ? '&' : '?';
+        fallbackUrl = `${fallbackUrl}${separator}token=${encodeURIComponent(token)}`;
+      }
+      window.open(fallbackUrl, '_blank');
     }
   };
 

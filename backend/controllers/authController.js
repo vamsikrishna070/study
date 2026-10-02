@@ -288,8 +288,40 @@ export async function resetPassword(req, res) {
     { isRevoked: true, revokedAt: new Date(), revokedReason: 'password_reset' }
   );
 
-  const { token } = await createSessionForUser(user._id, req);
-  res.json({ success: true, data: { user: publicUser(user), token } });
+  res.json({ success: true, message: 'Password reset successfully. All sessions have been logged out. Please log in with your new password.' });
+}
+
+export async function changePassword(req, res) {
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ success: false, message: 'Current password and new password are required' });
+  }
+  if (typeof newPassword !== 'string' || newPassword.length < 6) {
+    return res.status(400).json({ success: false, message: 'New password must be at least 6 characters' });
+  }
+
+  const user = await User.findById(req.user._id).select('+password');
+  if (!user || !(await user.comparePassword(currentPassword))) {
+    return res.status(401).json({ success: false, message: 'Current password is incorrect' });
+  }
+
+  user.password = newPassword;
+  await user.save();
+
+  // Revoke ALL active sessions for this user across all devices (including the calling device)
+  await Session.updateMany(
+    { user: user._id, isRevoked: false },
+    {
+      isRevoked: true,
+      revokedAt: new Date(),
+      revokedReason: 'password_changed',
+    }
+  );
+
+  res.json({
+    success: true,
+    message: 'Password changed successfully. All devices have been logged out. Please log in again.',
+  });
 }
 
 export async function me(req, res) {
@@ -429,19 +461,34 @@ export async function getSessions(req, res) {
     expiresAt: { $gt: new Date() },
   }).sort({ lastActiveAt: -1 }).lean();
 
-  const data = sessions.map((s) => ({
-    id: s.sessionId,
-    sessionId: s.sessionId,
-    deviceName: s.deviceName || 'Unknown Device',
-    deviceType: s.deviceType || 'unknown',
-    platform: s.platform || 'unknown',
-    browser: s.browser || 'Unknown Browser',
-    os: s.os || 'Unknown OS',
-    ipAddress: s.ipAddress || '',
-    createdAt: s.createdAt,
-    lastActiveAt: s.lastActiveAt,
-    isCurrent: Boolean(currentSessionId && s.sessionId === currentSessionId),
-  }));
+  const data = sessions.map((s) => {
+    let devName = s.deviceName;
+    if (!devName || devName === 'Unknown Device') {
+      if (s.browser && s.os && s.browser !== 'Unknown Browser' && s.os !== 'Unknown OS') {
+        devName = `${s.browser} on ${s.os}`;
+      } else if (s.platform === 'android') {
+        devName = 'StudyArena on Android';
+      } else if (s.platform === 'ios') {
+        devName = 'StudyArena on iOS';
+      } else {
+        devName = 'Active Session';
+      }
+    }
+
+    return {
+      id: s.sessionId,
+      sessionId: s.sessionId,
+      deviceName: devName,
+      deviceType: s.deviceType || (s.platform === 'android' || s.platform === 'ios' ? 'mobile' : 'desktop'),
+      platform: s.platform || (s.deviceType === 'mobile' ? 'android' : 'web'),
+      browser: s.browser || (s.platform === 'android' ? 'StudyArena Android' : s.platform === 'ios' ? 'StudyArena iOS' : 'Web Browser'),
+      os: s.os || (s.platform === 'android' ? 'Android' : s.platform === 'ios' ? 'iOS' : 'Unknown OS'),
+      ipAddress: s.ipAddress || '',
+      createdAt: s.createdAt,
+      lastActiveAt: s.lastActiveAt,
+      isCurrent: Boolean(currentSessionId && s.sessionId === currentSessionId),
+    };
+  });
 
   res.json({ success: true, data });
 }

@@ -23,7 +23,7 @@ router.post('/', protect, upload.single('file'), (req, res) => {
   });
 });
 
-router.get('/preview', async (req, res) => {
+async function streamRemoteFile(req, res, disposition = 'inline') {
   try {
     const fileUrl = req.query.url;
     const rawFilename = String(req.query.filename || 'document.pdf');
@@ -66,9 +66,9 @@ router.get('/preview', async (req, res) => {
     const encodedFilename = encodeURIComponent(cleanName);
 
     res.setHeader('Content-Type', contentType);
-    res.setHeader('Content-Disposition', `inline; filename="${safeAsciiFilename}"; filename*=UTF-8''${encodedFilename}`);
+    res.setHeader('Content-Disposition', `${disposition}; filename="${safeAsciiFilename}"; filename*=UTF-8''${encodedFilename}`);
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
 
     if (response.body) {
       Readable.fromWeb(response.body).pipe(res);
@@ -76,9 +76,12 @@ router.get('/preview', async (req, res) => {
       res.end();
     }
   } catch (err) {
-    console.error('[UploadRoutes] Error streaming preview:', err);
-    res.status(500).send('Error streaming document preview');
+    console.error(`[UploadRoutes] Error streaming document (${disposition}):`, err);
+    res.status(500).send('Error streaming document');
   }
-});
+}
+
+router.get('/preview', protect, (req, res) => streamRemoteFile(req, res, 'inline'));
+router.get('/download', protect, (req, res) => streamRemoteFile(req, res, 'attachment'));
 
 export default router;

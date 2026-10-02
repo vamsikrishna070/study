@@ -63,9 +63,13 @@ export function DocumentPreviewCard({
     if (downloading) return;
     setDownloading(true);
     try {
-
-      const downloadUrl = getDownloadUrl(file.url);
-      const res = await fetch(downloadUrl);
+      const downloadUrl = getDownloadUrl(file.url, originalName);
+      const token = typeof localStorage !== 'undefined'
+        ? (localStorage.getItem('studyarena_token') || localStorage.getItem('token'))
+        : null;
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await fetch(downloadUrl, { headers });
+      if (!res.ok) throw new Error('Download failed');
       const blob = await res.blob();
       const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -79,10 +83,16 @@ export function DocumentPreviewCard({
       setDownloadSuccess(true);
       setTimeout(() => setDownloadSuccess(false), 3000);
     } catch (err) {
-
-      const downloadUrl = getDownloadUrl(file.url);
+      const token = typeof localStorage !== 'undefined'
+        ? (localStorage.getItem('studyarena_token') || localStorage.getItem('token'))
+        : null;
+      let fallbackUrl = getDownloadUrl(file.url, originalName);
+      if (token && fallbackUrl.includes('/api/upload/download')) {
+        const separator = fallbackUrl.includes('?') ? '&' : '?';
+        fallbackUrl = `${fallbackUrl}${separator}token=${encodeURIComponent(token)}`;
+      }
       const link = document.createElement('a');
-      link.href = downloadUrl;
+      link.href = fallbackUrl;
       link.target = '_blank';
       link.download = originalName;
       document.body.appendChild(link);
