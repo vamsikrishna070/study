@@ -142,6 +142,10 @@ export default function Syllabus() {
         );
       }
     } catch (err) {
+      if (err.response?.status === 409 || err.response?.data?.inProgress) {
+        alert(err.response?.data?.message || 'Syllabus extraction is already in progress for this subject. Please wait a moment.');
+        return;
+      }
       const msg = getUserFriendlyError(err, 'syllabus_upload');
       setExtractionError(msg);
     } finally {
@@ -152,7 +156,7 @@ export default function Syllabus() {
   };
 
   const handleExtractExisting = async () => {
-    if (!currentSubject?.syllabusFile?.url || !effectiveSubjectId) return;
+    if (!currentSubject?.syllabusFile?.url || !effectiveSubjectId || extracting || uploadingPdf) return;
     setExtracting(true);
     setExtractionError(null);
     setExtractionStep('Extracting units & topics...');
@@ -168,6 +172,10 @@ export default function Syllabus() {
         alert('Could not detect structured units from this PDF. You can add units manually.');
       }
     } catch (err) {
+      if (err.response?.status === 409 || err.response?.data?.inProgress) {
+        alert(err.response?.data?.message || 'Syllabus extraction is already in progress for this subject. Please wait a moment.');
+        return;
+      }
       const msg =
         err.response?.data?.message ||
         'Could not extract the syllabus. Please make sure the PDF contains readable syllabus text.';

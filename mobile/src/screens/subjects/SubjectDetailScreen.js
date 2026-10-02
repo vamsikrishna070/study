@@ -198,12 +198,21 @@ const SubjectDetailScreen = ({ route, navigation }) => {
           setParsedUnits(parsed);
           setReviewModalVisible(true);
         } catch (extractErr) {
-          showDialog({
-            type: 'info',
-            title: 'Syllabus Uploaded',
-            message: 'Syllabus PDF was uploaded successfully. Text extraction could not detect units automatically, but you can view the PDF anytime.',
-            confirmText: 'Got It',
-          });
+          if (extractErr?.response?.status === 409 || extractErr?.response?.data?.inProgress) {
+            showDialog({
+              type: 'info',
+              title: 'Extraction in Progress',
+              message: extractErr?.response?.data?.message || 'Syllabus extraction is already in progress for this subject.',
+              confirmText: 'OK',
+            });
+          } else {
+            showDialog({
+              type: 'info',
+              title: 'Syllabus Uploaded',
+              message: 'Syllabus PDF was uploaded successfully. Text extraction could not detect units automatically, but you can view the PDF anytime.',
+              confirmText: 'Got It',
+            });
+          }
         } finally {
           setExtracting(false);
         }
@@ -219,7 +228,7 @@ const SubjectDetailScreen = ({ route, navigation }) => {
   };
 
   const handleExtractExisting = async () => {
-    if (!subject.syllabusFile?.url) return;
+    if (!subject.syllabusFile?.url || extracting || uploadingPdf) return;
     setExtracting(true);
     try {
       const extractRes = await extractSyllabus(
@@ -232,6 +241,15 @@ const SubjectDetailScreen = ({ route, navigation }) => {
       setParsedUnits(parsed);
       setReviewModalVisible(true);
     } catch (err) {
+      if (err?.response?.status === 409 || err?.response?.data?.inProgress) {
+        showDialog({
+          type: 'info',
+          title: 'Extraction in Progress',
+          message: err?.response?.data?.message || 'Syllabus extraction is already in progress for this subject.',
+          confirmText: 'OK',
+        });
+        return;
+      }
       showError(
         'Extraction Failed',
         err?.response?.data?.message || 'Could not extract syllabus units from this PDF.'

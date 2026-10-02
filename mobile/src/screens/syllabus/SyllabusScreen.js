@@ -128,8 +128,8 @@ const SyllabusScreen = ({ route, navigation }) => {
   const subjectColor = currentSubject?.color || colors.accent;
 
   const handleUploadAndExtract = async () => {
-    if (!subjectId) {
-      showError('Required Field', 'Please select a subject first.');
+    if (!subjectId || extracting || uploadingPdf) {
+      if (!subjectId) showError('Required Field', 'Please select a subject first.');
       return;
     }
 
@@ -182,6 +182,15 @@ const SyllabusScreen = ({ route, navigation }) => {
       }
       loadData();
     } catch (e) {
+      if (e?.response?.status === 409 || e?.response?.data?.inProgress) {
+        showDialog({
+          type: 'info',
+          title: 'Extraction in Progress',
+          message: e?.response?.data?.message || 'Syllabus extraction is already in progress for this subject.',
+          confirmText: 'OK',
+        });
+        return;
+      }
       showError('Extraction Failed', e?.response?.data?.message || e.message || 'Failed to extract syllabus.');
     } finally {
       setUploadingPdf(false);
@@ -190,7 +199,7 @@ const SyllabusScreen = ({ route, navigation }) => {
   };
 
   const handleExtractExisting = async () => {
-    if (!currentSubject?.syllabusFile?.url) return;
+    if (!currentSubject?.syllabusFile?.url || extracting || uploadingPdf) return;
     setExtracting(true);
     try {
       const res = await extractSyllabus(
@@ -222,6 +231,15 @@ const SyllabusScreen = ({ route, navigation }) => {
         });
       }
     } catch (err) {
+      if (err?.response?.status === 409 || err?.response?.data?.inProgress) {
+        showDialog({
+          type: 'info',
+          title: 'Extraction in Progress',
+          message: err?.response?.data?.message || 'Syllabus extraction is already in progress for this subject.',
+          confirmText: 'OK',
+        });
+        return;
+      }
       showError('Extraction Failed', err?.response?.data?.message || 'Failed to extract syllabus.');
     } finally {
       setExtracting(false);

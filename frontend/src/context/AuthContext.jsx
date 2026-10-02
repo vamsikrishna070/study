@@ -209,11 +209,55 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const getSessions = async () => {
+    try {
+      const { data } = await apiClient.get('/auth/sessions');
+      return data.success ? data.data : [];
+    } catch (error) {
+      console.error('[AuthContext] Failed to fetch active sessions:', error);
+      throw error;
+    }
+  };
+
+  const revokeSession = async (sessionId) => {
+    try {
+      const { data } = await apiClient.delete(`/auth/sessions/${sessionId}`);
+      return data;
+    } catch (error) {
+      console.error('[AuthContext] Failed to revoke session:', error);
+      throw error;
+    }
+  };
+
+  const revokeOtherSessions = async () => {
+    try {
+      const { data } = await apiClient.post('/auth/sessions/revoke-others');
+      return data;
+    } catch (error) {
+      console.error('[AuthContext] Failed to revoke other sessions:', error);
+      throw error;
+    }
+  };
+
+  const revokeAllSessions = async () => {
+    try {
+      await apiClient.post('/auth/sessions/revoke-all');
+    } catch (error) {
+      console.error('[AuthContext] Failed to revoke all sessions:', error);
+    }
+    localStorage.removeItem('studyarena_token');
+    localStorage.removeItem('studyarena_cached_user');
+    delete apiClient.defaults.headers.common['Authorization'];
+    setUser(null);
+    setIsAuthenticated(false);
+  };
+
   return (
     <AuthContext.Provider value={{
       user, isAuthenticated, isLoading,
       login, register, verifyEmail, resendOtp, forgotPassword, resetPassword,
-      logout, updateProfile, refreshUser: checkAuth
+      logout, updateProfile, refreshUser: checkAuth,
+      getSessions, revokeSession, revokeOtherSessions, revokeAllSessions
     }}>
       {children}
     </AuthContext.Provider>

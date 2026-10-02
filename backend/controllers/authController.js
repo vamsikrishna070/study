@@ -1,9 +1,40 @@
+import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 import User from '../models/User.js';
 import College from '../models/College.js';
+import Session from '../models/Session.js';
+import { env } from '../config/env.js';
 import { generateToken } from '../utils/generateToken.js';
 import { sendVerificationEmail, sendPasswordResetEmail } from '../services/emailService.js';
+import { parseClientInfo, hashSessionId } from '../utils/deviceHelper.js';
+
+export async function createSessionForUser(userId, req) {
+  const sessionId = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex');
+  const sessionHash = hashSessionId(sessionId);
+  const clientInfo = parseClientInfo(req);
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+
+  const session = await Session.create({
+    user: userId,
+    sessionId,
+    sessionHash,
+    deviceName: clientInfo.deviceName,
+    deviceType: clientInfo.deviceType,
+    platform: clientInfo.platform,
+    browser: clientInfo.browser,
+    os: clientInfo.os,
+    ipAddress: clientInfo.ipAddress,
+    createdAt: new Date(),
+    lastActiveAt: new Date(),
+    expiresAt,
+    isRevoked: false,
+  });
+
+  const token = generateToken(userId, sessionId);
+  return { session, token };
+}
 
 const publicUser = (user) => {
   const effectiveDisplayName = (user.displayName && user.displayName.trim())
@@ -126,7 +157,8 @@ export async function verifyEmail(req, res) {
   user.otpExpires = undefined;
   await user.save();
 
-  res.json({ success: true, data: { user: publicUser(user), token: generateToken(user._id) } });
+  const { token } = await createSessionForUser(user._id, req);
+  res.json({ success: true, data: { user: publicUser(user), token } });
 }
 
 export async function resendOtp(req, res) {
@@ -202,7 +234,8 @@ export async function login(req, res) {
   if (!user.isVerified) {
     return res.json({ success: false, message: 'Please verify your email before logging in', unverified: true });
   }
-  res.json({ success: true, data: { user: publicUser(user), token: generateToken(user._id) } });
+  const { token } = await createSessionForUser(user._id, req);
+  res.json({ success: true, data: { user: publicUser(user), token } });
 }
 
 export async function forgotPassword(req, res) {
@@ -250,7 +283,13 @@ export async function resetPassword(req, res) {
   user.resetPasswordExpires = undefined;
   await user.save();
 
-  res.json({ success: true, data: { user: publicUser(user), token: generateToken(user._id) } });
+  await Session.updateMany(
+    { user: user._id, isRevoked: false },
+    { isRevoked: true, revokedAt: new Date(), revokedReason: 'password_reset' }
+  );
+
+  const { token } = await createSessionForUser(user._id, req);
+  res.json({ success: true, data: { user: publicUser(user), token } });
 }
 
 export async function me(req, res) {
@@ -357,8 +396,118 @@ export async function updateProfile(req, res) {
   res.json({ success: true, data: publicUser(user) });
 }
 
-export function logout(_req, res) {
-  res.json({ success: true, data: null });
+export async function logout(req, res) {
+  try {
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith('Bearer ') && env.JWT_SECRET) {
+      try {
+        const decoded = jwt.verify(authHeader.slice(7), env.JWT_SECRET);
+        if (decoded.sessionId && decoded.userId) {
+          await Session.updateOne(
+            { sessionId: decoded.sessionId, user: decoded.userId },
+            { isRevoked: true, revokedAt: new Date(), revokedReason: 'user_logout' }
+          );
+        }
+      } catch (_) {}
+    } else if (req.session?.sessionId) {
+      await Session.updateOne(
+        { sessionId: req.session.sessionId, user: req.user._id },
+        { isRevoked: true, revokedAt: new Date(), revokedReason: 'user_logout' }
+      );
+    }
+  } catch (err) {
+    console.error('[AuthController] Logout session revocation error:', err.message);
+  }
+  res.json({ success: true, data: null, message: 'Logged out successfully' });
+}
+
+export async function getSessions(req, res) {
+  const currentSessionId = req.session?.sessionId;
+  const sessions = await Session.find({
+    user: req.user._id,
+    isRevoked: false,
+    expiresAt: { $gt: new Date() },
+  }).sort({ lastActiveAt: -1 }).lean();
+
+  const data = sessions.map((s) => ({
+    id: s.sessionId,
+    sessionId: s.sessionId,
+    deviceName: s.deviceName || 'Unknown Device',
+    deviceType: s.deviceType || 'unknown',
+    platform: s.platform || 'unknown',
+    browser: s.browser || 'Unknown Browser',
+    os: s.os || 'Unknown OS',
+    ipAddress: s.ipAddress || '',
+    createdAt: s.createdAt,
+    lastActiveAt: s.lastActiveAt,
+    isCurrent: Boolean(currentSessionId && s.sessionId === currentSessionId),
+  }));
+
+  res.json({ success: true, data });
+}
+
+export async function revokeSession(req, res) {
+  const { sessionId } = req.params;
+  if (!sessionId) {
+    return res.status(400).json({ success: false, message: 'Session ID is required' });
+  }
+
+  const session = await Session.findOne({ sessionId, user: req.user._id });
+  if (!session) {
+    return res.status(404).json({ success: false, message: 'Session not found or already removed' });
+  }
+
+  session.isRevoked = true;
+  session.revokedAt = new Date();
+  session.revokedReason = 'revoked_by_user';
+  await session.save();
+
+  const isCurrent = Boolean(req.session?.sessionId === sessionId);
+  res.json({
+    success: true,
+    message: isCurrent ? 'Current session revoked' : 'Remote session revoked successfully',
+    data: { isCurrent, sessionId },
+  });
+}
+
+export async function revokeOtherSessions(req, res) {
+  const currentSessionId = req.session?.sessionId;
+  const query = {
+    user: req.user._id,
+    isRevoked: false,
+  };
+  if (currentSessionId) {
+    query.sessionId = { $ne: currentSessionId };
+  }
+
+  const result = await Session.updateMany(query, {
+    isRevoked: true,
+    revokedAt: new Date(),
+    revokedReason: 'revoked_others',
+  });
+
+  res.json({
+    success: true,
+    message: 'All other sessions have been logged out',
+    data: { revokedCount: result.modifiedCount },
+  });
+}
+
+export async function revokeAllSessions(req, res) {
+  const result = await Session.updateMany(
+    { user: req.user._id, isRevoked: false },
+    {
+      isRevoked: true,
+      revokedAt: new Date(),
+      revokedReason: 'revoked_all',
+    }
+  );
+
+  res.json({
+    success: true,
+    message: 'All sessions have been logged out',
+    data: { revokedCount: result.modifiedCount },
+  });
 }
 
 function formatDateYYYYMMDD(date) {

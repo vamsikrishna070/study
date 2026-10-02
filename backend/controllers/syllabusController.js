@@ -15,13 +15,39 @@ class HttpError extends Error {
   }
 }
 
+const inFlightExtractions = new Set();
+
+export function isExtractionInProgress(userId, subjectId) {
+  return inFlightExtractions.has(`${userId}:${subjectId}`);
+}
+
+export function acquireExtractionLock(userId, subjectId) {
+  const key = `${userId}:${subjectId}`;
+  if (inFlightExtractions.has(key)) return null;
+  inFlightExtractions.add(key);
+  return () => inFlightExtractions.delete(key);
+}
+
+export function resetAllLocksForTesting() {
+  inFlightExtractions.clear();
+}
+
 export async function extractSyllabus(req, res) {
+  const subjectId = req.params.id;
+  const userId = req.user?._id?.toString();
+
+  const releaseLock = acquireExtractionLock(userId, subjectId);
+  if (!releaseLock) {
+    return res.status(409).json({
+      success: false,
+      message: 'Syllabus extraction is already in progress for this subject.',
+      inProgress: true,
+    });
+  }
+
+  console.info('[SyllabusExtract] Started', { subjectId, userId });
+
   try {
-    const subjectId = req.params.id;
-    const userId = req.user?._id?.toString();
-
-    console.info('[SyllabusExtract] Started', { subjectId, userId });
-
     const subject = await Subject.findOne({
       _id: subjectId,
       user: req.user._id,
@@ -147,6 +173,8 @@ export async function extractSyllabus(req, res) {
       success: false,
       message: 'Failed to extract syllabus due to an unexpected server error.',
     });
+  } finally {
+    releaseLock();
   }
 }
 
@@ -331,4 +359,3 @@ export async function updateSyllabusStructure(req, res) {
     res.status(500).json({ success: false, message: 'Failed to update syllabus' });
   }
 }
-

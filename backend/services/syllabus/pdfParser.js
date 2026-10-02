@@ -33,6 +33,8 @@ export async function parsePdfDocument(buffer, options = {}) {
     const rawPages = textResult?.pages || [];
     const totalPages = rawPages.length || 1;
 
+    console.info(`[PDFParser] Extracted text: ${totalPages} pages`);
+
     const assessments = rawPages.map((p, idx) => {
       const pageNum = p.pageNumber || (idx + 1);
       const text = p.text || '';
@@ -43,14 +45,12 @@ export async function parsePdfDocument(buffer, options = {}) {
       };
     });
 
-    const hasScannedPages = assessments.some((a) => a.assessment.needsOcr);
-
     for (let i = 0; i < assessments.length; i++) {
       const { pageNumber, rawText, assessment } = assessments[i];
       const shouldOcr = !options.disableOcr && assessment.needsOcr;
 
       if (shouldOcr) {
-        console.info(`[PDFParser] Page ${pageNumber} quality is ${assessment.quality} (scanned/hybrid: ${hasScannedPages}). Triggering OCR...`);
+        console.info(`[SyllabusExtract] OCR page ${pageNumber}`);
         try {
           const screenshots = await parser.getScreenshot({
             imageBuffer: true,
@@ -59,7 +59,7 @@ export async function parsePdfDocument(buffer, options = {}) {
           });
 
           const pageScreenshot = screenshots?.pages?.find((s) => s.pageNumber === pageNumber) || screenshots?.pages?.[0];
-          if (pageScreenshot && pageScreenshot.data) {
+          if (pageScreenshot?.data) {
             const ocrRes = await performOcr(pageScreenshot.data);
             const ocrCleanText = normalizeDocumentText(ocrRes.text);
 
@@ -81,7 +81,7 @@ export async function parsePdfDocument(buffer, options = {}) {
             }
           }
         } catch (ocrErr) {
-          console.warn(`[PDFParser] OCR attempt failed for page ${pageNumber}:`, ocrErr.message);
+          console.warn(`[PDFParser] OCR failed for page ${pageNumber}:`, ocrErr.message);
         }
       }
 

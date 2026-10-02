@@ -272,7 +272,7 @@ export default function SubjectDetail() {
   };
 
   const extractSyllabusFromPDF = async () => {
-    if (!subject.syllabusFile?.url) return;
+    if (!subject.syllabusFile?.url || extracting) return;
     setExtracting(true);
     try {
       const res = await apiClient.post(
@@ -280,6 +280,10 @@ export default function SubjectDetail() {
       );
       setParsedSyllabusData(res.data.data);
     } catch (err) {
+      if (err.response?.status === 409 || err.response?.data?.inProgress) {
+        alert(err.response?.data?.message || "Syllabus extraction is already in progress for this subject. Please wait.");
+        return;
+      }
       alert(err.response?.data?.message || "Failed to extract syllabus text.");
     } finally {
       setExtracting(false);

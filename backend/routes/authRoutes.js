@@ -1,5 +1,20 @@
 import { Router } from 'express';
-import { login, logout, me, register, updateProfile, verifyEmail, forgotPassword, resetPassword, resendOtp, recordActivity } from '../controllers/authController.js';
+import {
+  login,
+  logout,
+  me,
+  register,
+  updateProfile,
+  verifyEmail,
+  forgotPassword,
+  resetPassword,
+  resendOtp,
+  recordActivity,
+  getSessions,
+  revokeSession,
+  revokeOtherSessions,
+  revokeAllSessions,
+} from '../controllers/authController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { authLimiter, otpLimiter } from '../middleware/rateLimiter.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -15,4 +30,11 @@ router.get('/me', protect, asyncHandler(me));
 router.post('/activity', protect, asyncHandler(recordActivity));
 router.patch('/profile', protect, asyncHandler(updateProfile));
 router.post('/logout', logout);
+
+// Active Sessions management
+router.get('/sessions', protect, asyncHandler(getSessions));
+router.delete('/sessions/:sessionId', protect, asyncHandler(revokeSession));
+router.post('/sessions/revoke-others', protect, asyncHandler(revokeOtherSessions));
+router.post('/sessions/revoke-all', protect, asyncHandler(revokeAllSessions));
+
 export default router;

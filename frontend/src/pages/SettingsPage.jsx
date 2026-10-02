@@ -1,5 +1,24 @@
-import { useEffect, useState, useRef } from "react";
-import { Moon, Sun, Trophy, ToggleLeft, ToggleRight, Camera, Bell, BellOff, ShieldAlert, CheckCircle } from "lucide-react";
+import { useEffect, useState, useRef, useCallback } from "react";
+import {
+  Moon,
+  Sun,
+  Trophy,
+  ToggleLeft,
+  ToggleRight,
+  Camera,
+  Bell,
+  BellOff,
+  ShieldAlert,
+  CheckCircle,
+  Laptop,
+  Smartphone,
+  Tablet,
+  Globe,
+  LogOut,
+  RefreshCw,
+  ShieldCheck,
+  AlertCircle,
+} from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useSubscribePush, uploadFile } from "../services/apiHooks.js";
 import { useGetPortalStatus } from "../services/portalHooks.js";
@@ -30,9 +49,24 @@ export default function SettingsPage() {
   const [dark, setDark] = useState(
     () => localStorage.getItem("study-arena-theme") === "dark"
   );
-  const { user, logout, updateProfile } = useAuth();
+  const {
+    user,
+    logout,
+    updateProfile,
+    getSessions,
+    revokeSession,
+    revokeOtherSessions,
+    revokeAllSessions,
+  } = useAuth();
   const subscribePush = useSubscribePush();
   const fileInputRef = useRef(null);
+
+  const [sessions, setSessions] = useState([]);
+  const [loadingSessions, setLoadingSessions] = useState(true);
+  const [sessionActionLoading, setSessionActionLoading] = useState(false);
+  const [sessionActionTarget, setSessionActionTarget] = useState(null);
+  const [sessionStatusMessage, setSessionStatusMessage] = useState("");
+  const [confirmModal, setConfirmModal] = useState(null); // { type, sessionId, deviceName, title, message }
 
   const [form, setForm] = useState({
     displayName: user?.displayName || "",
@@ -106,6 +140,84 @@ export default function SettingsPage() {
 
     }
     setPushState("idle");
+  };
+
+  const loadSessions = useCallback(async () => {
+    try {
+      setLoadingSessions(true);
+      const data = await getSessions();
+      setSessions(data || []);
+    } catch (err) {
+      console.error("Failed to load active sessions:", err);
+    } finally {
+      setLoadingSessions(false);
+    }
+  }, [getSessions]);
+
+  useEffect(() => {
+    loadSessions();
+  }, [loadSessions]);
+
+  const handleExecuteModalAction = async () => {
+    if (!confirmModal) return;
+    const { type, sessionId } = confirmModal;
+    setSessionActionLoading(true);
+    setSessionActionTarget(sessionId || type);
+    try {
+      if (type === "revoke_single" && sessionId) {
+        await revokeSession(sessionId);
+        setSessionStatusMessage("Device successfully logged out.");
+        await loadSessions();
+      } else if (type === "revoke_others") {
+        const res = await revokeOtherSessions();
+        setSessionStatusMessage(
+          `Logged out of ${res.data?.revokedCount || "all other"} other device(s).`
+        );
+        await loadSessions();
+      } else if (type === "revoke_all") {
+        await revokeAllSessions();
+        return;
+      }
+      setTimeout(() => setSessionStatusMessage(""), 4000);
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to complete the requested action.");
+    } finally {
+      setSessionActionLoading(false);
+      setSessionActionTarget(null);
+      setConfirmModal(null);
+    }
+  };
+
+  const formatActivityTime = (dateStr) => {
+    if (!dateStr) return "Unknown";
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffSec = Math.floor((now - date) / 1000);
+
+    if (diffSec < 120) return "Active now";
+    if (diffSec < 3600) return `${Math.floor(diffSec / 60)} min ago`;
+    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)} hr ago`;
+    return date.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const getDeviceIcon = (platform, deviceType) => {
+    const p = String(platform || "").toLowerCase();
+    const d = String(deviceType || "").toLowerCase();
+    if (p === "ios" || p === "android" || d === "mobile") {
+      return <Smartphone size={18} className="text-accent" />;
+    }
+    if (d === "tablet") {
+      return <Tablet size={18} className="text-accent" />;
+    }
+    if (d === "desktop" || p === "web") {
+      return <Laptop size={18} className="text-accent" />;
+    }
+    return <Globe size={18} className="text-accent" />;
   };
 
   useEffect(() => {
@@ -545,10 +657,199 @@ export default function SettingsPage() {
               {renderPushSection()}
             </div>
           </section>
+          <section className="rounded-2xl border border-card-border bg-card p-6 sm:p-8">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-widest text-accent">
+                  Security & Devices
+                </p>
+                <h2 className="mt-1 font-display text-2xl">Active Sessions</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Manage devices and web browsers where your StudyArena account is currently active.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={loadSessions}
+                disabled={loadingSessions}
+                className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-background text-muted-foreground transition hover:border-accent hover:text-accent"
+                title="Refresh sessions"
+              >
+                <RefreshCw size={15} className={loadingSessions ? "animate-spin text-accent" : ""} />
+              </button>
+            </div>
+
+            {sessionStatusMessage && (
+              <div className="mt-4 flex items-center gap-2 rounded-xl border border-accent/20 bg-accent/10 px-4 py-3 text-xs font-semibold text-accent">
+                <CheckCircle size={15} />
+                <span>{sessionStatusMessage}</span>
+              </div>
+            )}
+
+            <div className="mt-6 space-y-4">
+              {loadingSessions && sessions.length === 0 ? (
+                <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
+                  <RefreshCw size={18} className="mr-2 animate-spin text-accent" />
+                  Loading active devices...
+                </div>
+              ) : (
+                <>
+                  {/* Current Session */}
+                  {sessions
+                    .filter((s) => s.isCurrent)
+                    .map((s) => (
+                      <div
+                        key={s.id || s.sessionId}
+                        className="rounded-xl border-2 border-accent/40 bg-accent/5 p-4 sm:p-5"
+                      >
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="flex items-start gap-3.5">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-accent/30 bg-background shadow-sm">
+                              {getDeviceIcon(s.platform, s.deviceType)}
+                            </div>
+                            <div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h3 className="text-sm font-bold text-foreground">
+                                  {s.deviceName || `${s.browser} on ${s.os}`}
+                                </h3>
+                                <span className="inline-flex items-center gap-1.5 rounded-full bg-accent/20 px-2.5 py-0.5 text-[10px] font-bold text-accent">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
+                                  CURRENT DEVICE
+                                </span>
+                              </div>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {s.browser} • {s.os}
+                                {s.ipAddress ? ` • IP: ${s.ipAddress}` : ""}
+                              </p>
+                              <p className="mt-1 text-[11px] text-muted-foreground/80">
+                                <span className="font-semibold text-accent">Active now</span>
+                                {s.createdAt
+                                  ? ` • Logged in ${new Date(s.createdAt).toLocaleDateString(undefined, {
+                                      month: "short",
+                                      day: "numeric",
+                                      year: "numeric",
+                                    })}`
+                                  : ""}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center sm:self-center">
+                            <Button
+                              variant="danger"
+                              onClick={logout}
+                              className="w-full sm:w-auto text-xs"
+                            >
+                              Log out this device
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                  {/* Other Sessions */}
+                  <div className="pt-2">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                      Other Active Devices
+                    </h3>
+
+                    {sessions.filter((s) => !s.isCurrent).length === 0 ? (
+                      <div className="mt-3 rounded-xl border border-dashed border-border bg-background/50 p-5 text-center text-xs text-muted-foreground">
+                        <ShieldCheck size={24} className="mx-auto mb-2 text-accent/60" />
+                        No other active sessions. Your account is only signed in on this device.
+                      </div>
+                    ) : (
+                      <div className="mt-3 space-y-3">
+                        {sessions
+                          .filter((s) => !s.isCurrent)
+                          .map((s) => (
+                            <div
+                              key={s.id || s.sessionId}
+                              className="flex flex-col gap-3 rounded-xl border border-border bg-background p-4 sm:flex-row sm:items-center sm:justify-between"
+                            >
+                              <div className="flex items-start gap-3.5">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-card shadow-sm">
+                                  {getDeviceIcon(s.platform, s.deviceType)}
+                                </div>
+                                <div>
+                                  <h4 className="text-sm font-bold text-foreground">
+                                    {s.deviceName || `${s.browser} on ${s.os}`}
+                                  </h4>
+                                  <p className="mt-0.5 text-xs text-muted-foreground">
+                                    {s.browser} • {s.os}
+                                    {s.ipAddress ? ` • IP: ${s.ipAddress}` : ""}
+                                  </p>
+                                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                                    Last active: {formatActivityTime(s.lastActiveAt)}
+                                  </p>
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                disabled={sessionActionLoading && sessionActionTarget === s.id}
+                                onClick={() =>
+                                  setConfirmModal({
+                                    type: "revoke_single",
+                                    sessionId: s.id || s.sessionId,
+                                    deviceName: s.deviceName || `${s.browser} on ${s.os}`,
+                                    title: "Log Out Device",
+                                    message: `Are you sure you want to log out "${s.deviceName || s.browser}"? This device will be signed out immediately and required to log in again.`,
+                                  })
+                                }
+                                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-1.5 text-xs font-semibold text-destructive transition hover:bg-destructive hover:text-white disabled:opacity-50"
+                              >
+                                <LogOut size={13} />
+                                {sessionActionLoading && sessionActionTarget === s.id
+                                  ? "Logging out..."
+                                  : "Log out"}
+                              </button>
+                            </div>
+                          ))}
+
+                        <div className="flex flex-wrap gap-3 pt-3">
+                          <Button
+                            variant="secondary"
+                            onClick={() =>
+                              setConfirmModal({
+                                type: "revoke_others",
+                                title: "Log Out All Other Devices",
+                                message:
+                                  "Are you sure you want to log out all other active sessions? Only this current device will stay logged in.",
+                              })
+                            }
+                            disabled={sessionActionLoading}
+                            className="text-xs"
+                          >
+                            Log out other devices
+                          </Button>
+                          <Button
+                            variant="danger"
+                            onClick={() =>
+                              setConfirmModal({
+                                type: "revoke_all",
+                                title: "Log Out All Devices",
+                                message:
+                                  "Are you sure you want to log out of ALL devices, including this one? You will be redirected to the login screen.",
+                              })
+                            }
+                            disabled={sessionActionLoading}
+                            className="text-xs"
+                          >
+                            Log out all devices
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </section>
+
+          {/* Account Quick Logout */}
           <section className="rounded-2xl border border-destructive/20 bg-destructive/5 p-6 sm:p-8">
             <h2 className="font-display text-2xl text-destructive">Account</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Log out of your current session.
+              Log out of your current session on this device.
             </p>
             <div className="mt-6">
               <Button variant="danger" onClick={logout}>
@@ -556,6 +857,37 @@ export default function SettingsPage() {
               </Button>
             </div>
           </section>
+
+          {/* Confirmation Modal */}
+          {confirmModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+              <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl animate-in fade-in zoom-in-95">
+                <div className="flex items-center gap-3 text-destructive">
+                  <AlertCircle size={22} />
+                  <h3 className="font-display text-lg text-foreground">{confirmModal.title}</h3>
+                </div>
+                <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
+                  {confirmModal.message}
+                </p>
+                <div className="mt-6 flex items-center justify-end gap-3">
+                  <Button
+                    variant="secondary"
+                    onClick={() => setConfirmModal(null)}
+                    disabled={sessionActionLoading}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="danger"
+                    onClick={handleExecuteModalAction}
+                    disabled={sessionActionLoading}
+                  >
+                    {sessionActionLoading ? "Processing..." : "Confirm Log Out"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
         <aside className="h-fit rounded-2xl border border-accent/20 bg-accent/10 p-6">
           <Trophy size={20} className="text-accent" />
